@@ -1,0 +1,34 @@
+<launch>
+
+  <group ns="$(arg veh)">  <!-- Sets [n]ame[s]pace -->
+    <node
+        pkg="heartbeat_package"
+        type="heartbeat_publisher_node.py"
+        name="heartbeat_publisher"
+        output="screen"/>
+
+    <node
+        pkg="heartbeat_package"
+        type="heartbeat_publisher_node.py"
+        name="heartbeat_publisher_alt"
+        output="screen"/>
+
+    <!-- This version doesn't work, since it's not a relative private namespace
+    <remap from="~heartbeat_subscriber/chatter" to="heartbeat_publisher/heartbeat" />
+    -->
+    <remap from="heartbeat_subscriber/chatter" to="heartbeat_publisher/heartbeat" />
+    <node
+        pkg="heartbeat_package"
+        type="heartbeat_subscriber_node.py"
+        name="heartbeat_subscriber"
+        output="screen"/>
+
+    <node pkg="heartbeat_package"
+        type="heartbeat_subscriber_node.py"
+        name="heartbeat_subscriber_alt"
+        output="screen">
+      <remap from="~/chatter" to="heartbeat_publisher_alt/heartbeat" />
+    </node>
+  </group>
+
+</launch>
