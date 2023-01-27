@@ -1,0 +1,18 @@
+# vim: set ft=yaml.docker-compose:
+version: "3"
+services:
+  duckduckgoose:
+    build: .
+    network_mode: host
+    stdin_open: true
+    tty: true
+    privileged: true
+    environment:
+      ROS_MASTER_URI: "http://192.168.1.10:11311"
+      ROS_IP: "192.168.1.18"
+    volumes:
+      - type: bind
+        source: /home/emiliko
+        target: /media/duckie_time
+
+#docker run -it --rm --net host duckietown/dt-ros-commons:daffy /bin/bash
