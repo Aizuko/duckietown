@@ -4,6 +4,7 @@ import os
 import rospy
 from duckietown.dtros import DTROS, NodeType
 from sensor_msgs.msg import CameraInfo
+from sensor_msgs.msg import CompressedImage
 from std_msgs.msg import String
 
 hostname = os.environ['VEHICLE_NAME']
@@ -13,8 +14,8 @@ class MySubscriberNode(DTROS):
         # initialize the DTROS parent class
         super(MySubscriberNode, self).__init__(node_name=node_name, node_type=NodeType.GENERIC)
         # construct publisher
-        self.sub = rospy.Subscriber(
-            f'~path_to/camera_info', CameraInfo, self.callback)
+        #self.sub = rospy.Subscriber(f'~path_to/camera_info', CameraInfo, self.callback)
+        self.sub = rospy.Subscriber(f'~path_to/camera_compressed', CompressedImage, self.callback)
 
     def callback(self, data):
         rospy.loginfo("Saw an image's information?")
@@ -22,6 +23,6 @@ class MySubscriberNode(DTROS):
 
 if __name__ == '__main__':
     # create the node
-    node = MySubscriberNode(node_name='my_camera_subscriber_node')
+    node = MySubscriberNode(node_name='compressed')
     # keep spinning
     rospy.spin()

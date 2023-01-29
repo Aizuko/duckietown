@@ -1,10 +1,13 @@
 <launch>
 
-  <node pkg="camera_demo_node"
-      type="my_camera_subscriber_node.py"
-      name="my_camera_subscriber_node"
-      output="screen">
-    <remap from="~path_to/camera_info" to="/$(arg veh)/camera_node/camera_info" />
-  </node>
+  <group ns="$(arg veh)/camera_mod">  <!-- Sets [n]ame[s]pace -->
+    <node pkg="camera_demo_node"
+        type="my_camera_subscriber_node.py"
+        name="compressed"
+        output="screen">
+      <remap from="~path_to/camera_info" to="/$(arg veh)/camera_node/camera_info" />
+      <remap from="~path_to/camera_compressed" to="/$(arg veh)/camera_node/image/compressed" />
+    </node>
+  </group>
 
 </launch>
