@@ -1,0 +1,10 @@
+<launch>
+
+  <node pkg="camera_demo_node"
+      type="my_camera_subscriber_node.py"
+      name="my_camera_subscriber_node"
+      output="screen">
+    <remap from="~path_to/camera_info" to="/$(arg veh)/camera_node/camera_info" />
+  </node>
+
+</launch>
