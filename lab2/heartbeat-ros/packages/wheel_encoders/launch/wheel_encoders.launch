@@ -1,0 +1,11 @@
+<launch>
+
+  <group ns="$(arg veh)/custom_wheels">  <!-- Sets [n]ame[s]pace -->
+    <node pkg="wheel_encoders"
+        type="custom_wheel_node.py"
+        name="custom_wheel_node"
+        output="screen">
+    </node>
+  </group>
+
+</launch>
