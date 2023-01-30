@@ -13,13 +13,36 @@ class MySubscriberNode(DTROS):
     def __init__(self, node_name):
         # initialize the DTROS parent class
         super(MySubscriberNode, self).__init__(node_name=node_name, node_type=NodeType.GENERIC)
-        # construct publisher
-        #self.sub = rospy.Subscriber(f'~path_to/camera_info', CameraInfo, self.callback)
-        self.sub = rospy.Subscriber(f'~path_to/camera_compressed', CompressedImage, self.callback)
 
-    def callback(self, data):
-        rospy.loginfo("Saw an image's information?")
-        #rospy.loginfo(f"Saw an image of type {type(data.data)}")
+        self.pub_info = rospy.Publisher(
+            '~path_to/published_image_info',
+            String,
+            queue_size=2,
+        )
+        self.pub_comp = rospy.Publisher(
+            '~path_to/published_compressed',
+            CompressedImage,
+            queue_size=2,
+        )
+        self.sub_info = rospy.Subscriber(
+            f'~path_to/camera_info',
+            CameraInfo,
+            self.callback_info,
+        )
+        self.sub_comp = rospy.Subscriber(
+            f'~path_to/camera_compressed',
+            CompressedImage,
+            self.callback_image,
+        )
+
+    def callback_info(self, img_info):
+        img_dims = f"{img_info.height}x{img_info.width}"
+        rospy.loginfo(f"Image size: {img_dims}")
+        self.pub_info.publish(img_dims)
+
+    def callback_image(self, compressed):
+        rospy.loginfo("Republishing image")
+        self.pub_comp.publish(compressed)
 
 if __name__ == '__main__':
     # create the node

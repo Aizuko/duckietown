@@ -18,7 +18,8 @@ dt-launchfile-init
 #sleep 5
 #dt-exec rosrun my_package my_publisher_node.py
 #dt-exec rosrun my_package my_subscriber_node.py
-roslaunch heartbeat_package heartbeat.launch veh:=$VEHICLE_NAME
+#roslaunch heartbeat_package heartbeat.launch veh:=$VEHICLE_NAME
+roslaunch camera_demo_node camera.launch veh:=$VEHICLE_NAME
 
 # ----------------------------------------------------------------------------
 # YOUR CODE ABOVE THIS LINE

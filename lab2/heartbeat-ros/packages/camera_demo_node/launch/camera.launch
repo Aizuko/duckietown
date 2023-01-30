@@ -7,6 +7,8 @@
         output="screen">
       <remap from="~path_to/camera_info" to="/$(arg veh)/camera_node/camera_info" />
       <remap from="~path_to/camera_compressed" to="/$(arg veh)/camera_node/image/compressed" />
+      <remap from="~path_to/published_image_info" to="~/camera_info" />
+      <remap from="~path_to/published_compressed" to="~/compressed" />
     </node>
   </group>
 
