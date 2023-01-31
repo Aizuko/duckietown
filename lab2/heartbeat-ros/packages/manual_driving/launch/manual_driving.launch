@@ -1,0 +1,13 @@
+<launch>
+
+  <group ns="$(arg veh)/manual_driving">  <!-- Sets [n]ame[s]pace -->
+    <node pkg="manual_driving"
+        type="manual_driving_node.py"
+        name="manual_driving_node"
+        output="screen">
+      <remap from="~path_to/wheels_cmd_executed" to="/$(arg veh)/wheels_driver_node/wheels_cmd_executed" />
+      <remap from="~path_to/wheels_cmd" to="/$(arg veh)/wheels_driver_node/wheels_cmd" />
+    </node>
+  </group>
+
+</launch>
