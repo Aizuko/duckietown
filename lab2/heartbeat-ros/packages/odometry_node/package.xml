@@ -1,0 +1,11 @@
+<package>
+  <name>odometry_node</name>
+  <version>0.1.0</version>
+  <description>
+    Drives a bot a very specific distance
+  </description>
+  <maintainer email="akemi.izuko@ualberta.ca">Akemi Izuko</maintainer>
+  <license>GPL3</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+</package>
