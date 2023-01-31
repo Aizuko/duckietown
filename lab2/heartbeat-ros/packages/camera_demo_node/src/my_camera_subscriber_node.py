@@ -2,6 +2,8 @@
 
 import os
 import rospy
+import cv2
+import numpy as np
 from duckietown.dtros import DTROS, NodeType
 from sensor_msgs.msg import CameraInfo
 from sensor_msgs.msg import CompressedImage
@@ -41,7 +43,13 @@ class MySubscriberNode(DTROS):
         self.pub_info.publish(img_dims)
 
     def callback_image(self, compressed):
-        rospy.loginfo("Republishing image")
+        raw_bytes = np.frombuffer(compressed.data, dtype=np.uint8)
+
+        cv_img = cv2.imdecode(raw_bytes, cv2.IMREAD_COLOR)
+        mono_cv_img = cv2.cvtColor(cv_img, cv2.COLOR_BGR2GRAY)
+        mono_raw = cv2.imencode('.jpeg', mono_cv_img)[1].tobytes()
+
+        compressed.data = mono_raw
         self.pub_comp.publish(compressed)
 
 if __name__ == '__main__':
