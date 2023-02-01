@@ -97,7 +97,7 @@ class OdometryPublisherNode(DTROS):
             self.wheels[wheel]["velocity"] = velocity
             self.wheels[wheel]["direction"] = 1 if velocity >= 0 else -1
 
-    def publish(self):
+    def run(self):
         rate = rospy.Rate(30)
         while not rospy.is_shutdown():
             for name, wheel in self.wheel_names.items():
@@ -111,5 +111,6 @@ class OdometryPublisherNode(DTROS):
 
 if __name__ == '__main__':
     node = OdometryPublisherNode(node_name='odometry_publisher_node')
+    node.run()
     rospy.spin()
     #node.bag.close()
