@@ -8,7 +8,7 @@ from sensor_msgs.msg import CameraInfo
 from sensor_msgs.msg import CompressedImage
 from std_msgs.msg import String, Header, Float32
 
-FORWARD_DIST = 1  # Measured in meters
+FORWARD_DIST = 1.0  # Measured in meters
 FORWARD_SPEED = 0.3
 
 hostname = os.environ['VEHICLE_NAME']
@@ -40,19 +40,20 @@ class OdometryDriverNode(DTROS):
         )
 
         self.sub_right = rospy.Subscriber(
-            f'~right_wheel_integrated_distance',
+            f'right_wheel_integrated_distance',
             Float32,
             lambda dist: self.dist_callback('right', dist)
         )
         self.sub_left = rospy.Subscriber(
-            f'~left_wheel_integrated_distance',
+            f'left_wheel_integrated_distance',
             Float32,
             lambda dist: self.dist_callback('left', dist)
         )
 
     def dist_callback(self, wheel, dist):
-        self.distances[wheel] += dist
-        rospy.loginfo(f"{wheel} wheel has traveled {dist}cm")
+        m = dist.data
+        self.distances[wheel] = m
+        rospy.loginfo(f"{wheel} wheel traveled {m}m this, for a total of {self.distances[wheel]}")
 
     def run(self, rate=0.5):
         rate = rospy.Rate(rate)  # Measured in Hz

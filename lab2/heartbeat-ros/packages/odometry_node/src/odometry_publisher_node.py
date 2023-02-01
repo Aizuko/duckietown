@@ -55,13 +55,13 @@ class OdometryPublisherNode(DTROS):
                     lambda msg, wheel=wheel: self.cb_encoder_data(wheel, msg)
                 ),
                 "pub_integrated_distance": rospy.Publisher(
-                    f'~{wheel}_wheel_integrated_distance',
+                    f'{wheel}_wheel_integrated_distance',
                     Float32,
                     queue_size=10
                 ),
                 "distance": 0,
                 "direction": 1,
-                "ticks": 0,
+                "ticks": -1,
                 "velocity": 0
             }
         self.sub_executed_commands = rospy.Subscriber(
@@ -75,6 +75,10 @@ class OdometryPublisherNode(DTROS):
         Update encoder distance information from ticks.
         """
         #self.bag.write(f'/{hostname}/{wheel}_wheel_encoder/tick', msg)
+        if self.wheels[wheel]["ticks"] == -1:
+            self.wheels[wheel]["ticks"] = msg.data
+            rospy.loginfo(f"Init {wheel:5} wheel to {self.wheels[wheel]['ticks']}")
+            return
 
         self.wheels[wheel]["distance"] += (
             self.wheels[wheel]["direction"] * 2 * np.pi * self._radius
@@ -82,6 +86,7 @@ class OdometryPublisherNode(DTROS):
         )
         self.wheels[wheel]["ticks"] = msg.data
         self.wheels[wheel]["pub_integrated_distance"].publish(self.wheels[wheel]["distance"])
+        rospy.loginfo(f"Pub: {wheel:5} wheel direction: {self.wheels[wheel]['direction']}, distance: {self.wheels[wheel]['distance']} m")
 
     def cb_executed_commands(self, msg):
         """
@@ -91,9 +96,7 @@ class OdometryPublisherNode(DTROS):
         for wheel in self.wheels:
             velocity = getattr(msg, f"vel_{wheel}")
             self.wheels[wheel]["velocity"] = velocity
-            self.wheels[wheel]["direction"] = 1 if velocity > 0 else -1
-            rospy.loginfo(f"{wheel:5} wheel direction: {self.wheels[wheel]['direction']}")
-            rospy.loginfo(f"{wheel:5} wheel distance: {self.wheels[wheel]['distance']} m")
+            self.wheels[wheel]["direction"] = 1 if velocity >= 0 else -1
 
 
 if __name__ == '__main__':

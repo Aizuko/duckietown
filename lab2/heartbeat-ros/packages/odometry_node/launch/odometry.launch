@@ -1,17 +1,19 @@
 <launch>
 
-  <group ns="$(arg veh)/manual_driving">  <!-- Sets [n]ame[s]pace -->
+  <group ns="$(arg veh)/odometry_driving">  <!-- Sets [n]ame[s]pace -->
     <node pkg="odometry_node"
         type="odometry_publisher_node.py"
         name="odometry_publisher_node"
         output="screen">
     </node>
 
+    <!--
     <node pkg="odometry_node"
         type="odometry_driver_node.py"
         name="odometry_driver_node"
         output="screen">
     </node>
+    -->
   </group>
 
 </launch>
