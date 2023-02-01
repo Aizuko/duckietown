@@ -47,8 +47,7 @@ class OdometryPublisherNode(DTROS):
         self.sub_encoder_ticks = {}
         self.pub_integrated_distance = {}
         self.wheels = {}
-        self.wheel_names = ['left', 'right']
-        for wheel in self.wheel_names:
+        for wheel in ['left', 'right']:
             self.wheels[wheel] = {
                 "sub_encoder_ticks": rospy.Subscriber(
                     f'/{hostname}/{wheel}_wheel_encoder_node/tick',
@@ -100,7 +99,7 @@ class OdometryPublisherNode(DTROS):
     def run(self):
         rate = rospy.Rate(30)
         while not rospy.is_shutdown():
-            for name, wheel in self.wheel_names.items():
+            for name, wheel in self.wheels.items():
                 rospy.loginfo(
                     f"Pub: {name:5} wheel direction: "
                     f"{wheel['direction']}, "
