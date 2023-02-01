@@ -8,7 +8,7 @@ from sensor_msgs.msg import CameraInfo
 from sensor_msgs.msg import CompressedImage
 from std_msgs.msg import String, Header, Float32
 
-FORWARD_DIST = 25  # Measured in centimeters
+FORWARD_DIST = 1  # Measured in meters
 FORWARD_SPEED = 0.3
 
 hostname = os.environ['VEHICLE_NAME']
@@ -60,7 +60,7 @@ class OdometryDriverNode(DTROS):
         rospy.loginfo("Starting forward movement")
 
         while (self.distances['left'] < FORWARD_DIST
-               or self.distances['right'] < FORWARD_DIST):
+               and self.distances['right'] < FORWARD_DIST):
             self.publish_speed(FORWARD_SPEED)
             rate.sleep()
             self.publish_speed(0.0)
@@ -77,7 +77,7 @@ class OdometryDriverNode(DTROS):
 
         self.publish_speed(0.0)
 
-    def publish_speed(velocity: float):
+    def publish_speed(self, velocity: float):
         cmd = WheelsCmdStamped()
         cmd.vel_left = velocity
         cmd.vel_right = velocity
@@ -87,6 +87,14 @@ class OdometryDriverNode(DTROS):
 if __name__ == '__main__':
     # create the node
     node = OdometryDriverNode(node_name='odometry_driver_node')
+
+    def emergency_halt():
+        node.publish_speed(0.0)
+        rospy.loginfo("Sent emergency stop")
+
+    rospy.on_shutdown(emergency_halt)  # Stop on crash
+
     node.run()
     # keep spinning
-    rospy.spin()
+    #rospy.spin()  # Probably don't need?
+    rospy.loginfo("Finished driving. Ready to exit")
