@@ -47,7 +47,8 @@ class OdometryPublisherNode(DTROS):
         self.sub_encoder_ticks = {}
         self.pub_integrated_distance = {}
         self.wheels = {}
-        for wheel in ["left", "right"]:
+        self.wheel_names = ['left', 'right']
+        for wheel in self.wheel_names:
             self.wheels[wheel] = {
                 "sub_encoder_ticks": rospy.Subscriber(
                     f'/{hostname}/{wheel}_wheel_encoder_node/tick',
@@ -85,8 +86,6 @@ class OdometryPublisherNode(DTROS):
             * (msg.data - self.wheels[wheel]["ticks"]) / msg.resolution
         )
         self.wheels[wheel]["ticks"] = msg.data
-        self.wheels[wheel]["pub_integrated_distance"].publish(self.wheels[wheel]["distance"])
-        rospy.loginfo(f"Pub: {wheel:5} wheel direction: {self.wheels[wheel]['direction']}, distance: {self.wheels[wheel]['distance']} m")
 
     def cb_executed_commands(self, msg):
         """
@@ -98,6 +97,17 @@ class OdometryPublisherNode(DTROS):
             self.wheels[wheel]["velocity"] = velocity
             self.wheels[wheel]["direction"] = 1 if velocity >= 0 else -1
 
+    def publish(self):
+        rate = rospy.Rate(30)
+        while not rospy.is_shutdown():
+            for name, wheel in self.wheel_names.items():
+                rospy.loginfo(
+                    f"Pub: {name:5} wheel direction: "
+                    f"{wheel['direction']}, "
+                    f"distance: {wheel['distance']} m"
+                )
+                wheel["pub_integrated_distance"].publish(wheel["distance"])
+            rate.sleep()
 
 if __name__ == '__main__':
     node = OdometryPublisherNode(node_name='odometry_publisher_node')
