@@ -1,0 +1,11 @@
+<package>
+  <name>led_controls</name>
+  <version>0.1.0</version>
+  <description>
+    Controls the color of the leds
+  </description>
+  <maintainer email="akemi.izuko@ualberta.ca">Akemi Izuko</maintainer>
+  <license>GPL3</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+</package>
