@@ -7,13 +7,11 @@
         output="screen">
     </node>
 
-    <!--
     <node pkg="odometry_node"
         type="odometry_driver_node.py"
         name="odometry_driver_node"
         output="screen">
     </node>
-    -->
   </group>
 
 </launch>

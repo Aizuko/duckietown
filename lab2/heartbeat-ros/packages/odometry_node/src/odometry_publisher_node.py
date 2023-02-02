@@ -34,9 +34,9 @@ class OdometryPublisherNode(DTROS):
             node_name=node_name, node_type=NodeType.PERCEPTION
         )
 
-        #bag_name = time.ctime().replace(' ', '_').replace(':', '-')
-        #self.bag = rosbag.Bag(f'/data/bags/odometry_at_{bag_name}.bag', 'w')
-        #rospy.loginfo(f"Made a bag {self.bag}")
+        bag_name = time.ctime().replace(' ', '_').replace(':', '-')
+        self.bag = rosbag.Bag(f'/data/bags/odometry_at_{bag_name}.bag', 'w')
+        rospy.loginfo(f"Made a bag {self.bag}")
 
         # Get static parameters
         self._radius = rospy.get_param(
@@ -57,7 +57,7 @@ class OdometryPublisherNode(DTROS):
                 "pub_integrated_distance": rospy.Publisher(
                     f'{wheel}_wheel_integrated_distance',
                     Float32,
-                    queue_size=10
+                    queue_size=1
                 ),
                 "distance": 0,
                 "direction": 1,
@@ -74,7 +74,7 @@ class OdometryPublisherNode(DTROS):
         """
         Update encoder distance information from ticks.
         """
-        #self.bag.write(f'/{hostname}/{wheel}_wheel_encoder/tick', msg)
+        self.bag.write(f'/{hostname}/{wheel}_wheel_encoder/tick', msg)
         if self.wheels[wheel]["ticks"] == -1:
             self.wheels[wheel]["ticks"] = msg.data
             rospy.loginfo(f"Init {wheel:5} wheel to {self.wheels[wheel]['ticks']}")
@@ -90,7 +90,7 @@ class OdometryPublisherNode(DTROS):
         """
         Use the executed commands to determine the direction of travel of each wheel.
         """
-        #self.bag.write(f'/{hostname}/wheels_cmd_executed', msg)
+        self.bag.write(f'/{hostname}/wheels_cmd_executed', msg)
         for wheel in self.wheels:
             velocity = getattr(msg, f"vel_{wheel}")
             self.wheels[wheel]["velocity"] = velocity
@@ -100,11 +100,13 @@ class OdometryPublisherNode(DTROS):
         rate = rospy.Rate(30)
         while not rospy.is_shutdown():
             for name, wheel in self.wheels.items():
+                """
                 rospy.loginfo(
                     f"Pub: {name:5} wheel direction: "
                     f"{wheel['direction']}, "
                     f"distance: {wheel['distance']} m"
                 )
+                """
                 wheel["pub_integrated_distance"].publish(wheel["distance"])
             rate.sleep()
 
@@ -112,4 +114,4 @@ if __name__ == '__main__':
     node = OdometryPublisherNode(node_name='odometry_publisher_node')
     node.run()
     rospy.spin()
-    #node.bag.close()
+    node.bag.close()

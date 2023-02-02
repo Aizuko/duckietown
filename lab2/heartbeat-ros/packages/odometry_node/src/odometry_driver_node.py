@@ -35,27 +35,29 @@ class OdometryDriverNode(DTROS):
         self.pub_move = rospy.Publisher(
             f'/{hostname}/wheels_driver_node/wheels_cmd',
             WheelsCmdStamped,
-            queue_size=10,
+            queue_size=1,
             dt_topic_type=TopicType.DRIVER,
         )
 
         self.sub_right = rospy.Subscriber(
             f'right_wheel_integrated_distance',
             Float32,
-            lambda dist: self.dist_callback('right', dist)
+            lambda dist: self.dist_callback('right', dist),
+            queue_size=1,
         )
         self.sub_left = rospy.Subscriber(
             f'left_wheel_integrated_distance',
             Float32,
-            lambda dist: self.dist_callback('left', dist)
+            lambda dist: self.dist_callback('left', dist),
+            queue_size=1,
         )
 
     def dist_callback(self, wheel, dist):
         m = dist.data
         self.distances[wheel] = m
-        rospy.loginfo(f"{wheel} wheel traveled {m}m this, for a total of {self.distances[wheel]}")
+        rospy.loginfo(f"{wheel} wheel traveled {m}m change, for a total of {self.distances[wheel]}")
 
-    def run(self, rate=0.5):
+    def run(self, rate=10):
         rate = rospy.Rate(rate)  # Measured in Hz
 
         rospy.loginfo("Starting forward movement")
@@ -64,15 +66,15 @@ class OdometryDriverNode(DTROS):
                and self.distances['right'] < FORWARD_DIST):
             self.publish_speed(FORWARD_SPEED)
             rate.sleep()
-            self.publish_speed(0.0)
+            #self.publish_speed(0.0)
 
         rospy.loginfo("Starting reverse movement")
 
         while (self.distances['left'] < 2*FORWARD_DIST
                or self.distances['right'] < 2*FORWARD_DIST):
             self.publish_speed(-FORWARD_SPEED)
-            rate.sleep()
-            self.publish_speed(0.0)
+            #rate.sleep()
+            #self.publish_speed(0.0)
 
         rospy.loginfo("Finished movement, setting velocities to 0")
 
