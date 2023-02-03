@@ -31,6 +31,7 @@ class OdometryPublisherNode(DTROS):
             Cumulative tick count on the right wheel. Reverse substracts
         /{hostname}/left_wheel_encoder_node/tick (WheelEncoderStamped):
             Cumulative tick count on the left wheel. Reverse substracts
+        /{hostname}/wheels_driver_node/wheels_cmd_executed (WheelsCmdStamped)
     """
     def __init__(self, node_name):
         # Initialize the DTROS parent class
@@ -46,11 +47,11 @@ class OdometryPublisherNode(DTROS):
 
         # Get static parameters
         self._radius = rospy.get_param(
-            f'/{hostname}/kinematics_node/radius', 100
+            f'/{hostname}/kinematics_node/radius', 0.025
         )
+        self._length = 0.05
 
         self.wheels = {}
-        self.kR = np.zeros((3,))
         self.kW = np.array([
             0.32,
             0.32,
@@ -71,7 +72,7 @@ class OdometryPublisherNode(DTROS):
                 "distance": 0,
                 "d": 0,
                 "direction": 1,
-                "ticks": -1,
+                "ticks": None,
                 "velocity": 0
             }
         self.sub_executed_commands = rospy.Subscriber(
@@ -85,25 +86,25 @@ class OdometryPublisherNode(DTROS):
             queue_size=1
         )
 
-    def cb_encoder_data(self, wheel, msg):
+    def cb_encoder_data(self, name, msg):
         """
         Update encoder distance information from ticks.
         """
-        self.bag.write(f'/{hostname}/{wheel}_wheel_encoder/tick', msg)
-        if self.wheels[wheel]["ticks"] == -1:
-            self.wheels[wheel]["ticks"] = msg.data
-            rospy.loginfo(f"Init {wheel:5} wheel to {self.wheels[wheel]['ticks']}")
+        self.bag.write(f'/{hostname}/{name}_wheel_encoder/tick', msg)
+        if self.wheels[name]["ticks"] is None:
+            self.wheels[name]["ticks"] = msg.data
+            rospy.loginfo(f"Init {name:5} wheel to {self.wheels[name]['ticks']}")
             return
 
-        self.wheels[wheel]["distance"] += (
-            self.wheels[wheel]["direction"] * 2 * np.pi * self._radius
-            * (msg.data - self.wheels[wheel]["ticks"]) / msg.resolution
+        self.wheels[name]["distance"] += (
+            self.wheels[name]["direction"] * 2 * np.pi * self._radius
+            * (msg.data - self.wheels[name]["ticks"]) / msg.resolution
         )
-        self.wheels[wheel]["d"] += (
+        self.wheels[name]["d"] += (
             2 * np.pi * self._radius
-            * (msg.data - self.wheels[wheel]["ticks"]) / msg.resolution
+            * (msg.data - self.wheels[name]["ticks"]) / msg.resolution
         )
-        self.wheels[wheel]["ticks"] = msg.data
+        self.wheels[name]["ticks"] = msg.data
 
     def cb_executed_commands(self, msg):
         """
@@ -121,20 +122,19 @@ class OdometryPublisherNode(DTROS):
         """
         dl = self.wheels["left"]["d"]
         dr = self.wheels["right"]["d"]
-        t = self.kR[2]
-        dkR = np.array([
-            (dl + dr) / 2,
+        dkR = 1 / 2 * np.array([
+            (dl + dr),
             0,
-            (dr - dl) / 2,
+            (dr - dl) / self._length,
         ])
-        self.kR += dkR
-        t = self.kR[2]
-        R = np.array([
-            [np.cos(t), np.sin(t), 0],
-            [-np.sin(t), np.cos(t), 0],
+        t = dkR[2]
+        R_inv = np.array([
+            [np.cos(t), -np.sin(t), 0],
+            [np.sin(t), np.cos(t), 0],
             [0, 0, 1]
         ])
-        self.kW = R @ self.kR
+        self.kW += R_inv @ dkR
+        self.kW[2] %= np.pi
         for wheel in self.wheels.values():
             wheel["d"] = 0
 

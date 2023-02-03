@@ -32,6 +32,8 @@ class OdometryDriverNode(DTROS):
         # initialize the DTROS parent class
         super(OdometryDriverNode, self).__init__(node_name=node_name, node_type=NodeType.DRIVER)
 
+        self._length = 0.05
+
         self.distances = { 'left': 0.0, 'right': 0.0 }
 
         self.pub_move = rospy.Publisher(
@@ -64,40 +66,97 @@ class OdometryDriverNode(DTROS):
     def dist_callback(self, wheel, dist):
         m = dist.data
         self.distances[wheel] = m
-        rospy.loginfo(f"{wheel} wheel traveled {m}m change, for a total of {self.distances[wheel]}")
+        # rospy.loginfo(f"{wheel} wheel traveled {m}m, for a total of {self.distances[wheel]}")
 
     def world_kinematics_callback(self, message):
         self.kW = np.array(message.data)
-        rospy.loginfo(self.kW)
+
+    def target_to_robot_frame(self, target):
+        # get target coordinate in robot frame
+        t = self.kW[2]
+        R = np.array([
+            [np.cos(t), np.sin(t), 0],
+            [-np.sin(t), np.cos(t), 0],
+            [0, 0, 1]
+        ])
+        dKW = target - self.kW
+        dkR = (R @ dKW)[[0,2]]
+        dkR[1] %= np.pi
+        return dkR
+
+    def newton_method(self, kR_target, n=10, threshold=0.001):
+        # use Newton's method solve for wheel displacements
+        J = 1/2 * np.array([
+            [1, 1],
+            [-1/self._length, 1/self._length]
+        ])
+        d = np.zeros((2, ))
+        for _ in range(n):
+            kR = 1/2 * np.array([
+                (d[0] + d[1]),
+                (d[1] - d[0]) / (self._length),
+            ])
+            dkR = kR - kR_target
+            if np.linalg.norm(dkR) < threshold:
+                break
+            d -= np.linalg.solve(J, dkR)
+        return d
+
+    def displacement_to_velocity(self, d):
+        # map wheel displacements to wheel velocity
+        v = 2 * d
+        vmax = np.max(np.abs(v))
+        if vmax > 1:
+            v /= vmax
+        return v
+
+    def inverse_kinematics(self, target):
+        dkR = self.target_to_robot_frame(target)
+        d = self.newton_method(dkR)
+        v = self.displacement_to_velocity(d)
+        return v
 
     def run(self, rate=10):
         rate = rospy.Rate(rate)  # Measured in Hz
 
-        rospy.loginfo("Starting forward movement")
+        stages = [
+            {
+                "name": f"FORWARD MOTION 1",
+                "waypoints": np.linspace((0.32, 0.32, 0), (1.32, 0.32, 0), 2)
+            },
+            {
+                "name": f"SPIN 1",
+                "waypoints": np.linspace((1.32, 0.32, 0), (1.32, 0.32, np.pi/2), 2)
+            }
+        ]
 
-        while (self.distances['left'] < FORWARD_DIST
-               and self.distances['right'] < FORWARD_DIST):
-            self.publish_speed(FORWARD_SPEED)
+        while self.kW is None:
             rate.sleep()
-            #self.publish_speed(0.0)
 
-        rospy.loginfo("Starting reverse movement")
+        threshold = 0.01
 
-        while (self.distances['left'] < 2*FORWARD_DIST
-               or self.distances['right'] < 2*FORWARD_DIST):
-            self.publish_speed(-FORWARD_SPEED)
-            #rate.sleep()
-            #self.publish_speed(0.0)
+        self.loginfo(self.kW)
+        for stage in stages:
+            rospy.loginfo(f"STAGE: {stage['name']}")
+            for waypoint in stage['waypoints']:
+                while True:
+                    v = self.inverse_kinematics(waypoint)
+                    rospy.logdebug(f"    kW: {self.kW}     v: {v}")
+                    if np.linalg.norm(self.kW - waypoint) < threshold:
+                        break
+                    self.publish_speed(v)
+                    rate.sleep()
+                self.loginfo(self.kW)
 
         rospy.loginfo("Finished movement, setting velocities to 0")
 
-        self.publish_speed(0.0)
+        self.publish_speed(np.zeros((2,)))
+        rate.sleep()
 
-    def publish_speed(self, velocity: float):
+    def publish_speed(self, v):
         cmd = WheelsCmdStamped()
-        cmd.vel_left = velocity
-        cmd.vel_right = velocity
-
+        cmd.vel_left = v[0]
+        cmd.vel_right = v[1]
         self.pub_move.publish(cmd)
 
 if __name__ == '__main__':
@@ -105,12 +164,12 @@ if __name__ == '__main__':
     node = OdometryDriverNode(node_name='odometry_driver_node')
 
     def emergency_halt():
-        node.publish_speed(0.0)
+        node.publish_speed(np.zeros((2,)))
         rospy.loginfo("Sent emergency stop")
 
     rospy.on_shutdown(emergency_halt)  # Stop on crash
 
     node.run()
     # keep spinning
-    #rospy.spin()  # Probably don't need?
+    rospy.spin()
     rospy.loginfo("Finished driving. Ready to exit")
