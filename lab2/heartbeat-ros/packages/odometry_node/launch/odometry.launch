@@ -1,6 +1,7 @@
 <launch>
 
-  <node pkg="mock_wheels_driver"
+  <node if="false" 
+       pkg="mock_wheels_driver"
        type="mock_wheels_driver_node.py"
        name="mock_wheels_driver"
        output="screen">

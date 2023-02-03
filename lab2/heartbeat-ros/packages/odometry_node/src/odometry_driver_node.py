@@ -32,6 +32,9 @@ class OdometryDriverNode(DTROS):
         # initialize the DTROS parent class
         super(OdometryDriverNode, self).__init__(node_name=node_name, node_type=NodeType.DRIVER)
 
+        self._radius = rospy.get_param(
+            f'/{hostname}/kinematics_node/radius', 0.025
+        )
         self._length = 0.05
 
         self.distances = { 'left': 0.0, 'right': 0.0 }
@@ -82,12 +85,12 @@ class OdometryDriverNode(DTROS):
         ])
         dKW = target - self.kW
         dkR = (R @ dKW)[[0,2]]
-        dkR[1] %= np.pi
+        dkR[1] %= 2 * np.pi
         return dkR
 
     def newton_method(self, kR_target, n=10, threshold=0.001):
         # use Newton's method solve for wheel displacements
-        J = 1/2 * np.array([
+        J = self._radius/2 * np.array([
             [1, 1],
             [-1/self._length, 1/self._length]
         ])
@@ -105,10 +108,14 @@ class OdometryDriverNode(DTROS):
 
     def displacement_to_velocity(self, d):
         # map wheel displacements to wheel velocity
-        v = 2 * d
-        vmax = np.max(np.abs(v))
-        if vmax > 1:
+        MIN_VELOCITY = 0.60
+        v = d.copy()
+        vmax = np.max(np.abs(d))
+        if vmax == 0:
+            v = np.zeros((2, ))
+        elif vmax < MIN_VELOCITY:
             v /= vmax
+            v = MIN_VELOCITY * v
         return v
 
     def inverse_kinematics(self, target):
@@ -120,34 +127,58 @@ class OdometryDriverNode(DTROS):
     def run(self, rate=10):
         rate = rospy.Rate(rate)  # Measured in Hz
 
-        stages = [
+        states = [
             {
-                "name": f"FORWARD MOTION 1",
-                "waypoints": np.linspace((0.32, 0.32, 0), (1.32, 0.32, 0), 2)
+                "name": "STATE 1: STAY STILL",
+                "waypoints": np.array([[0.32, 0.32, np.pi/2]])
             },
             {
-                "name": f"SPIN 1",
-                "waypoints": np.linspace((1.32, 0.32, 0), (1.32, 0.32, np.pi/2), 2)
+                "name": f"STATE 2A: ROTATE 1",
+                "waypoints": np.linspace((0.32, 0.32, np.pi/2), (0.32, 0.32, 0), 2)
+            },
+            {
+                "name": f"STATE 2B: FORWARD MOTION 1",
+                "waypoints": np.linspace((0.32, 0.32, 0), (1.57, 0.32, 0), 10)
+            },
+            {
+                "name": f"STATE 2C: ROTATE 2",
+                "waypoints": np.array([[1.57, 0.32, np.pi/2]])
             }
         ]
 
         while self.kW is None:
             rate.sleep()
 
-        threshold = 0.01
+        rate2 = rospy.Rate(30)
+        while True:
+            v = np.array([6/10, -6/10])
+            rospy.logdebug(f"v: {v}")
+            self.publish_speed(v)
+            rospy.logdebug(f"kW: {self.kW}",)
+            rate2.sleep()
+            self.publish_speed(np.zeros((2, )))
+            if self.kW[2] == 0 or self.kW[2] > np.pi:
+                self.publish_speed(np.zeros((2, )))
+                break
+        return
+
+        threshold = 0.05
 
         self.loginfo(self.kW)
-        for stage in stages:
+        for stage in states:
             rospy.loginfo(f"STAGE: {stage['name']}")
             for waypoint in stage['waypoints']:
-                while True:
+                rospy.logdebug(f"  waypoint: {waypoint}")
+                while np.linalg.norm(self.kW - waypoint) > threshold:
                     v = self.inverse_kinematics(waypoint)
                     rospy.logdebug(f"    kW: {self.kW}     v: {v}")
-                    if np.linalg.norm(self.kW - waypoint) < threshold:
+                    if rospy.is_shutdown():
                         break
                     self.publish_speed(v)
                     rate.sleep()
-                self.loginfo(self.kW)
+            self.loginfo(self.kW)
+            if rospy.is_shutdown():
+                break
 
         rospy.loginfo("Finished movement, setting velocities to 0")
 
@@ -168,6 +199,7 @@ class OdometryDriverNode(DTROS):
     def emergency_halt(self):
         self.publish_speed(np.zeros((2,)))
         rospy.loginfo("Sent emergency stop")
+        rospy.loginfo(f"kW: {self.kW}",)
         rospy.signal_shutdown("emergency halt")
 
 if __name__ == '__main__':
@@ -178,5 +210,5 @@ if __name__ == '__main__':
 
     node.run()
     # keep spinning
-    rospy.spin()
+    # rospy.spin()
     rospy.loginfo("Finished driving. Ready to exit")

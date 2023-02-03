@@ -53,9 +53,11 @@ class OdometryPublisherNode(DTROS):
 
         self.wheels = {}
         self.kW = np.array([
-            0.32,
-            0.32,
-            0
+            # 0.32,
+            # 0.32,
+            1,
+            1,
+            np.pi/2
         ])
         for wheel in ['left', 'right']:
             self.wheels[wheel] = {
@@ -134,7 +136,7 @@ class OdometryPublisherNode(DTROS):
             [0, 0, 1]
         ])
         self.kW += R_inv @ dkR
-        self.kW[2] %= np.pi
+        self.kW[2] %= 2 * np.pi
         for wheel in self.wheels.values():
             wheel["d"] = 0
 
