@@ -39,6 +39,8 @@ class OdometryDriverNode(DTROS):
 
         self.distances = { 'left': 0.0, 'right': 0.0 }
 
+        self.EMERGENCY_STOPPED = False
+
         self.pub_move = rospy.Publisher(
             f'/{hostname}/wheels_driver_node/wheels_cmd',
             WheelsCmdStamped,
@@ -124,66 +126,98 @@ class OdometryDriverNode(DTROS):
         v = self.displacement_to_velocity(d)
         return v
 
+    def hardcoded_turn(self, target, clockwise=True):
+        rate = rospy.Rate(30)
+        v = np.array([5/10, -5/10])
+        if not clockwise:
+            v = -v
+        while not rospy.is_shutdown() and not self.EMERGENCY_STOPPED:
+            self.publish_speed(v)
+            rospy.logdebug(f"kW: {self.kW}",)
+            rate.sleep()
+            self.publish_speed(np.zeros((2, )))
+            threshold = 0.1
+            if np.abs(self.kW[2] - target % (2 * np.pi)) < threshold:
+                self.publish_speed(np.zeros((2, )))
+                return
+
+    def hardcoded_forward(self, target):
+        rate = rospy.Rate(30)
+        v = np.array([0.5, 0.5])
+        while not rospy.is_shutdown() and not self.EMERGENCY_STOPPED:
+            self.publish_speed(v)
+            rospy.logdebug(f"kW: {self.kW}",)
+            rate.sleep()
+            # self.publish_speed(np.zeros((2, )))
+            threshold = 0.1
+            if np.linalg.norm(self.kW[:2] - target) < threshold:
+                self.publish_speed(np.zeros((2, )))
+                return
+
     def run(self, rate=10):
         rate = rospy.Rate(rate)  # Measured in Hz
 
-        states = [
-            {
-                "name": "STATE 1: STAY STILL",
-                "waypoints": np.array([[0.32, 0.32, np.pi/2]])
-            },
-            {
-                "name": f"STATE 2A: ROTATE 1",
-                "waypoints": np.linspace((0.32, 0.32, np.pi/2), (0.32, 0.32, 0), 2)
-            },
-            {
-                "name": f"STATE 2B: FORWARD MOTION 1",
-                "waypoints": np.linspace((0.32, 0.32, 0), (1.57, 0.32, 0), 10)
-            },
-            {
-                "name": f"STATE 2C: ROTATE 2",
-                "waypoints": np.array([[1.57, 0.32, np.pi/2]])
-            }
-        ]
+        # states = [
+        #     {
+        #         "name": "STATE 1: STAY STILL",
+        #         "waypoints": np.array([[0.32, 0.32, np.pi/2]])
+        #     },
+        #     {
+        #         "name": f"STATE 2A: ROTATE 1",
+        #         "waypoints": np.linspace((0.32, 0.32, np.pi/2), (0.32, 0.32, 0), 2)
+        #     },
+        #     {
+        #         "name": f"STATE 2B: FORWARD MOTION 1",
+        #         "waypoints": np.linspace((0.32, 0.32, 0), (1.57, 0.32, 0), 10)
+        #     },
+        #     {
+        #         "name": f"STATE 2C: ROTATE 2",
+        #         "waypoints": np.array([[1.57, 0.32, np.pi/2]])
+        #     }
+        # ]
 
         while self.kW is None:
             rate.sleep()
 
-        rate2 = rospy.Rate(30)
-        while True:
-            v = np.array([6/10, -6/10])
-            rospy.logdebug(f"v: {v}")
-            self.publish_speed(v)
-            rospy.logdebug(f"kW: {self.kW}",)
-            rate2.sleep()
-            self.publish_speed(np.zeros((2, )))
-            if self.kW[2] == 0 or self.kW[2] > np.pi:
-                self.publish_speed(np.zeros((2, )))
-                break
-        return
+        rospy.loginfo("TURN 1")
+        self.hardcoded_turn(0, clockwise=True)
+        rospy.loginfo("FOWARD 1")
+        self.hardcoded_forward(np.array([1.57, 0.32]))
+        rospy.loginfo("TURN 2")
+        self.hardcoded_turn(np.pi/2, clockwise=False)
+        rospy.loginfo("FOWARD 2")
+        self.hardcoded_forward(np.array([1.57, 1.57]))
+        rospy.loginfo("TURN 3")
+        self.hardcoded_turn(np.pi, clockwise=False)
+        rospy.loginfo("FOWARD 3")
+        self.hardcoded_forward(np.array([0.32, 1.57]))
+        rospy.loginfo("TURN 4")
+        self.hardcoded_turn(3 * np.pi/2, clockwise=False)
+        rospy.loginfo("FOWARD 4")
+        self.hardcoded_forward(np.array([0.32, 0.32]))
 
         threshold = 0.05
 
-        self.loginfo(self.kW)
-        for stage in states:
-            rospy.loginfo(f"STAGE: {stage['name']}")
-            for waypoint in stage['waypoints']:
-                rospy.logdebug(f"  waypoint: {waypoint}")
-                while np.linalg.norm(self.kW - waypoint) > threshold:
-                    v = self.inverse_kinematics(waypoint)
-                    rospy.logdebug(f"    kW: {self.kW}     v: {v}")
-                    if rospy.is_shutdown():
-                        break
-                    self.publish_speed(v)
-                    rate.sleep()
-            self.loginfo(self.kW)
-            if rospy.is_shutdown():
-                break
+        # self.loginfo(self.kW)
+        # for stage in states:
+        #     rospy.loginfo(f"STAGE: {stage['name']}")
+        #     for waypoint in stage['waypoints']:
+        #         rospy.logdebug(f"  waypoint: {waypoint}")
+        #         while np.linalg.norm(self.kW - waypoint) > threshold:
+        #             v = self.inverse_kinematics(waypoint)
+        #             rospy.logdebug(f"    kW: {self.kW}     v: {v}")
+        #             if rospy.is_shutdown():
+        #                 break
+        #             self.publish_speed(v)
+        #             rate.sleep()
+        #     self.loginfo(self.kW)
+        #     if rospy.is_shutdown():
+        #         break
 
-        rospy.loginfo("Finished movement, setting velocities to 0")
+        # rospy.loginfo("Finished movement, setting velocities to 0")
 
-        self.publish_speed(np.zeros((2,)))
-        rate.sleep()
+        # self.publish_speed(np.zeros((2,)))
+        # rate.sleep()
 
     def publish_speed(self, v):
         cmd = WheelsCmdStamped()
@@ -192,15 +226,16 @@ class OdometryDriverNode(DTROS):
         self.pub_move.publish(cmd)
 
     def check_exit_duckietown(self):
-        if self.kW[0] < 0 or self.kW[1] < 0 or self.kW[0] > 2.01 or self.kW[1] > 3.27:
+        return
+        if self.kW[0] < -0.00 or self.kW[1] < -0.00 or self.kW[0] > 2.01 or self.kW[1] > 3.27:
             rospy.loginfo("exited duckietown, yikes!")
             self.emergency_halt()
 
     def emergency_halt(self):
         self.publish_speed(np.zeros((2,)))
+        self.EMERGENCY_STOPPED = True
         rospy.loginfo("Sent emergency stop")
         rospy.loginfo(f"kW: {self.kW}",)
-        rospy.signal_shutdown("emergency halt")
 
 if __name__ == '__main__':
     # create the node
