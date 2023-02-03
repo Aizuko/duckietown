@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 
 import os
+
+import numpy as np
 import rospy
 from duckietown.dtros import DTROS, NodeType, TopicType
 from duckietown_msgs.msg import WheelsCmdStamped
-from sensor_msgs.msg import CameraInfo
-from sensor_msgs.msg import CompressedImage
-from std_msgs.msg import String, Header, Float32
+from sensor_msgs.msg import CameraInfo, CompressedImage
+from std_msgs.msg import Float32, Float64MultiArray, Header, String
 
 FORWARD_DIST = 1.0  # Measured in meters
 FORWARD_SPEED = 0.3
@@ -23,8 +24,9 @@ class OdometryDriverNode(DTROS):
             Tells wheels to move at a certain velocity. Default max is 3
 
     Subscribers:
-        ~right_wheel_integrated_distance (Float32)
-        ~left_wheel_integrated_distance (Float32)
+        right_wheel_integrated_distance (Float32)
+        left_wheel_integrated_distance (Float32)
+        world_kinematics (Float64Array)
     """
     def __init__(self, node_name):
         # initialize the DTROS parent class
@@ -51,11 +53,22 @@ class OdometryDriverNode(DTROS):
             lambda dist: self.dist_callback('left', dist),
             queue_size=1,
         )
+        self.sub_world_kinematics = rospy.Subscriber(
+            "world_kinematics",
+            Float64MultiArray,
+            callback=self.world_kinematics_callback
+        )
+
+        self.kW = None
 
     def dist_callback(self, wheel, dist):
         m = dist.data
         self.distances[wheel] = m
         rospy.loginfo(f"{wheel} wheel traveled {m}m change, for a total of {self.distances[wheel]}")
+
+    def world_kinematics_callback(self, message):
+        self.kW = np.array(message.data)
+        rospy.loginfo(self.kW)
 
     def run(self, rate=10):
         rate = rospy.Rate(rate)  # Measured in Hz

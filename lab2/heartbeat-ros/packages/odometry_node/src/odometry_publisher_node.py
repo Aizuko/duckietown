@@ -8,7 +8,8 @@ import rospy
 import time
 from duckietown.dtros import DTROS, NodeType
 from duckietown_msgs.msg import WheelEncoderStamped, WheelsCmdStamped
-from std_msgs.msg import Float32
+from std_msgs.msg import Float32, Float64MultiArray
+from pathlib import Path
 
 hostname = os.environ['VEHICLE_NAME']
 
@@ -17,10 +18,13 @@ class OdometryPublisherNode(DTROS):
     Records and publishes the distance both wheels have traveled
 
     Publishers:
-        ~right_wheel_integrated_distance (Float32):
+        right_wheel_integrated_distance (Float32):
             Right wheel distance traveled. Starts at 0, can't decrease
-        ~left_wheel_integrated_distance (Float32):
+        left_wheel_integrated_distance (Float32):
             Left wheel distance traveled. Starts at 0, can't decrease
+        world_kinematics (Float64MultiArray):
+            [xW, yW, tW], where xW is the x coordinate in the world frame,
+            yW is the y coordinate in the world frame, and tW is the angle.
 
     Subscribers:
         /{hostname}/right_wheel_encoder_node/tick (WheelEncoderStamped):
@@ -35,7 +39,9 @@ class OdometryPublisherNode(DTROS):
         )
 
         bag_name = time.ctime().replace(' ', '_').replace(':', '-')
-        self.bag = rosbag.Bag(f'/data/bags/odometry_at_{bag_name}.bag', 'w')
+        bag_filename = f'/data/bags/odometry_at_{bag_name}.bag'
+        Path(bag_filename).parent.mkdir(parents=True, exist_ok=True)
+        self.bag = rosbag.Bag(bag_filename, 'w')
         rospy.loginfo(f"Made a bag {self.bag}")
 
         # Get static parameters
@@ -43,10 +49,13 @@ class OdometryPublisherNode(DTROS):
             f'/{hostname}/kinematics_node/radius', 100
         )
 
-        # Subscribing to the wheel encoders
-        self.sub_encoder_ticks = {}
-        self.pub_integrated_distance = {}
         self.wheels = {}
+        self.kR = np.zeros((3,))
+        self.kW = np.array([
+            0.32,
+            0.32,
+            0
+        ])
         for wheel in ['left', 'right']:
             self.wheels[wheel] = {
                 "sub_encoder_ticks": rospy.Subscriber(
@@ -60,6 +69,7 @@ class OdometryPublisherNode(DTROS):
                     queue_size=1
                 ),
                 "distance": 0,
+                "d": 0,
                 "direction": 1,
                 "ticks": -1,
                 "velocity": 0
@@ -68,6 +78,11 @@ class OdometryPublisherNode(DTROS):
             f'/{hostname}/wheels_driver_node/wheels_cmd_executed',
             WheelsCmdStamped,
             self.cb_executed_commands
+        )
+        self.pub_world_kinematics = rospy.Publisher(
+            "world_kinematics",
+            Float64MultiArray,
+            queue_size=1
         )
 
     def cb_encoder_data(self, wheel, msg):
@@ -84,6 +99,10 @@ class OdometryPublisherNode(DTROS):
             self.wheels[wheel]["direction"] * 2 * np.pi * self._radius
             * (msg.data - self.wheels[wheel]["ticks"]) / msg.resolution
         )
+        self.wheels[wheel]["d"] += (
+            2 * np.pi * self._radius
+            * (msg.data - self.wheels[wheel]["ticks"]) / msg.resolution
+        )
         self.wheels[wheel]["ticks"] = msg.data
 
     def cb_executed_commands(self, msg):
@@ -96,19 +115,52 @@ class OdometryPublisherNode(DTROS):
             self.wheels[wheel]["velocity"] = velocity
             self.wheels[wheel]["direction"] = 1 if velocity >= 0 else -1
 
+    def calculate_kinematics(self):
+        """
+        Calculate [x, y, t] in both robot and world frames using dl/dr
+        """
+        dl = self.wheels["left"]["d"]
+        dr = self.wheels["right"]["d"]
+        t = self.kR[2]
+        dkR = np.array([
+            (dl + dr) / 2,
+            0,
+            (dr - dl) / 2,
+        ])
+        self.kR += dkR
+        t = self.kR[2]
+        R = np.array([
+            [np.cos(t), np.sin(t), 0],
+            [-np.sin(t), np.cos(t), 0],
+            [0, 0, 1]
+        ])
+        self.kW = R @ self.kR
+        for wheel in self.wheels.values():
+            wheel["d"] = 0
+
     def run(self):
         rate = rospy.Rate(30)
         while not rospy.is_shutdown():
-            for name, wheel in self.wheels.items():
-                """
-                rospy.loginfo(
-                    f"Pub: {name:5} wheel direction: "
-                    f"{wheel['direction']}, "
-                    f"distance: {wheel['distance']} m"
-                )
-                """
-                wheel["pub_integrated_distance"].publish(wheel["distance"])
+            self.publish_integrated_distances()
+            self.calculate_kinematics()
+            self.publish_kinematics()
             rate.sleep()
+
+    def publish_integrated_distances(self):
+        for name, wheel in self.wheels.items():
+            """
+            rospy.loginfo(
+                f"Pub: {name:5} wheel direction: "
+                f"{wheel['direction']}, "
+                f"distance: {wheel['distance']} m"
+            )
+            """
+            wheel["pub_integrated_distance"].publish(wheel["distance"])
+
+    def publish_kinematics(self):
+        message = Float64MultiArray(data=self.kW)
+        self.pub_world_kinematics.publish(message)
+
 
 if __name__ == '__main__':
     node = OdometryPublisherNode(node_name='odometry_publisher_node')
