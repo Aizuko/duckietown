@@ -70,6 +70,7 @@ class OdometryDriverNode(DTROS):
 
     def world_kinematics_callback(self, message):
         self.kW = np.array(message.data)
+        self.check_exit_duckietown()
 
     def target_to_robot_frame(self, target):
         # get target coordinate in robot frame
@@ -159,15 +160,21 @@ class OdometryDriverNode(DTROS):
         cmd.vel_right = v[1]
         self.pub_move.publish(cmd)
 
+    def check_exit_duckietown(self):
+        if self.kW[0] < 0 or self.kW[1] < 0 or self.kW[0] > 2.01 or self.kW[1] > 3.27:
+            rospy.loginfo("exited duckietown, yikes!")
+            self.emergency_halt()
+
+    def emergency_halt(self):
+        self.publish_speed(np.zeros((2,)))
+        rospy.loginfo("Sent emergency stop")
+        rospy.signal_shutdown("emergency halt")
+
 if __name__ == '__main__':
     # create the node
     node = OdometryDriverNode(node_name='odometry_driver_node')
 
-    def emergency_halt():
-        node.publish_speed(np.zeros((2,)))
-        rospy.loginfo("Sent emergency stop")
-
-    rospy.on_shutdown(emergency_halt)  # Stop on crash
+    rospy.on_shutdown(node.emergency_halt)  # Stop on crash
 
     node.run()
     # keep spinning
