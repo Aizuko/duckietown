@@ -1,5 +1,11 @@
 <launch>
 
+  <node pkg="mock_wheels_driver"
+       type="mock_wheels_driver_node.py"
+       name="mock_wheels_driver"
+       output="screen">
+  </node>
+
   <group ns="$(arg veh)/odometry_driving">  <!-- Sets [n]ame[s]pace -->
     <node pkg="odometry_node"
         type="odometry_publisher_node.py"
@@ -7,13 +13,11 @@
         output="screen">
     </node>
 
-    <!--
     <node pkg="odometry_node"
         type="odometry_driver_node.py"
         name="odometry_driver_node"
         output="screen">
     </node>
-    -->
   </group>
 
 </launch>

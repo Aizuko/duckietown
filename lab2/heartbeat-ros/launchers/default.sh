@@ -22,7 +22,7 @@ dt-launchfile-init
 #roslaunch camera_demo_node camera.launch veh:=$VEHICLE_NAME
 #roslaunch wheel_encoders wheel_encoders.launch veh:=$VEHICLE_NAME
 #roslaunch manual_driving manual_driving.launch veh:=$VEHICLE_NAME
-roslaunch odometry_node odometry.launch veh:=$VEHICLE_NAME
+dt-exec roslaunch odometry_node odometry.launch veh:=$VEHICLE_NAME
 #roslaunch led_controls led_controls.launch veh:=$VEHICLE_NAME
 
 # ----------------------------------------------------------------------------
