@@ -11,8 +11,6 @@ from duckietown_msgs.msg import WheelEncoderStamped, WheelsCmdStamped
 from std_msgs.msg import Float32, Float64MultiArray
 from pathlib import Path
 
-hostname = os.environ['VEHICLE_NAME']
-
 class OdometryPublisherNode(DTROS):
     """
     Records and publishes the distance both wheels have traveled
@@ -45,22 +43,44 @@ class OdometryPublisherNode(DTROS):
         self.bag = rosbag.Bag(bag_filename, 'w')
         rospy.loginfo(f"Made a bag {self.bag}")
 
+        self.hostname = os.environ['VEHICLE_NAME']
+
         # Get static parameters
         self._radius = rospy.get_param(
-            f'/{hostname}/kinematics_node/radius', 0.025
+            f'/{self.hostname}/kinematics_node/radius', 0.025
         )
         self._length = 0.05
+
+        self._params = {
+            "csc22902": {
+                "g": 1,
+                "gs": 1,
+                "t": {
+                    "left": 1,
+                    "right": 1,
+                }
+            },
+            "csc22927": {
+                "g": 1,
+                # "gs": 0.6,
+                "gs": 1,
+                "t": {
+                    "left": 1,
+                    "right": 1,
+                }
+            }
+        }
 
         self.wheels = {}
         self.kW = np.array([
             0.32,
             0.32,
-            0
+            np.pi/2
         ])
         for wheel in ['left', 'right']:
             self.wheels[wheel] = {
                 "sub_encoder_ticks": rospy.Subscriber(
-                    f'/{hostname}/{wheel}_wheel_encoder_node/tick',
+                    f'/{self.hostname}/{wheel}_wheel_encoder_node/tick',
                     WheelEncoderStamped,
                     lambda msg, wheel=wheel: self.cb_encoder_data(wheel, msg)
                 ),
@@ -76,7 +96,7 @@ class OdometryPublisherNode(DTROS):
                 "velocity": 0
             }
         self.sub_executed_commands = rospy.Subscriber(
-            f'/{hostname}/wheels_driver_node/wheels_cmd_executed',
+            f'/{self.hostname}/wheels_driver_node/wheels_cmd_executed',
             WheelsCmdStamped,
             self.cb_executed_commands
         )
@@ -90,7 +110,7 @@ class OdometryPublisherNode(DTROS):
         """
         Update encoder distance information from ticks.
         """
-        self.bag.write(f'/{hostname}/{name}_wheel_encoder/tick', msg)
+        self.bag.write(f'/{self.hostname}/{name}_wheel_encoder/tick', msg)
         if self.wheels[name]["ticks"] is None:
             self.wheels[name]["ticks"] = msg.data
             rospy.loginfo(f"Init {name:5} wheel to {self.wheels[name]['ticks']}")
@@ -101,7 +121,8 @@ class OdometryPublisherNode(DTROS):
             * (msg.data - self.wheels[name]["ticks"]) / msg.resolution
         )
         self.wheels[name]["d"] += (
-            2 * np.pi * self._radius
+            1 / self._params[self.hostname]["g"]
+            * self._params[self.hostname]["t"][name] * 2 * np.pi * self._radius
             * (msg.data - self.wheels[name]["ticks"]) / msg.resolution
         )
         self.wheels[name]["ticks"] = msg.data
@@ -110,7 +131,7 @@ class OdometryPublisherNode(DTROS):
         """
         Use the executed commands to determine the direction of travel of each wheel.
         """
-        self.bag.write(f'/{hostname}/wheels_cmd_executed', msg)
+        self.bag.write(f'/{self.hostname}/wheels_cmd_executed', msg)
         for wheel in self.wheels:
             velocity = getattr(msg, f"vel_{wheel}")
             self.wheels[wheel]["velocity"] = velocity
@@ -127,14 +148,15 @@ class OdometryPublisherNode(DTROS):
             0,
             (dr - dl) / self._length,
         ])
-        t = dkR[2]
+        dkR[1] /= self._params[self.hostname]["gs"]
+        t = self.kW[2]
         R_inv = np.array([
             [np.cos(t), -np.sin(t), 0],
             [np.sin(t), np.cos(t), 0],
             [0, 0, 1]
         ])
         self.kW += R_inv @ dkR
-        self.kW[2] %= np.pi
+        self.kW[2] %= 2 * np.pi
         for wheel in self.wheels.values():
             wheel["d"] = 0
 
