@@ -10,6 +10,8 @@ from duckietown.dtros import DTROS, NodeType
 from duckietown_msgs.msg import LEDPattern
 from std_msgs.msg import ColorRGBA
 
+from led_controls.srv import LEDControlService, LEDControlServiceResponse
+
 hostname = os.environ['VEHICLE_NAME']
 
 class LEDControlNode(DTROS):
@@ -26,6 +28,11 @@ class LEDControlNode(DTROS):
             LEDPattern,
             queue_size=10,
         )
+
+    def switch_led_colors(msg: LEDPattern):
+        self.pub.publish(msg)
+
+        return
 
 
 def create_led_msg(colors: 'List[float]') -> 'LEDPattern':
@@ -50,6 +57,8 @@ def create_led_msg(colors: 'List[float]') -> 'LEDPattern':
 if __name__ == '__main__':
     node = LEDControlNode(node_name='led_controller')
     rospy.loginfo("Starting led controller")
+
+    serv = rospy.Service('switch_led_colors', LEDControlService, node.switch_led_colors)
 
     def turn_off_leds():
         led_msg = create_led_msg([0.0, 0.0, 0.0])
