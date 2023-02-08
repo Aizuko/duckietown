@@ -180,7 +180,7 @@ class OdometryDriverNode(DTROS):
             # self.publish_speed(np.zeros((2, )))
             distance = np.sqrt(np.linalg.norm(self.kW[:2] - kW0))
             max_distance = max(max_distance, distance)
-            if min_distance > 10 and distance < threshold:
+            if max_distance > min_distance and distance < threshold:
                 self.publish_speed(np.zeros((2, )))
                 return
 
