@@ -159,6 +159,21 @@ class OdometryDriverNode(DTROS):
                 self.publish_speed(np.zeros((2, )))
                 return
 
+    def hardcoded_circle(self):
+        rate = rospy.Rate(30)
+        v = np.array([0.7, 0.5])
+        threshold = 0.1
+        kW0 = self.kW.copy()[:2]
+        while not rospy.is_shutdown() and not self.EMERGENCY_STOPPED:
+            self.publish_speed(v)
+            rospy.logdebug(f"kW: {self.kW}",)
+            rate.sleep()
+            # self.publish_speed(np.zeros((2, )))
+            distance = np.sqrt(np.linalg.norm(self.kW[:2] - kW0))
+            if distance < threshold:
+                self.publish_speed(np.zeros((2, )))
+                return
+
     def state_1(self):
         rospy.loginfo("STATE 1: Stay still")
         self.switch_led(1., 0., 0., 1.0)
@@ -194,11 +209,7 @@ class OdometryDriverNode(DTROS):
     def state_4(self):
         rospy.loginfo("STATE 4: Circle")
         self.switch_led(1., 1., 0., 1.0)
-        distance = 1.1
-        rospy.loginfo("TURN 4")
-        self.hardcoded_turn(np.pi/2, clockwise=False)
-        rospy.loginfo("FOWARD 4")
-        self.hardcoded_forward(distance, backwards=True)
+        self.hardcoded_circle()
 
     def run(self, rate=10):
         rate = rospy.Rate(rate)  # Measured in Hz
