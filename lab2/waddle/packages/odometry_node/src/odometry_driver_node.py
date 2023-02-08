@@ -168,7 +168,7 @@ class OdometryDriverNode(DTROS):
 
     def hardcoded_circle(self):
         rate = rospy.Rate(30)
-        v = np.array([0.7, 0.5])
+        v = np.array([0.7, 0.3])
         threshold = 0.1
         kW0 = self.kW.copy()[:2]
         max_distance = 0
@@ -194,7 +194,7 @@ class OdometryDriverNode(DTROS):
         self.switch_led(0., 1., 0., 1.0)
         distance = 1.1
         rospy.loginfo("TURN 1")
-        self.hardcoded_turn(0, clockwise=True)
+        self.hardcoded_turn(0 - np.pi/16, clockwise=True)
         rospy.loginfo("FOWARD 1")
         self.hardcoded_forward(distance)
         rospy.loginfo("TURN 2")
