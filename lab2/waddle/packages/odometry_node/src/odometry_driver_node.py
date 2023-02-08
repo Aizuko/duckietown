@@ -161,7 +161,7 @@ class OdometryDriverNode(DTROS):
             rospy.logdebug(f"kW: {self.kW}",)
             rate.sleep()
             # self.publish_speed(np.zeros((2, )))
-            distance = np.sqrt(np.linalg.norm(self.kW[:2] - kW0))
+            distance = np.linalg.norm(self.kW[:2] - kW0)
             if np.abs(distance - target_distance) < threshold:
                 self.publish_speed(np.zeros((2, )))
                 return
@@ -169,7 +169,7 @@ class OdometryDriverNode(DTROS):
     def hardcoded_circle(self):
         rate = rospy.Rate(30)
         v = np.array([0.7, 0.3])
-        target_distance = 2 * np.pi * 40
+        target_distance = 2 * np.pi * 0.4
         kW0 = self.kW.copy()[:2]
         threshold = 0.1
         distance = 0
@@ -178,7 +178,7 @@ class OdometryDriverNode(DTROS):
             rospy.logdebug(f"kW: {self.kW}",)
             rate.sleep()
             # self.publish_speed(np.zeros((2, )))
-            distance += np.sqrt(np.linalg.norm(self.kW[:2] - kW0))
+            distance += np.linalg.norm(self.kW[:2] - kW0)
             kW0 = self.kW.copy()[:2]
             if np.abs(target_distance - distance) < threshold:
                 self.publish_speed(np.zeros((2, )))
@@ -192,7 +192,7 @@ class OdometryDriverNode(DTROS):
     def state_2(self):
         rospy.loginfo("STATE 2: C")
         self.switch_led(0., 1., 0., 1.0)
-        distance = 1.1
+        distance = 1.25
         rospy.loginfo("TURN 1")
         self.hardcoded_turn(0, clockwise=True)
         rospy.loginfo("FOWARD 1")
@@ -268,9 +268,12 @@ class OdometryDriverNode(DTROS):
         self.pub_move.publish(cmd)
 
     def check_exit_duckietown(self):
-        if self.kW[0] < -0.00 or self.kW[1] < -0.00 or self.kW[0] > 1.82 or self.kW[1] > 3:
+        LX = 0 - 0.2
+        LY = 0 - 0.2
+        UX = 1.82 + 0.2
+        UY = 3 + 0.2
+        if self.kW[0] < LX or self.kW[1] < LY or self.kW[0] > UX or self.kW[1] > UY:
             rospy.logwarn("exited duckietown, yikes!")
-            return
             self.emergency_halt()
 
     def emergency_halt(self):
