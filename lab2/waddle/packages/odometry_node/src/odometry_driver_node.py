@@ -66,9 +66,11 @@ class OdometryDriverNode(DTROS):
             Float64MultiArray,
             callback=self.world_kinematics_callback
         )
+        rospy.logdebug("Waiting for led_control_service")
         rospy.wait_for_service('led_control_service')
+        rospy.logdebug("Found led_control_service")
         self.switch_led = rospy.ServiceProxy(
-            'led_control_service',
+            f'/{hostname}/led_controls/led_control_service',
             LEDControlService
         )
         self.kW = None
@@ -218,11 +220,7 @@ class OdometryDriverNode(DTROS):
     def run(self, rate=10):
         rate = rospy.Rate(rate)  # Measured in Hz
 
-        rospy.loginfo("Waiting for service")
-
         self.state_1()
-
-
 
         while self.kW is None:
             rate.sleep()
