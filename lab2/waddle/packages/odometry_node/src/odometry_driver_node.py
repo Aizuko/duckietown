@@ -214,7 +214,16 @@ class OdometryDriverNode(DTROS):
     def run(self, rate=10):
         rate = rospy.Rate(rate)  # Measured in Hz
 
+        while True:
+            try:
+                self.switch_led(0., 0., 0., 0.0)
+                break
+            except rospy.ServiceException:
+                pass
+
         self.state_1()
+
+
 
         while self.kW is None:
             rate.sleep()
