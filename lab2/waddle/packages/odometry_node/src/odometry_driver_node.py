@@ -222,6 +222,7 @@ class OdometryDriverNode(DTROS):
         rospy.loginfo("STATE 4: Circle")
         self.switch_led(1., 1., 0., 1.0)
         self.hardcoded_circle()
+        self.switch_led(1., 0., 1., 0.5)
 
     def forward_backward(self):
         distance = 1.25
