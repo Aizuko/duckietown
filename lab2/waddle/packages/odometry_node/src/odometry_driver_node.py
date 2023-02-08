@@ -218,51 +218,33 @@ class OdometryDriverNode(DTROS):
         rospy.loginfo("FOWARD 4")
         self.hardcoded_forward(distance, backwards=True)
 
-
     def state_4(self):
         rospy.loginfo("STATE 4: Circle")
         self.switch_led(1., 1., 0., 1.0)
         self.hardcoded_circle()
 
+    def forward_backward(self):
+        distance = 1.25
+        self.hardcoded_forward(distance)
+        self.hardcoded_forward(distance, backwards=True)
+
     def run(self, rate=10):
         rate = rospy.Rate(rate)  # Measured in Hz
-
-        self.state_1()
 
         while self.kW is None:
             rate.sleep()
 
+        start_time = time.perf_counter()
+        self.state_1()
         self.state_2()
-
         self.state_1()
-
         self.state_3()
-
         self.state_1()
-
         self.state_4()
-        # threshold = 0.05
+        end_time = time.perf_counter()
 
-        # self.loginfo(self.kW)
-        # for stage in states:
-        #     rospy.loginfo(f"STAGE: {stage['name']}")
-        #     for waypoint in stage['waypoints']:
-        #         rospy.logdebug(f"  waypoint: {waypoint}")
-        #         while np.linalg.norm(self.kW - waypoint) > threshold:
-        #             v = self.inverse_kinematics(waypoint)
-        #             rospy.logdebug(f"    kW: {self.kW}     v: {v}")
-        #             if rospy.is_shutdown():
-        #                 break
-        #             self.publish_speed(v)
-        #             rate.sleep()
-        #     self.loginfo(self.kW)
-        #     if rospy.is_shutdown():
-        #         break
-
-        # rospy.loginfo("Finished movement, setting velocities to 0")
-
-        # self.publish_speed(np.zeros((2,)))
-        # rate.sleep()
+        rospy.loginfo(f"Total execution time: {end_time - start_time:2f} s")
+        rospy.loginfo(f"final location (world frame): {self.kW}")
 
     def publish_speed(self, v):
         cmd = WheelsCmdStamped()
@@ -277,7 +259,7 @@ class OdometryDriverNode(DTROS):
         UY = 3 + 0.2
         if self.kW[0] < LX or self.kW[1] < LY or self.kW[0] > UX or self.kW[1] > UY:
             rospy.logwarn("exited duckietown, yikes!")
-            self.emergency_halt()
+            # self.emergency_halt()
 
     def emergency_halt(self):
         self.publish_speed(np.zeros((2,)))
@@ -292,6 +274,4 @@ if __name__ == '__main__':
     rospy.on_shutdown(node.emergency_halt)  # Stop on crash
 
     node.run()
-    # keep spinning
-    # rospy.spin()
     rospy.loginfo("Finished driving. Ready to exit")
