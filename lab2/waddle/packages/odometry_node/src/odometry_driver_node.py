@@ -171,13 +171,16 @@ class OdometryDriverNode(DTROS):
         v = np.array([0.7, 0.5])
         threshold = 0.1
         kW0 = self.kW.copy()[:2]
+        max_distance = 0
+        min_distance = 10
         while not rospy.is_shutdown() and not self.EMERGENCY_STOPPED:
             self.publish_speed(v)
             rospy.logdebug(f"kW: {self.kW}",)
             rate.sleep()
             # self.publish_speed(np.zeros((2, )))
             distance = np.sqrt(np.linalg.norm(self.kW[:2] - kW0))
-            if distance < threshold:
+            max_distance = max(max_distance, distance)
+            if min_distance > 10 and distance < threshold:
                 self.publish_speed(np.zeros((2, )))
                 return
 
@@ -208,7 +211,7 @@ class OdometryDriverNode(DTROS):
         self.switch_led(0., 0., 1., 1.0)
         distance = 1.1
         rospy.loginfo("TURN 4")
-        self.hardcoded_turn(np.pi/2, clockwise=False)
+        self.hardcoded_turn(np.pi/2, clockwise=True)
         rospy.loginfo("FOWARD 4")
         self.hardcoded_forward(distance, backwards=True)
 
@@ -234,7 +237,7 @@ class OdometryDriverNode(DTROS):
 
         self.state_1()
 
-        # self.state_4()
+        self.state_4()
         # threshold = 0.05
 
         # self.loginfo(self.kW)
