@@ -121,8 +121,8 @@ class OdometryPublisherNode(DTROS):
             * (msg.data - self.wheels[name]["ticks"]) / msg.resolution
         )
         self.wheels[name]["d"] += (
-            1 / self._params[self.hostname]["g"]
-            * self._params[self.hostname]["t"][name] * 2 * np.pi * self._radius
+            1 / self._params.get(self.hostname, {}).get("g", 1)
+            * self._params.get(self.hostname, {}).get("t", 1)[name] * 2 * np.pi * self._radius
             * (msg.data - self.wheels[name]["ticks"]) / msg.resolution
         )
         self.wheels[name]["ticks"] = msg.data
@@ -148,7 +148,7 @@ class OdometryPublisherNode(DTROS):
             0,
             (dr - dl) / self._length,
         ])
-        dkR[1] /= self._params[self.hostname]["gs"]
+        dkR[1] /= self._params.get(self.hostname, {}).get("gs", 1)
         t = self.kW[2]
         R_inv = np.array([
             [np.cos(t), -np.sin(t), 0],
