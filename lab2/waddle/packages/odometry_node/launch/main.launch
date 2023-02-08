@@ -1,0 +1,11 @@
+
+<launch>
+
+  <include file="$(find odometry_node)/launch/odometry.launch">
+    <arg name="veh" value="$(arg veh)"/>
+  </include>
+  <include file="$(find led_controls)/launch/led_controls.launch">
+    <arg name="veh" value="$(arg veh)"/>
+  </include>
+
+</launch>
