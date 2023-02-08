@@ -136,7 +136,7 @@ class OdometryDriverNode(DTROS):
 
     def hardcoded_turn(self, target, clockwise=True):
         rate = rospy.Rate(30)
-        v = np.array([5/10, -5/10])
+        v = np.array([10/10, -10/10])
         if not clockwise:
             v = -v
         while not rospy.is_shutdown() and not self.EMERGENCY_STOPPED:
@@ -194,7 +194,7 @@ class OdometryDriverNode(DTROS):
         self.switch_led(0., 1., 0., 1.0)
         distance = 1.1
         rospy.loginfo("TURN 1")
-        self.hardcoded_turn(0 - np.pi/8, clockwise=True)
+        self.hardcoded_turn(0, clockwise=True)
         rospy.loginfo("FOWARD 1")
         self.hardcoded_forward(distance)
         rospy.loginfo("TURN 2")
