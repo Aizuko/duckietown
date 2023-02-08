@@ -67,13 +67,13 @@ if __name__ == '__main__':
     node = LEDControlNode(node_name='led_controller')
     rospy.loginfo("Starting led controller")
 
-    #rospy.init_node('led_controls_server')
+    rospy.init_node('led_controls_server')
     def turn_off_leds():
         led_msg = create_led_msg([0.0, 0.0, 0.0])
         node.pub.publish(led_msg)
     rospy.on_shutdown(turn_off_leds)
 
-    rospy.wait_for_service('led_control_service')
+    # rospy.wait_for_service('led_control_service')
 
     # switch_led = rospy.ServiceProxy('led_control_service', LEDControlService)
     # resp1 = switch_led(0.0, 1.0, 1.0, 0.0)
