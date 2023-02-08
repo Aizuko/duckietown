@@ -136,7 +136,7 @@ class OdometryDriverNode(DTROS):
 
     def hardcoded_turn(self, target, clockwise=True):
         rate = rospy.Rate(30)
-        v = np.array([10/10, -10/10])
+        v = np.array([6/10, -6/10])
         if not clockwise:
             v = -v
         while not rospy.is_shutdown() and not self.EMERGENCY_STOPPED:
