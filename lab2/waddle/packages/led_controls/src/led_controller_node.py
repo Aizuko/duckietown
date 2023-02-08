@@ -66,8 +66,6 @@ class LEDControlNode(DTROS):
 if __name__ == '__main__':
     node = LEDControlNode(node_name='led_controller')
     rospy.loginfo("Starting led controller")
-
-    rospy.init_node('led_controls_server')
     def turn_off_leds():
         led_msg = create_led_msg([0.0, 0.0, 0.0])
         node.pub.publish(led_msg)
