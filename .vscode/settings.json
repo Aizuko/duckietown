@@ -9,5 +9,5 @@
     "/home/steven/Github/dt-ros-commons/packages/duckietown/include",
     "/home/steven/Github/code/catkin_ws/devel/lib/python3/dist-packages"
   ],
-  "terminal.integrated.cwd": "lab2/heartbeat-ros",
+  "terminal.integrated.cwd": "lab2/waddle",
 }

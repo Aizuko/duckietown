@@ -1,0 +1,11 @@
+<launch>
+
+  <group ns="$(arg veh)/led_controls">  <!-- Sets [n]ame[s]pace -->
+    <node pkg="led_controls"
+        type="led_controller_node.py"
+        name="led_controller_node"
+        output="screen">
+    </node>
+  </group>
+
+</launch>

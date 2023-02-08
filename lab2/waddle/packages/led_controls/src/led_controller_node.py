@@ -62,34 +62,32 @@ class LEDControlNode(DTROS):
         self.pub.publish(msg)
         return 1
 
-    def test_led(self):
-        switch_led = rospy.ServiceProxy('led_control_service', LEDControlService)
-        resp1 = switch_led(0.0, 1.0, 1.0, 0.0)
-        rospy.loginfo(f"Got response: {resp1}")
-
-        rate = rospy.Rate(1)
-
-        while not rospy.is_shutdown():
-            for rgb in [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0],
-                        [1.0, 1.0, 0.0], [0.0, 1.0, 1.0]]:
-                r = switch_led(rgb[0], rgb[1], rgb[2], 1.0)
-                rospy.loginfo(f"LEDs to color {rgb} with response {r}")
-                rate.sleep()
-
-        rospy.signal_shutdown("Required")
-
-    def turn_off_leds(self):
-        led_msg = create_led_msg([0.0, 0.0, 0.0])
-        self.pub.publish(led_msg)
 
 if __name__ == '__main__':
     node = LEDControlNode(node_name='led_controller')
     rospy.loginfo("Starting led controller")
 
-    # rospy.init_node('led_controls_server')
-
-    rospy.on_shutdown(node.turn_off_leds)
+    #rospy.init_node('led_controls_server')
+    def turn_off_leds():
+        led_msg = create_led_msg([0.0, 0.0, 0.0])
+        node.pub.publish(led_msg)
+    rospy.on_shutdown(turn_off_leds)
 
     rospy.wait_for_service('led_control_service')
 
-    rospy.spin()
+    # switch_led = rospy.ServiceProxy('led_control_service', LEDControlService)
+    # resp1 = switch_led(0.0, 1.0, 1.0, 0.0)
+    # rospy.loginfo(f"Got response: {resp1}")
+
+    # rate = rospy.Rate(1)
+
+    # while not rospy.is_shutdown():
+    #     for rgb in [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0],
+    #                 [1.0, 1.0, 0.0], [0.0, 1.0, 1.0]]:
+    #         r = switch_led(rgb[0], rgb[1], rgb[2], 1.0)
+    #         rospy.loginfo(f"LEDs to color {rgb} with response {r}")
+    #         rate.sleep()
+
+    #rospy.signal_shutdown("Required")
+
+    #rospy.spin()

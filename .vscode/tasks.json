@@ -6,9 +6,9 @@
     {
       "label": "Build",
       "type": "shell",
-      "command": "docker build -t duckietown/heartbeat-ros:latest-arm64v8 .",
+      "command": "docker build -t duckietown/waddle:latest-arm64v8 .",
       "options": {
-        "cwd": "${workspaceFolder}/lab2/heartbeat-ros"
+        "cwd": "${workspaceFolder}/lab2/waddle"
       },
       "group": "build",
       "presentation": {
