@@ -209,7 +209,7 @@ class OdometryDriverNode(DTROS):
     def state_3(self):
         rospy.loginfo("STATE 3: Go Home")
         self.switch_led(0., 0., 1., 1.0)
-        distance = 1.1
+        distance = 1.25
         rospy.loginfo("TURN 4")
         self.hardcoded_turn(np.pi/2, clockwise=True)
         rospy.loginfo("FOWARD 4")
