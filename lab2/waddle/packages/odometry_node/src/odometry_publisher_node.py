@@ -54,7 +54,7 @@ class OdometryPublisherNode(DTROS):
         self._params = {
             "csc22902": {
                 "g": 1,
-                "gs": 0.9,
+                "gs": 1,
                 "t": {
                     "left": 1,
                     "right": 1,
