@@ -169,7 +169,7 @@ class OdometryDriverNode(DTROS):
     def hardcoded_circle(self):
         rate = rospy.Rate(30)
         v = np.array([0.7, 0.3])
-        threshold = 0.1
+        threshold = 10
         kW0 = self.kW.copy()[:2]
         max_distance = 0
         min_distance = 10
