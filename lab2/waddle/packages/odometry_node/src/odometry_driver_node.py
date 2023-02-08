@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 
 import os
+import time
 
 import numpy as np
 import rospy
 from duckietown.dtros import DTROS, NodeType, TopicType
 from duckietown_msgs.msg import WheelsCmdStamped, Pose2DStamped
 from std_msgs.msg import Float32, Float64MultiArray, Header, String
+from led_controls.srv import LEDControlService
 
 FORWARD_DIST = 1.0  # Measured in meters
 FORWARD_SPEED = 0.3
@@ -64,7 +66,7 @@ class OdometryDriverNode(DTROS):
             Float64MultiArray,
             callback=self.world_kinematics_callback
         )
-
+        self.switch_led = rospy.ServiceProxy('led_control_service', LEDControlService)
         self.kW = None
 
     def dist_callback(self, wheel, dist):
@@ -140,9 +142,11 @@ class OdometryDriverNode(DTROS):
                 self.publish_speed(np.zeros((2, )))
                 return
 
-    def hardcoded_forward(self, target_distance):
+    def hardcoded_forward(self, target_distance, backwards=False):
         rate = rospy.Rate(30)
         v = np.array([0.5, 0.5])
+        if backwards:
+            v = -v
         threshold = 0.1
         kW0 = self.kW.copy()[:2]
         while not rospy.is_shutdown() and not self.EMERGENCY_STOPPED:
@@ -155,31 +159,14 @@ class OdometryDriverNode(DTROS):
                 self.publish_speed(np.zeros((2, )))
                 return
 
-    def run(self, rate=10):
-        rate = rospy.Rate(rate)  # Measured in Hz
+    def state_1(self):
+        rospy.loginfo("STATE 1: Stay still")
+        self.switch_led(1., 0., 0., 1.0)
+        time.sleep(5)
 
-        # states = [
-        #     {
-        #         "name": "STATE 1: STAY STILL",
-        #         "waypoints": np.array([[0.32, 0.32, np.pi/2]])
-        #     },
-        #     {
-        #         "name": f"STATE 2A: ROTATE 1",
-        #         "waypoints": np.linspace((0.32, 0.32, np.pi/2), (0.32, 0.32, 0), 2)
-        #     },
-        #     {
-        #         "name": f"STATE 2B: FORWARD MOTION 1",
-        #         "waypoints": np.linspace((0.32, 0.32, 0), (1.57, 0.32, 0), 10)
-        #     },
-        #     {
-        #         "name": f"STATE 2C: ROTATE 2",
-        #         "waypoints": np.array([[1.57, 0.32, np.pi/2]])
-        #     }
-        # ]
-
-        while self.kW is None:
-            rate.sleep()
-
+    def state_2(self):
+        rospy.loginfo("STATE 2: C")
+        self.switch_led(0., 1., 0., 1.0)
         distance = 1.1
         rospy.loginfo("TURN 1")
         self.hardcoded_turn(0, clockwise=True)
@@ -193,11 +180,43 @@ class OdometryDriverNode(DTROS):
         self.hardcoded_turn(np.pi, clockwise=False)
         rospy.loginfo("FOWARD 3")
         self.hardcoded_forward(distance)
-        rospy.loginfo("TURN 4")
-        self.hardcoded_turn(3 * np.pi/2, clockwise=False)
-        rospy.loginfo("FOWARD 4")
-        self.hardcoded_forward(distance)
 
+    def state_3(self):
+        rospy.loginfo("STATE 3: Go Home")
+        self.switch_led(0., 0., 1., 1.0)
+        distance = 1.1
+        rospy.loginfo("TURN 4")
+        self.hardcoded_turn(np.pi/2, clockwise=False)
+        rospy.loginfo("FOWARD 4")
+        self.hardcoded_forward(distance, backwards=True)
+
+
+    def state_4(self):
+        rospy.loginfo("STATE 4: Circle")
+        self.switch_led(1., 1., 0., 1.0)
+        distance = 1.1
+        rospy.loginfo("TURN 4")
+        self.hardcoded_turn(np.pi/2, clockwise=False)
+        rospy.loginfo("FOWARD 4")
+        self.hardcoded_forward(distance, backwards=True)
+
+    def run(self, rate=10):
+        rate = rospy.Rate(rate)  # Measured in Hz
+
+        self.state_1()
+
+        while self.kW is None:
+            rate.sleep()
+
+        self.state_2()
+
+        self.state_1()
+
+        self.state_3()
+
+        self.state_1()
+
+        # self.state_4()
         # threshold = 0.05
 
         # self.loginfo(self.kW)
