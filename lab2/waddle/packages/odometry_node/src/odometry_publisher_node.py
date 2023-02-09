@@ -122,7 +122,8 @@ class OdometryPublisherNode(DTROS):
         )
         self.wheels[name]["d"] += (
             1 / self._params.get(self.hostname, {}).get("g", 1)
-            * self._params.get(self.hostname, {}).get("t", 1)[name] * 2 * np.pi * self._radius
+            * self._params.get(self.hostname, {}).get("t", {}).get(name, 1)
+            * 2 * np.pi * self._radius
             * (msg.data - self.wheels[name]["ticks"]) / msg.resolution
         )
         self.wheels[name]["ticks"] = msg.data
