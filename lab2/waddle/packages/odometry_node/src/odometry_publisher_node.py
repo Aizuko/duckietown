@@ -11,6 +11,7 @@ from duckietown_msgs.msg import WheelEncoderStamped, WheelsCmdStamped
 from std_msgs.msg import Float32, Float64MultiArray
 from pathlib import Path
 
+
 class OdometryPublisherNode(DTROS):
     """
     Records and publishes the distance both wheels have traveled
@@ -50,26 +51,6 @@ class OdometryPublisherNode(DTROS):
             f'/{self.hostname}/kinematics_node/radius', 0.025
         )
         self._length = 0.05
-
-        self._params = {
-            "csc22902": {
-                "g": 1,
-                "gs": 1,
-                "t": {
-                    "left": 1,
-                    "right": 1,
-                }
-            },
-            "csc22927": {
-                "g": 1,
-                # "gs": 0.6,
-                "gs": 1,
-                "t": {
-                    "left": 1,
-                    "right": 1,
-                }
-            }
-        }
 
         self.wheels = {}
         self.kW = np.array([
@@ -121,9 +102,7 @@ class OdometryPublisherNode(DTROS):
             * (msg.data - self.wheels[name]["ticks"]) / msg.resolution
         )
         self.wheels[name]["d"] += (
-            1 / self._params.get(self.hostname, {}).get("g", 1)
-            * self._params.get(self.hostname, {}).get("t", {}).get(name, 1)
-            * 2 * np.pi * self._radius
+            2 * np.pi * self._radius
             * (msg.data - self.wheels[name]["ticks"]) / msg.resolution
         )
         self.wheels[name]["ticks"] = msg.data
@@ -149,7 +128,6 @@ class OdometryPublisherNode(DTROS):
             0,
             (dr - dl) / self._length,
         ])
-        dkR[1] /= self._params.get(self.hostname, {}).get("gs", 1)
         t = self.kW[2]
         R_inv = np.array([
             [np.cos(t), -np.sin(t), 0],

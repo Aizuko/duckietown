@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-
+import json
 import os
 import time
 
@@ -10,10 +10,10 @@ from duckietown_msgs.msg import WheelsCmdStamped, Pose2DStamped
 from std_msgs.msg import Float32, Float64MultiArray, Header, String
 from led_controls.srv import LEDControlService
 
+
 FORWARD_DIST = 1.0  # Measured in meters
 FORWARD_SPEED = 0.3
 
-hostname = os.environ['VEHICLE_NAME']
 
 class OdometryDriverNode(DTROS):
     """
@@ -32,23 +32,30 @@ class OdometryDriverNode(DTROS):
     def __init__(self, node_name):
         # initialize the DTROS parent class
         super(OdometryDriverNode, self).__init__(node_name=node_name, node_type=NodeType.DRIVER)
-
+        self.hostname = os.environ['VEHICLE_NAME']
         self._radius = rospy.get_param(
-            f'/{hostname}/kinematics_node/radius', 0.025
+            f'/{self.hostname}/kinematics_node/radius', 0.025
         )
         self._length = 0.05
 
         self.distances = { 'left': 0.0, 'right': 0.0 }
 
+        try:
+            with open("params.json") as f:
+                self.params = json.load(f)
+        except FileNotFoundError:
+            self.params = {}
+        rospy.loginfo("Params: ")
+        rospy.loginfo(json.dumps(self.params, indent=4))
+
         self.EMERGENCY_STOPPED = False
 
         self.pub_move = rospy.Publisher(
-            f'/{hostname}/wheels_driver_node/wheels_cmd',
+            f'/{self.hostname}/wheels_driver_node/wheels_cmd',
             WheelsCmdStamped,
             queue_size=1,
             dt_topic_type=TopicType.DRIVER,
         )
-
         self.sub_right = rospy.Subscriber(
             f'right_wheel_integrated_distance',
             Float32,
@@ -66,7 +73,7 @@ class OdometryDriverNode(DTROS):
             Float64MultiArray,
             callback=self.world_kinematics_callback
         )
-        LED_CONTROL_SERVICE_NAME = f'/{hostname}/led_controls/led_control_service'
+        LED_CONTROL_SERVICE_NAME = f'/{self.hostname}/led_controls/led_control_service'
         rospy.logdebug(f"Waiting for {LED_CONTROL_SERVICE_NAME}")
         rospy.wait_for_service(LED_CONTROL_SERVICE_NAME)
         rospy.logdebug(f"Found {LED_CONTROL_SERVICE_NAME}")
@@ -134,14 +141,13 @@ class OdometryDriverNode(DTROS):
         v = self.displacement_to_velocity(d)
         return v
 
-    def hardcoded_turn(self, target, clockwise=True):
+    def hardcoded_turn(self, target, clockwise=True, force=0.6):
         rate = rospy.Rate(30)
-        coldstart_v = np.array([0.4, -0.4])
-        v = np.array([6/10, -6/10])
+        v = np.array([force, -force])
+        v[0] = v[0] * self.params.get(self.hostname, {}).get("t", {}).get("left", 1)
+        v[1] = v[1] * self.params.get(self.hostname, {}).get("t", {}).get("right", 1)
         if not clockwise:
             v = -v
-            coldstart_v = -coldstart_v
-        self.publish_speed(coldstart_v)
         while not rospy.is_shutdown() and not self.EMERGENCY_STOPPED:
             self.publish_speed(v)
             rospy.logdebug(f"kW: {self.kW}",)
@@ -155,6 +161,8 @@ class OdometryDriverNode(DTROS):
     def hardcoded_forward(self, target_distance, backwards=False):
         rate = rospy.Rate(30)
         v = np.array([0.5, 0.5])
+        v[0] = v[0] * self.params.get(self.hostname, {}).get("t", {}).get("left", 1)
+        v[1] = v[1] * self.params.get(self.hostname, {}).get("t", {}).get("right", 1)
         if backwards:
             v = -v
         threshold = 0.1
@@ -172,6 +180,8 @@ class OdometryDriverNode(DTROS):
     def hardcoded_circle(self):
         rate = rospy.Rate(30)
         v = np.array([0.7, 0.3])
+        v[0] = v[0] * self.params.get(self.hostname, {}).get("t", {}).get("left", 1)
+        v[1] = v[1] * self.params.get(self.hostname, {}).get("t", {}).get("right", 1)
         target_distance = 2 * np.pi * 0.4
         kW0 = self.kW.copy()[:2]
         threshold = 0.1
@@ -197,7 +207,7 @@ class OdometryDriverNode(DTROS):
         self.switch_led(0., 1., 0., 1.0)
         distance = 1.25
         rospy.loginfo("TURN 1")
-        self.hardcoded_turn(0, clockwise=True)
+        self.hardcoded_turn(0, clockwise=True, force=1.0)
         rospy.loginfo("FOWARD 1")
         self.hardcoded_forward(distance)
         rospy.loginfo("TURN 2")
@@ -234,6 +244,8 @@ class OdometryDriverNode(DTROS):
 
         while self.kW is None:
             rate.sleep()
+
+        self.hardcoded_forward(3)
 
         start_time = time.perf_counter()
         self.state_1()
