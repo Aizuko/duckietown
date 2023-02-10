@@ -1,16 +1,30 @@
 {
   "csc22902": {
+    "initial_turn_force": 0.7,
+    "turnspeed": 0.6,
       "g": 1,
       "t": {
           "left": 1.0,
-          "right": 1.2
-      }
+          "right": 1.0
+      },
+      "tune": false,
+      "fbspeed": 0.5,
+      "forwardbackward": false,
+      "forwardspeed": 0.5,
+      "turntwitch": false
   },
   "csc22927": {
+    "initial_turn_force": 0.5,
+    "turnspeed": 0.6,
       "g": 1,
       "t": {
-          "left": 1,
-          "right": 1
-      }
+          "left": 1.05,
+          "right": 1.0
+      },
+      "tune": false,
+      "fbspeed": 0.5,
+      "forwardbackward": false,
+      "forwardspeed": 0.5,
+      "turntwitch": false
   }
 }

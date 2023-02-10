@@ -41,10 +41,11 @@ class OdometryDriverNode(DTROS):
         self.distances = { 'left': 0.0, 'right': 0.0 }
 
         try:
-            with open("params.json") as f:
+            with open("/params.json") as f:
                 self.params = json.load(f)
         except FileNotFoundError:
             self.params = {}
+        self.params = self.params.get(self.hostname, {})
         rospy.loginfo("Params: ")
         rospy.loginfo(json.dumps(self.params, indent=4))
 
@@ -143,26 +144,31 @@ class OdometryDriverNode(DTROS):
 
     def hardcoded_turn(self, target, clockwise=True, force=0.6):
         rate = rospy.Rate(30)
+        if self.params.get("turnspeed") is not None:
+            force = self.params.get("turnspeed")
         v = np.array([force, -force])
-        v[0] = v[0] * self.params.get(self.hostname, {}).get("t", {}).get("left", 1)
-        v[1] = v[1] * self.params.get(self.hostname, {}).get("t", {}).get("right", 1)
+        v[0] = v[0] * self.params.get("tt", {}).get("left", 1)
+        v[1] = v[1] * self.params.get("tt", {}).get("right", 1)
         if not clockwise:
             v = -v
         while not rospy.is_shutdown() and not self.EMERGENCY_STOPPED:
             self.publish_speed(v)
             rospy.logdebug(f"kW: {self.kW}",)
             rate.sleep()
-            self.publish_speed(np.zeros((2, )))
+            if self.params.get("turn_twitch", False):
+                self.publish_speed(np.zeros((2, )))
             threshold = 0.1
             if np.abs(self.kW[2] - target % (2 * np.pi)) < threshold:
                 self.publish_speed(np.zeros((2, )))
                 return
 
-    def hardcoded_forward(self, target_distance, backwards=False):
+    def hardcoded_forward(self, target_distance, backwards=False, speed=0.5):
         rate = rospy.Rate(30)
-        v = np.array([0.5, 0.5])
-        v[0] = v[0] * self.params.get(self.hostname, {}).get("t", {}).get("left", 1)
-        v[1] = v[1] * self.params.get(self.hostname, {}).get("t", {}).get("right", 1)
+        if self.params.get("forwardspeed") is not None:
+            speed = self.params.get("forwardspeed")
+        v = np.array([speed, speed])
+        v[0] = v[0] * self.params.get("t", {}).get("left", 1)
+        v[1] = v[1] * self.params.get("t", {}).get("right", 1)
         if backwards:
             v = -v
         threshold = 0.1
@@ -180,8 +186,8 @@ class OdometryDriverNode(DTROS):
     def hardcoded_circle(self):
         rate = rospy.Rate(30)
         v = np.array([0.7, 0.3])
-        v[0] = v[0] * self.params.get(self.hostname, {}).get("t", {}).get("left", 1)
-        v[1] = v[1] * self.params.get(self.hostname, {}).get("t", {}).get("right", 1)
+        v[0] = v[0] * self.params.get("tc", {}).get("left", 1)
+        v[1] = v[1] * self.params.get("tc", {}).get("right", 1)
         target_distance = 2 * np.pi * 0.4
         kW0 = self.kW.copy()[:2]
         threshold = 0.1
@@ -207,7 +213,7 @@ class OdometryDriverNode(DTROS):
         self.switch_led(0., 1., 0., 1.0)
         distance = 1.25
         rospy.loginfo("TURN 1")
-        self.hardcoded_turn(0, clockwise=True, force=1.0)
+        self.hardcoded_turn(0, clockwise=True, force=self.params.get("initial_turn_force", 0.8))
         rospy.loginfo("FOWARD 1")
         self.hardcoded_forward(distance)
         rospy.loginfo("TURN 2")
@@ -234,10 +240,10 @@ class OdometryDriverNode(DTROS):
         self.hardcoded_circle()
         self.switch_led(1., 0., 1., 0.5)
 
-    def forward_backward(self):
+    def forward_backward(self, speed):
         distance = 1.25
-        self.hardcoded_forward(distance)
-        self.hardcoded_forward(distance, backwards=True)
+        self.hardcoded_forward(distance, speed=speed)
+        self.hardcoded_forward(distance, backwards=True, speed=speed)
 
     def run(self, rate=10):
         rate = rospy.Rate(rate)  # Measured in Hz
@@ -245,7 +251,13 @@ class OdometryDriverNode(DTROS):
         while self.kW is None:
             rate.sleep()
 
-        self.hardcoded_forward(3)
+        if self.params.get("tune", False):
+            self.hardcoded_forward(3)
+            return
+
+        if self.params.get("forwardbackward", False):
+            self.forward_backward(self.params.get("fbspeed", 1))
+            return
 
         start_time = time.perf_counter()
         self.state_1()

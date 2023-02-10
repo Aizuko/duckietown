@@ -76,7 +76,7 @@ RUN dt-install-launchers "${LAUNCH_PATH}"
 CMD ["bash", "-c", "dt-launcher-${DT_LAUNCHER}"]
 
 # copy the params
-COPY ./config/params.json "${REPO_PATH}/packages/odometry_node/src"
+COPY ./config/params.json /
 
 # store module metadata
 LABEL org.duckietown.label.module.type="${REPO_NAME}" \

@@ -91,7 +91,6 @@ class OdometryPublisherNode(DTROS):
         """
         Update encoder distance information from ticks.
         """
-        self.bag.write(f'/{self.hostname}/{name}_wheel_encoder/tick', msg)
         if self.wheels[name]["ticks"] is None:
             self.wheels[name]["ticks"] = msg.data
             rospy.loginfo(f"Init {name:5} wheel to {self.wheels[name]['ticks']}")
@@ -111,7 +110,6 @@ class OdometryPublisherNode(DTROS):
         """
         Use the executed commands to determine the direction of travel of each wheel.
         """
-        self.bag.write(f'/{self.hostname}/wheels_cmd_executed', msg)
         for wheel in self.wheels:
             velocity = getattr(msg, f"vel_{wheel}")
             self.wheels[wheel]["velocity"] = velocity
@@ -161,10 +159,11 @@ class OdometryPublisherNode(DTROS):
     def publish_kinematics(self):
         message = Float64MultiArray(data=self.kW)
         self.pub_world_kinematics.publish(message)
+        self.bag.write("world_kinematics", message)
 
 
 if __name__ == '__main__':
     node = OdometryPublisherNode(node_name='odometry_publisher_node')
     node.run()
+    rospy.on_shutdown(node.bag.close)
     rospy.spin()
-    node.bag.close()
