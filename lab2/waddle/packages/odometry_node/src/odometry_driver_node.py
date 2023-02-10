@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from datetime import datetime
 import json
 import os
 import time
@@ -9,6 +10,8 @@ from duckietown.dtros import DTROS, NodeType, TopicType
 from duckietown_msgs.msg import WheelsCmdStamped, Pose2DStamped
 from std_msgs.msg import Float32, Float64MultiArray, Header, String
 from led_controls.srv import LEDControlService
+import rosbag
+from pathlib import Path
 
 
 FORWARD_DIST = 1.0  # Measured in meters
@@ -83,6 +86,14 @@ class OdometryDriverNode(DTROS):
             LEDControlService
         )
         self.kW = None
+        bag_name = datetime.now().isoformat()
+        bag_name = bag_name.replace('-', '.')
+        bag_name = bag_name.replace(':', '.')
+        bag_filename = f'/data/bags/odometry_at_{bag_name}.bag'
+        Path(bag_filename).parent.mkdir(parents=True, exist_ok=True)
+        self.bag = rosbag.Bag(bag_filename, 'w')
+        self.bag_closed = False
+        rospy.loginfo(f"Made a bag {self.bag}")
 
     def dist_callback(self, wheel, dist):
         m = dist.data
@@ -90,6 +101,8 @@ class OdometryDriverNode(DTROS):
         # rospy.loginfo(f"{wheel} wheel traveled {m}m, for a total of {self.distances[wheel]}")
 
     def world_kinematics_callback(self, message):
+        if not self.bag_closed:
+            self.bag.write("world_kinematics", message)
         self.kW = np.array(message.data)
         self.check_exit_duckietown()
 
@@ -188,7 +201,7 @@ class OdometryDriverNode(DTROS):
         v = np.array([0.7, 0.3])
         v[0] = v[0] * self.params.get("tc", {}).get("left", 1)
         v[1] = v[1] * self.params.get("tc", {}).get("right", 1)
-        target_distance = 2 * np.pi * 0.4
+        target_distance = 2 * np.pi * self.params.get("circle_radius", 0.4)
         kW0 = self.kW.copy()[:2]
         threshold = 0.1
         distance = 0
@@ -267,9 +280,13 @@ class OdometryDriverNode(DTROS):
         self.state_1()
         self.state_4()
         end_time = time.perf_counter()
+        self.bag_closed = True
+        self.bag.close()
 
         rospy.loginfo(f"Total execution time: {end_time - start_time:2f} s")
         rospy.loginfo(f"final location (world frame): {self.kW}")
+
+        time.sleep(5)
 
     def publish_speed(self, v):
         cmd = WheelsCmdStamped()

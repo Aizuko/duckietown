@@ -3,14 +3,10 @@
 import os
 
 import numpy as np
-import rosbag
 import rospy
-import time
 from duckietown.dtros import DTROS, NodeType
 from duckietown_msgs.msg import WheelEncoderStamped, WheelsCmdStamped
 from std_msgs.msg import Float32, Float64MultiArray
-from pathlib import Path
-
 
 class OdometryPublisherNode(DTROS):
     """
@@ -37,12 +33,6 @@ class OdometryPublisherNode(DTROS):
         super(OdometryPublisherNode, self).__init__(
             node_name=node_name, node_type=NodeType.PERCEPTION
         )
-
-        bag_name = time.ctime().replace(' ', '_').replace(':', '-')
-        bag_filename = f'/data/bags/odometry_at_{bag_name}.bag'
-        Path(bag_filename).parent.mkdir(parents=True, exist_ok=True)
-        self.bag = rosbag.Bag(bag_filename, 'w')
-        rospy.loginfo(f"Made a bag {self.bag}")
 
         self.hostname = os.environ['VEHICLE_NAME']
 
@@ -159,11 +149,9 @@ class OdometryPublisherNode(DTROS):
     def publish_kinematics(self):
         message = Float64MultiArray(data=self.kW)
         self.pub_world_kinematics.publish(message)
-        self.bag.write("world_kinematics", message)
 
 
 if __name__ == '__main__':
     node = OdometryPublisherNode(node_name='odometry_publisher_node')
     node.run()
-    rospy.on_shutdown(node.bag.close)
     rospy.spin()

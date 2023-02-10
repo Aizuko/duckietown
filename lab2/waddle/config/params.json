@@ -11,7 +11,8 @@
       "fbspeed": 0.5,
       "forwardbackward": false,
       "forwardspeed": 0.5,
-      "turntwitch": false
+      "turntwitch": false,
+      "circle_radius": 0.3
   },
   "csc22927": {
     "initial_turn_force": 0.5,
