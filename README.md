@@ -20,7 +20,7 @@ looking for a hacktober-fest contribution
 
 ## Authors
 
-Akemi Izuko & Steven Tango
+Akemi Izuko & Steven Tang
 
 ## Project status
 
