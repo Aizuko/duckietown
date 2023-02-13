@@ -76,7 +76,6 @@ TODO \()
 
 
 # Inverse Mathematics - Second lab
- + Link to intro image here
 
 ## Part 1 - ROS basics
 
@@ -167,8 +166,9 @@ picture of where the link leads:
 
 ### Robot Kinematics
 
-**What is the relation between your initial robot frame and world frame? How do you transform between them?**
-**How do you convert the location and theta at the initial robot frame to the world frame?**
+**What is the relation between your initial robot frame and world frame? How do
+you transform between them?** **How do you convert the location and theta at the
+initial robot frame to the world frame?**
 
 The robot frame is always centered on the robot, so it is given by
 $\mathbf{\xi}_R = \begin{bmatrix}
@@ -192,9 +192,9 @@ $\mathbf{\xi}_I = \begin{bmatrix}
     \frac{\pi}{2}
 \end{bmatrix}$
 
-To transform the initial world frame to the robot frame is trivial,
-keep the angle $\theta$ the same, and $x_R = 0$ and $y_R = 0$. This is equivalent
-to this matrix multiplication:
+To transform the initial world frame to the robot frame is trivial, keep the
+angle $\theta$ the same, and $x_R = 0$ and $y_R = 0$. This is equivalent to this
+matrix multiplication:
 
 $\mathbf{\xi}_R = \begin{bmatrix}
     0 & 0 & 0 \\
@@ -222,7 +222,8 @@ $\mathbf{R}^{-1}(\theta) = \begin{bmatrix}
     0 & 0 & 1
 \end{bmatrix}$
 
-Then we can update the world frame by integrating the above changes in world frame
+Then we can update the world frame by integrating the above changes in world
+frame
 
 $\mathbf{\xi}_I = \mathbf{\xi}_I + \mathbf{\dot{\xi}}_I$
 
@@ -231,11 +232,8 @@ $0$ and $2\pi$.
 
 We note that the equation for getting the change in robot frame is given by
 
-$\mathbf{\dot{\xi}}_R = \begin{bmatrix}
-    \frac{d_r + d_l}{2l} \\
-    0 \\
-    \frac{d_r - d_l}{2l}
-\end{bmatrix}$
+$\mathbf{\dot{\xi}}_R = \begin{bmatrix} \frac{d_r + d_l}{2l} \\ 0 \\ \frac{d_r -
+d_l}{2l} \end{bmatrix}$
 
 where $d_r$ and $d_l$ are the integrated displacement traveled by the right and
 left wheels and $l$ is the distance between the wheels and the center of the
@@ -248,27 +246,27 @@ $\Delta \text{ticks} = \text{ticks}_t - \text{ticks}_{t-1}$
 
 $d_r = 2\pi \cdot r \cdot \frac{\Delta \text{ticks}}{\text{resolution}}$
 
-where $r = 0.025$ is the radius of the Duckiebot wheel and
-$\text{resolution} = 135$ is the number of ticks in one rotation of the wheel.
+where $r = 0.025$ is the radius of the Duckiebot wheel and $\text{resolution} =
+135$ is the number of ticks in one rotation of the wheel.
 
 **How did you estimate/track the angles your DuckieBot has traveled?**
 
 To update the angle $\theta$ that our DuckieBot has traveled, we used the
 equation
 
-$\theta = \theta + \dot{\theta}$
-where
-$\dot{\theta} = \frac{d_r - d_l}{2l}$
+$\theta = \theta + \dot{\theta}$ where $\dot{\theta} = \frac{d_r - d_l}{2l}$
 
-**Can you explain why there is a difference between actual and desired location?**
+**Can you explain why there is a difference between actual and desired
+location?**
 
-There are small errors that are mostly due to slippage and momentum.
-Since we do dead reckoning, as the DuckieBot moves more the small errors
-compound. We note that errors in the angle tend to drastically affect the bot's
-x, y position due to the trigonometric functions used in matrix. This causes
-the Duckiebot's desired location to drastically different from the actual location.
+There are small errors that are mostly due to slippage and momentum. Since we do
+dead reckoning, as the DuckieBot moves more the small errors compound. We note
+that errors in the angle tend to drastically affect the bot's x, y position due
+to the trigonometric functions used in matrix. This causes the Duckiebot's
+desired location to drastically different from the actual location.
 
-**Which topic(s) did you use to make the robot move? How did you figure out the topic that could make the motor move?**
+**Which topic(s) did you use to make the robot move? How did you figure out the
+topic that could make the motor move?**
 
 For our first wheel-moving demo we published into the `/$(arg
 veh)/wheels_driver_node/wheels_cmd` topic. We found this topic with a mix of
@@ -304,13 +302,6 @@ drift longer from momentum, it will also read more traveled distance when its
 wheels quickly slip. We were quite surprised about this, since we expected the
 higher the speed the higher the noise, though our 3 empirical runs simply don't
 support that conclusion
-
-    + Image with difference in measurements
-    - Explain the rotation task (link failed video, it's the only one we have)
-    - TODO: explain math about driving duckiebot in the circle
-    - Talk about the use of `rospy.on_shutdown()` hooks to cleanly exit
-    - Explain how rosbags work
-    + Link script and matplotlib quiver plot of pose
 
 ### Rotation task
 
@@ -380,11 +371,6 @@ taken on the first callback, then relative changes can be calculated properly
 The other package contains the LED node, which provides a service interface.
 This is called from the `odometry_driver_node`, which acts as our central
 "state" node
-
- 1. An odometry publisher node that reads in wheel ticks
- 2. An odometry driver that makes decisions from the published pose
- 3. An LED node working as a service which the driver node communicates to
- + Link to new waddle workspace
 
 ### LED service
 
@@ -514,10 +500,6 @@ AR-ruler. About 62cm when measured by a prehistoric 90cm-stick:
     alt="64cm measured distance in an AR-ruler screenshot of an iPhone"
 /></div>
 
- - Created a PID controller with good dead reckoning which worked perfectly in the simulator
- - Continued to scrap pieces of the PID controller, like the duckietown exit notice
- - Explain why it's off...
-
 ### Putting it all together
 
 For the video above, we recorded [this
@@ -555,8 +537,6 @@ amount they overlap from the start to the end, so there's actually quite a bit
 of noise during the turn. On Tuesday Feb 6th's lecture, we also learned how
 turning is disastrously more noisy than going in the straight line, so the
 quiver-plot's disconnection from reality makes sense.
-
- - Mention shutdown hooks and rosbag recorders
 
 <!-- COMMENTED STUFF STARTS HERE, IGNORE THIS
 
