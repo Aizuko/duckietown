@@ -417,32 +417,43 @@ AR-ruler. About 62cm when measured by a prehistoric 90cm-stick:
 
 ### Putting it all together
 
-For the video above, we recorded [this bag]() and plotted it with matplotlib in
-a ipython-notebook, with the resulting image here:
+For the video above, we recorded [this
+bag](https://codeberg.org/akemi/duckietown/src/branch/main/lab2/bag-decoder/kinematics.bag)
+and plotted it with matplotlib in [this
+ipython-notebook](https://codeberg.org/akemi/duckietown/src/branch/main/lab2/bag-decoder/decode.ipynb),
+with the resulting image here:
 
 <img
-    src="/images/duckietown/lab2/quiver_plot_sprase.avif"
+    src="/images/duckietown/lab2/quiver_plot_sparse.avif"
     alt="A quiver plot (end-to-end arrows) of the robot traveling in a square"
 />
 
 This plot is showing what the duckiebot thinks it's doing, which looking at the
 video clearly doesn't align with what's actually taking place. A quiver-plot is
 nice, since it gives us a pretty good idea of what the pose is. Notably, unlike
-scatter-plots, we can see the duckiebot turning on the spot in the 4 corners.
+scatter-plots, we can see the duckiebot turning on the spot in the 4 corners. We
+can also see the duckiebot go backwards from the top left corner down, just like
+we coded it up to do.
 
 The initial turn, which in reality was the worst, looks as if it was nailed spot
-on.
+on. The duckiebot does pick up the slight drift is has when going in a straight
+line, which matches the results we saw in our forward-backward test from
+section 1.
 
- - Pretty much hardcoded, explain the steps
+We found it amusing how far off the results for our circle were though. In the
+quiver-plot, the duckiebot completely most of a perfect circle. In reality, it
+did about 1.5 circles in an ellipse. This was likely a mix of slippage, the
+wheel's wobble, and the angle of the wheel on the duckiebot, which was certainly
+not perfectly parallel with the sides. To test out how bad it is, we modified
+our program to make the duckies go in an endless circle and launched it on both
+our duckiebots. [Here's a video](https://www.youtube.com/shorts/Qf5KefGTbXg).
+Even in that short clip, the two robots clearly had their circles change the
+amount they overlap from the start to the end, so there's actually quite a bit
+of noise during the turn. On Tuesday Feb 6th's lecture, we also learned how
+turning is disastrously more noisy than going in the straight line, so the
+quiver-plot's disconnection from reality makes sense.
+
  - Mention shutdown hooks and rosbag recorders
- + Link to uploaded rosbag file, really
- + Display matplotlib quiver of bag file from before
- - Talk about the perfect circle and imperfect square, and how the circle is wrong
-
-
-
-
-
 
 <!-- COMMENTED STUFF STARTS HERE, IGNORE THIS
 
