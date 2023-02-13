@@ -165,8 +165,110 @@ picture of where the link leads:
     alt="Screenshot of 2 Chromium windows displaying source code"
 />
 
-### Robot frame stuff math
-TODO ()
+### Robot Kinematics
+
+**What is the relation between your initial robot frame and world frame? How do you transform between them?**
+**How do you convert the location and theta at the initial robot frame to the world frame?**
+
+The robot frame is always centered on the robot, so it is given by
+$\mathbf{\xi}_R = \begin{bmatrix}
+    x_R \\
+    y_R \\
+    \theta
+\end{bmatrix} = \begin{bmatrix}
+    0 \\
+    0 \\
+    \frac{\pi}{2}
+\end{bmatrix}$
+
+The initial world frame is given by
+$\mathbf{\xi}_I = \begin{bmatrix}
+    x_I \\
+    y_I \\
+    \theta
+\end{bmatrix} = \begin{bmatrix}
+    0.32 \\
+    0.32 \\
+    \frac{\pi}{2}
+\end{bmatrix}$
+
+To transform the initial world frame to the robot frame is trivial,
+keep the angle $\theta$ the same, and $x_R = 0$ and $y_R = 0$. This is equivalent
+to this matrix multiplication:
+
+$\mathbf{\xi}_R = \begin{bmatrix}
+    0 & 0 & 0 \\
+    0 & 0 & 0 \\
+    0 & 0 & 1
+\end{bmatrix}\mathbf{\xi}_I$
+
+To get the initial world frame from the initial robot frame,
+we keep the angle $\theta$ the same, and set $x_I = 0.32$ and $y_I = 0.32$.
+This is equivalent to this matrix multiplication:
+
+$\mathbf{\xi}_I = \begin{bmatrix}
+    1 & 0 & 0.32 \\
+    0 & 1 & 0.32 \\
+    0 & 0 & 1
+\end{bmatrix}\mathbf{\xi}_R$.
+
+We used the following matrix multiplication to transform between the two:
+
+$\mathbf{\dot{\xi}}_I = \mathbf{R}^{-1}\mathbf{\dot{\xi}}_R$
+with
+$\mathbf{R}^{-1}(\theta) = \begin{bmatrix}
+    \cos(\theta) & -\sin(\theta) & 0 \\
+    \sin(\theta) & \cos(\theta) & 0 \\
+    0 & 0 & 1
+\end{bmatrix}$
+
+Then we can update the world frame by integrating the above changes in world frame
+
+$\mathbf{\xi}_I = \mathbf{\xi}_I + \mathbf{\dot{\xi}}_I$
+
+We also must apply the modulo of $2\pi$ to the angle $\theta$ to keep it between
+$0$ and $2\pi$.
+
+We note that the equation for getting the change in robot frame is given by
+
+$\mathbf{\dot{\xi}}_R = \begin{bmatrix}
+    \frac{d_r + d_l}{2l} \\
+    0 \\
+    \frac{d_r - d_l}{2l}
+\end{bmatrix}$
+
+where $d_r$ and $d_l$ are the integrated displacement traveled by the right and
+left wheels and $l$ is the distance between the wheels and the center of the
+rotation.
+
+To get the integrated displacements $d_r$ and $d_l$, we use the wheel encoder
+ticks formula:
+
+$\Delta \text{ticks} = \text{ticks}_t - \text{ticks}_{t-1}$
+
+$d_r = 2\pi \cdot r \cdot \frac{\Delta \text{ticks}}{\text{resolution}}$
+
+where $r = 0.025$ is the radius of the Duckiebot wheel and
+$\text{resolution} = 135$ is the number of ticks in one rotation of the wheel.
+
+**How did you estimate/track the angles your DuckieBot has traveled?**
+
+To update the angle $\theta$ that our DuckieBot has traveled, we used the
+equation
+
+$\theta = \theta + \dot{\theta}$
+where
+$\dot{\theta} = \frac{d_r - d_l}{2l}$
+
+**Can you explain why there is a difference between actual and desired location?**
+
+There are small errors that are mostly due to slippage and momentum.
+Since we do dead reckoning, as the DuckieBot moves more the small errors
+compound. We note that errors in the angle tend to drastically affect the bot's
+x, y position due to the trigonometric functions used in matrix. This causes
+the Duckiebot's desired location to drastically different from the actual location.
+
+**Which topic(s) did you use to make the robot move? How did you figure out the topic that could make the motor move?**
 
 For our first wheel-moving demo we published into the `/$(arg
 veh)/wheels_driver_node/wheels_cmd` topic. We found this topic with a mix of
@@ -213,7 +315,8 @@ support that conclusion
 ### Rotation task
 
 The rotation task was pretty much identical to the driving forward task. We used
-the same publisher, just now we'd make one of the wheels go [in a
+the same publisher (`/$(arg
+veh)/wheels_driver_node/wheels_cmd`), just now we'd make one of the wheels go [in a
 negative](https://codeberg.org/akemi/duckietown/src/commit/392ef3a55c166f4a18ada428a5793feac5ffc613/lab2/waddle/packages/odometry_node/src/odometry_driver_node.py#L158)
 velocity, while the other is positive. To figure out our turn angle, we used a
 pretty [simple
@@ -418,10 +521,8 @@ AR-ruler. About 62cm when measured by a prehistoric 90cm-stick:
 ### Putting it all together
 
 For the video above, we recorded [this
-bag](https://codeberg.org/akemi/duckietown/src/branch/main/lab2/bag-decoder/kinematics.bag).
-Here's a video of [us playing the bag](https://youtu.be/WjkHO1CmJFQ), in this
-case on a local rosmaster, though the output is the same. We then plotted it
-with matplotlib in [this
+bag](https://codeberg.org/akemi/duckietown/src/branch/main/lab2/bag-decoder/kinematics.bag)
+and plotted it with matplotlib in [this
 ipython-notebook](https://codeberg.org/akemi/duckietown/src/branch/main/lab2/bag-decoder/decode.ipynb),
 with the resulting image here:
 
