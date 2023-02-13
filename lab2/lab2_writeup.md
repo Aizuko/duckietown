@@ -454,12 +454,6 @@ We still retained the localization-based turning from before though. Instead of
 telling the duckiebot to turn -90deg at the start, we told it to turn to 0deg in
 the world frame.
 
-<div>
-TODO
-how the whole PID controller thing works, math and frame and all. Talk about the
-publisher node
-</div>
-
 In the end, our code ended up being [very
 procedural](https://codeberg.org/akemi/duckietown/src/commit/392ef3a55c166f4a18ada428a5793feac5ffc613/lab2/waddle/packages/odometry_node/src/odometry_driver_node.py#L275).
 For each state, we have a different function. In general they start off by using
