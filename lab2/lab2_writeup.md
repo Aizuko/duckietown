@@ -418,8 +418,10 @@ AR-ruler. About 62cm when measured by a prehistoric 90cm-stick:
 ### Putting it all together
 
 For the video above, we recorded [this
-bag](https://codeberg.org/akemi/duckietown/src/branch/main/lab2/bag-decoder/kinematics.bag)
-and plotted it with matplotlib in [this
+bag](https://codeberg.org/akemi/duckietown/src/branch/main/lab2/bag-decoder/kinematics.bag).
+Here's a video of [us playing the bag](https://youtu.be/WjkHO1CmJFQ), in this
+case on a local rosmaster, though the output is the same. We then plotted it
+with matplotlib in [this
 ipython-notebook](https://codeberg.org/akemi/duckietown/src/branch/main/lab2/bag-decoder/decode.ipynb),
 with the resulting image here:
 
