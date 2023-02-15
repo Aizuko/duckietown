@@ -6,9 +6,9 @@
     {
       "label": "Build",
       "type": "shell",
-      "command": "docker build -t duckietown/waddle:latest-arm64v8 .",
+      "command": "docker -H csc22902.local build -t duckietown/farfetched:latest-arm64v8 .",
       "options": {
-        "cwd": "${workspaceFolder}/lab2/waddle"
+        "cwd": "${workspaceFolder}/lab3/farfetched"
       },
       "group": "build",
       "presentation": {
