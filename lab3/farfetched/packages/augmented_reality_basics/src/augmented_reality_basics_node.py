@@ -33,6 +33,12 @@ class ARBasicsNode(DTROS):
         with open(yaml_file, 'r') as y:
             self.config = yaml.load(y, Loader=yaml.CLoader)
 
+        self.img_sub(f"/{hostname}/camera_node/image/compressed",
+                     self.cb_input_image)
+
+    def cb_input_image(self, msg):
+        pass
+
     def on_shutdown(self):
         """Shutdown procedure.
 
