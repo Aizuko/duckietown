@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-import time
+import os
 import rospy
+import time
 import yaml
 
 import cv2
@@ -32,6 +33,9 @@ class ARBasicsNode(DTROS):
         super(ARBasicsNode, self)
             .__init__(node_name=node_name, node_type=NodeType.DRIVER)
 
+        self.hostname = rospy.get_param("~veh")
+
+        # Read in yaml ====
         yaml_file = rospy.get_param("~map_file")
         self.augmenter = Augmenter()
 
@@ -44,6 +48,18 @@ class ARBasicsNode(DTROS):
         cv_img = cv2.imdecode(raw_bytes, cv2.IMREAD_COLOR)
 
         self.image = self.augmenter.render_segments(cv_img, self.map)
+
+        # Setup publisher path ====
+        yaml_basename = os.path.basename(os.path.splitext(p)[0])
+
+        self.pub_topic = \
+            f"/{self.hostname}/node_name/{yaml_basename}/image/compressed"
+
+        self.img_sub(f"/{hostname}/camera_node/image/compressed",
+                     self.cb_input_image)
+
+    def cb_input_image(self, msg):
+        pass
 
     def on_shutdown(self):
         """Shutdown procedure.
