@@ -15,6 +15,19 @@
         "reveal": "always",
         "panel": "shared"
       }
+    },
+    {
+      "label": "test",
+      "type": "shell",
+      "command": "dts devel run -H csc22902.local",
+      "options": {
+        "cwd": "${workspaceFolder}/lab3/farfetched"
+      },
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
     }
   ]
 }
