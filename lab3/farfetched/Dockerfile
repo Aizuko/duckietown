@@ -76,7 +76,7 @@ RUN dt-install-launchers "${LAUNCH_PATH}"
 CMD ["bash", "-c", "dt-launcher-${DT_LAUNCHER}"]
 
 # copy the maps
-COPY ./maps "${REPO_PATH}/maps"
+COPY ./maps /tmp/maps
 
 # store module metadata
 LABEL org.duckietown.label.module.type="${REPO_NAME}" \
