@@ -20,7 +20,7 @@ class Augmenter:
         """
         return
 
-    def point_to_pixel(self, point: list):
+    def point_to_pixel(self, image: np.ndarray, point: list):
         """Converts a map file point into coordiantes
 
         Args:
@@ -29,16 +29,18 @@ class Augmenter:
         Returns:
             tuple: coordinates in image
         """
-        reference_frame, x, y = point
+        reference_frame, coordinates = point
         if reference_frame == "axle":
             raise NotImplementedError
         elif reference_frame == "camera":
             raise NotImplementedError
         elif reference_frame == "image01":
-            return np.ndarray((x, y))
+            return np.ndarray([
+                image.shape[1] * coordinates[0],
+                image.shape[0] * coordinates[1]
+            ])
         else:
             raise ValueError("Invalid reference frame")
-
 
     def ground2pixel(self, ground_coordinates):
         """
@@ -56,8 +58,8 @@ class Augmenter:
         for segment in segments:
             image = self.draw_segment(
                 image,
-                self.point_to_pixel(points[segment["points"][0]]),
-                self.point_to_pixel(points[segment["points"][1]]),
+                self.point_to_pixel(image, points[segment["points"][0]]),
+                self.point_to_pixel(image, points[segment["points"][1]]),
                 self.color_to_bgr(segment["color"])
             )
         return image
