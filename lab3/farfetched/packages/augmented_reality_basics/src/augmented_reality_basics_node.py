@@ -3,6 +3,7 @@ import os
 import rospy
 import time
 import yaml
+from pathlib import Path
 
 import cv2
 import numpy as np
@@ -11,10 +12,9 @@ from duckietown_msgs.srv import SetCustomLEDPattern, ChangePattern
 from duckietown_msgs.srv import SetCustomLEDPatternResponse, ChangePatternResponse
 from duckietown_msgs.msg import LEDPattern
 from std_msgs.msg import ColorRGBA
+from sensor_msgs.msg import CompressedImage
 
 from duckietown.dtros import DTROS, TopicType, NodeType
-from augmented_reality_basics import Augmenter
-
 from augmented_reality_basics import Augmenter
 
 # In the ROS node, you just need a callback on the camera image stream that
@@ -46,7 +46,7 @@ class ARBasicsNode(DTROS):
             self.map = yaml.load(y, Loader=yaml.CLoader)
 
         # Setup publisher path ====
-        yaml_basename = os.path.basename(os.path.splitext(p)[0])
+        yaml_basename = Path(yaml_file).stem
 
         self.pub = rospy.Publisher(
             f"/{self.hostname}/node_name/{yaml_basename}/image/compressed",
@@ -54,8 +54,10 @@ class ARBasicsNode(DTROS):
             queue_size=2,
         )
 
-        self.img_sub(f"/{self.hostname}/camera_node/image/compressed",
-                     self.callback_image)
+        self.img_sub = rospy.Subscriber(
+            f"/{self.hostname}/camera_node/image/compressed",
+            self.callback_image
+        )
 
     def callback_image(self, compressed):
         """Callback for the image topic."""
@@ -70,9 +72,7 @@ class ARBasicsNode(DTROS):
         At shutdown, changes the LED pattern to `LIGHT_OFF`.
         """
         # Turn off the lights when the node dies
-        self.loginfo("Shutting down. Turning LEDs off.")
-        self.changePattern("LIGHT_OFF")
-        time.sleep(1)
+        pass
 
 
 if __name__ == "__main__":
