@@ -10,6 +10,19 @@ from std_msgs.msg import ColorRGBA
 from duckietown.dtros import DTROS, TopicType, NodeType
 
 
+# In the ROS node, you just need a callback on the camera image stream that
+# uses the Augmenter class to modify the input image. Therefore, implement
+# a method called callback that writes the augmented image to the appropriate
+# topic.
+
+# Load the intrinsic / extrinsic calibration parameters for the given robot.
+# Read the map file corresponding to the map_file parameter given in the roslaunch
+# command above.
+# Subscribe to the image topic /robot name/camera_node/image/compressed.
+# When you receive an image, project the map features onto it, and then publish
+# the result to the topic /robot name/node_name/map file basename/image/compressed
+# where map file basename is the basename of the file without the yaml extension.
+
 class LEDEmitterNode(DTROS):
     """Node for controlling LEDs.
 
@@ -391,3 +404,12 @@ if __name__ == "__main__":
     led_emitter_node = LEDEmitterNode(node_name="led_emitter")
     # Keep it spinning to keep the node alive
     rospy.spin()
+
+
+# Your program is supposed to do the following:
+
+# Load the intrinsic / extrinsic calibration parameters for the given robot.
+# Read the map file corresponding to the map_file parameter given in the roslaunch command above.
+# Subscribe to the image topic /robot name/camera_node/image/compressed.
+# When you receive an image, project the map features onto it, and then publish the result to the topic /robot name/node_name/map file basename/image/compressed where map file basename is the basename of the file without the yaml extension.
+# Create a ROS node called augmented_reality_basics_node, which imports an Augmenter class, from an augmented_reality_basics module. The Augmenter class should contain the following methods:
