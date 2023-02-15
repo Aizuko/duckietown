@@ -1,16 +1,16 @@
+<!--
+AR vision node for segmenting out the lines
+-->
 <launch>
     <arg name="map_file" doc="Yaml file for segmentation"/>
     <arg name="veh" doc="Name of vehicle. ex: megaman"/>
-
-    <arg name="param_file_name" default="LED_protocol" doc="Specify a param file. ex:megaman"/>
-    <arg name="robot_type" default="duckiebot" doc="Type of robot"/>
 
     <group ns="$(arg veh)">
         <node pkg="augmented_reality_basics"
                 type="augmented_reality_basics.py"
                 name="augmented_reality_basics_node"
                 output="screen" >
-            <param name="robot_type" value="$(arg robot_type)"/>
+            <param name="map_file" value="$(arg map_file)"/>
         </node>
     </group>
 </launch>
