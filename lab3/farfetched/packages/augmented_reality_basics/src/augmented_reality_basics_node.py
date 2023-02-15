@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-import time
+import os
 import rospy
+import time
 import yaml
 
 from duckietown_msgs.srv import SetCustomLEDPattern, ChangePattern
@@ -28,10 +29,19 @@ class ARBasicsNode(DTROS):
         super(ARBasicsNode, self)
             .__init__(node_name=node_name, node_type=NodeType.DRIVER)
 
+        self.hostname = rospy.get_param("~veh")
+
+        # Read in yaml ====
         yaml_file = rospy.get_param("~map_file")
 
         with open(yaml_file, 'r') as y:
             self.config = yaml.load(y, Loader=yaml.CLoader)
+
+        # Setup publisher path ====
+        yaml_basename = os.path.basename(os.path.splitext(p)[0])
+
+        self.pub_topic = \
+            f"/{self.hostname}/node_name/{yaml_basename}/image/compressed"
 
         self.img_sub(f"/{hostname}/camera_node/image/compressed",
                      self.cb_input_image)
