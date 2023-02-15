@@ -48,11 +48,14 @@ class ARBasicsNode(DTROS):
         # Setup publisher path ====
         yaml_basename = os.path.basename(os.path.splitext(p)[0])
 
-        self.pub_topic = \
-            f"/{self.hostname}/node_name/{yaml_basename}/image/compressed"
+        self.pub = rospy.Publisher(
+            f"/{self.hostname}/node_name/{yaml_basename}/image/compressed",
+            CompressedImage,
+            queue_size=2,
+        )
 
         self.img_sub(f"/{self.hostname}/camera_node/image/compressed",
-                     self.cb_input_image)
+                     self.callback_image)
 
     def callback_image(self, compressed):
         """Callback for the image topic."""
@@ -73,7 +76,15 @@ class ARBasicsNode(DTROS):
 
 
 if __name__ == "__main__":
-    led_emitter_node = ARBasicsNode(node_name="augmented_reality_basics_node")
+    ar_node = ARBasicsNode(node_name="augmented_reality_basics_node")
+
+    rate = rospy.Rate(1)
+
+    while not rospy.is_shutdown():
+        if ar_node.image is not None:
+            ar_node.pub(ar_node.image)
+        rate.sleep()
+
     rospy.spin()
 
 # Load the intrinsic / extrinsic calibration parameters for the given robot.

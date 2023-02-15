@@ -10,7 +10,8 @@ AR vision node for segmenting out the lines
                 type="augmented_reality_basics_node.py"
                 name="augmented_reality_basics_node"
                 output="screen" >
-            <param name="map_file" value="$(arg map_file)"/>
+            <param name="veh" value="$(arg veh)" />
+            <param name="map_file" value="$(arg map_file)" />
         </node>
     </group>
 </launch>
