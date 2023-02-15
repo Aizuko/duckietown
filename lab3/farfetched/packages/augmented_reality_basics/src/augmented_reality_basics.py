@@ -54,12 +54,13 @@ class Augmenter:
         segments = map["segments"]
 
         for segment in segments:
-            self.draw_segment(
+            image = self.draw_segment(
                 image,
                 self.point_to_pixel(points[segment["points"][0]]),
                 self.point_to_pixel(points[segment["points"][1]]),
                 self.color_to_bgr(segment["color"])
             )
+        return image
 
     def color_to_bgr(self, color: str):
         _, [r, g, b] = self.defined_colors[color]

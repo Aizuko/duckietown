@@ -30,8 +30,7 @@ from augmented_reality_basics import Augmenter
 
 class ARBasicsNode(DTROS):
     def __init__(self, node_name):
-        super(ARBasicsNode, self)
-            .__init__(node_name=node_name, node_type=NodeType.DRIVER)
+        super(ARBasicsNode, self).__init__(node_name=node_name, node_type=NodeType.DRIVER)
 
         self.hostname = rospy.get_param("~veh")
 
@@ -55,7 +54,7 @@ class ARBasicsNode(DTROS):
         self.pub_topic = \
             f"/{self.hostname}/node_name/{yaml_basename}/image/compressed"
 
-        self.img_sub(f"/{hostname}/camera_node/image/compressed",
+        self.img_sub(f"/{self.hostname}/camera_node/image/compressed",
                      self.cb_input_image)
 
     def cb_input_image(self, msg):
