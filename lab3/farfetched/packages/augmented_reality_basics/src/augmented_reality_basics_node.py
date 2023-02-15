@@ -56,8 +56,11 @@ class ARBasicsNode(DTROS):
 
         self.img_sub = rospy.Subscriber(
             f"/{self.hostname}/camera_node/image/compressed",
+            CompressedImage,
             self.callback_image
         )
+
+        self.image = None
 
     def callback_image(self, compressed):
         """Callback for the image topic."""
@@ -71,19 +74,22 @@ class ARBasicsNode(DTROS):
 
         At shutdown, changes the LED pattern to `LIGHT_OFF`.
         """
-        # Turn off the lights when the node dies
         pass
+
+    def run(self):
+        rate = rospy.Rate(1)
+
+        while not rospy.is_shutdown():
+            if ar_node.image is not None:
+                ar_node.pub(ar_node.image)
+            rate.sleep()
+
 
 
 if __name__ == "__main__":
     ar_node = ARBasicsNode(node_name="augmented_reality_basics_node")
 
-    rate = rospy.Rate(1)
-
-    while not rospy.is_shutdown():
-        if ar_node.image is not None:
-            ar_node.pub(ar_node.image)
-        rate.sleep()
+    ar_node.run()
 
     rospy.spin()
 
@@ -91,4 +97,4 @@ if __name__ == "__main__":
 # Read the map file corresponding to the map_file parameter given in the roslaunch command above.
 # Subscribe to the image topic /robot name/camera_node/image/compressed.
 # When you receive an image, project the map features onto it, and then publish the result to the topic /robot name/node_name/map file basename/image/compressed where map file basename is the basename of the file without the yaml extension.
-# Create a ROS node called augmented_reality_basics_node, which imports an Augmenter class, from an augmented_reality_basics module. The Augmenter class should contain the following methods:
+
