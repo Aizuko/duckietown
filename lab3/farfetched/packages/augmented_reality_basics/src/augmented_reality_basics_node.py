@@ -3,12 +3,16 @@ import time
 import rospy
 import yaml
 
+import cv2
+import numpy as np
+
 from duckietown_msgs.srv import SetCustomLEDPattern, ChangePattern
 from duckietown_msgs.srv import SetCustomLEDPatternResponse, ChangePatternResponse
 from duckietown_msgs.msg import LEDPattern
 from std_msgs.msg import ColorRGBA
 
 from duckietown.dtros import DTROS, TopicType, NodeType
+from augmented_reality_basics import Augmenter
 
 # In the ROS node, you just need a callback on the camera image stream that
 # uses the Augmenter class to modify the input image. Therefore, implement
@@ -29,9 +33,17 @@ class ARBasicsNode(DTROS):
             .__init__(node_name=node_name, node_type=NodeType.DRIVER)
 
         yaml_file = rospy.get_param("~map_file")
+        self.augmenter = Augmenter()
 
         with open(yaml_file, 'r') as y:
-            self.config = yaml.load(y, Loader=yaml.CLoader)
+            self.map = yaml.load(y, Loader=yaml.CLoader)
+
+    def callback_image(self, compressed):
+        """Callback for the image topic."""
+        raw_bytes = np.frombuffer(compressed.data, dtype=np.uint8)
+        cv_img = cv2.imdecode(raw_bytes, cv2.IMREAD_COLOR)
+
+        self.image = self.augmenter.render_segments(cv_img, self.map)
 
     def on_shutdown(self):
         """Shutdown procedure.
