@@ -45,13 +45,6 @@ class ARBasicsNode(DTROS):
         with open(yaml_file, 'r') as y:
             self.cvmap = yaml.load(y, Loader=yaml.CLoader)
 
-        if self.cvmap == {}:
-            print(f"Map file from `{yaml_file}` is empty")
-            exit(1)
-        else:
-            print(f"Here's the cv map: {self.cvmap}")
-            exit(2)
-
         # Setup publisher path ====
         yaml_basename = Path(yaml_file).stem
 
@@ -88,7 +81,7 @@ class ARBasicsNode(DTROS):
 
         while not rospy.is_shutdown():
             if ar_node.image is not None:
-                ar_node.pub(ar_node.image)
+                ar_node.pub.publish(ar_node.image)
             rate.sleep()
 
 

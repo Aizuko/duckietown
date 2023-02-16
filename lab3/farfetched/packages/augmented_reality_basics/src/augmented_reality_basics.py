@@ -35,10 +35,12 @@ class Augmenter:
         elif reference_frame == "camera":
             raise NotImplementedError
         elif reference_frame == "image01":
-            return np.ndarray([
+            pixel = np.array([
                 image.shape[1] * coordinates[0],
                 image.shape[0] * coordinates[1]
             ])
+
+            return pixel
         else:
             raise ValueError("Invalid reference frame")
 
@@ -56,12 +58,12 @@ class Augmenter:
         segments = cvmap["segments"]
 
         for segment in segments:
-            image = self.draw_segment(
-                image,
-                self.point_to_pixel(image, points[segment["points"][0]]),
-                self.point_to_pixel(image, points[segment["points"][1]]),
-                self.color_to_bgr(segment["color"])
-            )
+            p1 = self.point_to_pixel(image, points[segment["points"][0]])
+            p2 = self.point_to_pixel(image, points[segment["points"][1]])
+            colo = self.color_to_bgr(segment["color"])
+
+            image = self.draw_segment(image, p1, p2, colo)
+
         return image
 
     def color_to_bgr(self, color: str):
