@@ -49,11 +49,11 @@ class Augmenter:
         """
         return
 
-    def render_segments(self, image: np.ndarray, map: dict):
+    def render_segments(self, image: np.ndarray, cvmap: dict):
         """Plots the segments from the map files onto the image.
         """
-        points = map["points"]
-        segments = map["segments"]
+        points = cvmap["points"]
+        segments = cvmap["segments"]
 
         for segment in segments:
             image = self.draw_segment(
@@ -86,6 +86,8 @@ class Augmenter:
             pt_b (np.ndarray): end point of segment
             color (str): color of segment
         """
+
+        print(f"Image type: {type(image)}")
 
         cv2.line(
             image,

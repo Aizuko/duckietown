@@ -43,13 +43,20 @@ class ARBasicsNode(DTROS):
         yaml_file = rospy.get_param("~map_file")
 
         with open(yaml_file, 'r') as y:
-            self.map = yaml.load(y, Loader=yaml.CLoader)
+            self.cvmap = yaml.load(y, Loader=yaml.CLoader)
+
+        if self.cvmap == {}:
+            print(f"Map file from `{yaml_file}` is empty")
+            exit(1)
+        else:
+            print(f"Here's the cv map: {self.cvmap}")
+            exit(2)
 
         # Setup publisher path ====
         yaml_basename = Path(yaml_file).stem
 
         self.pub = rospy.Publisher(
-            f"/{self.hostname}/node_name/{yaml_basename}/image/compressed",
+            f"/{self.hostname}/arbasics_node/{yaml_basename}/image/compressed",
             CompressedImage,
             queue_size=2,
         )
@@ -67,7 +74,7 @@ class ARBasicsNode(DTROS):
         raw_bytes = np.frombuffer(compressed.data, dtype=np.uint8)
         cv_img = cv2.imdecode(raw_bytes, cv2.IMREAD_COLOR)
 
-        self.image = self.augmenter.render_segments(cv_img, self.map)
+        self.image = self.augmenter.render_segments(cv_img, self.cvmap)
 
     def on_shutdown(self):
         """Shutdown procedure.
