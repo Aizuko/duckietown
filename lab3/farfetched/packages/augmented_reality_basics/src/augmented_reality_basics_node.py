@@ -16,7 +16,7 @@ from duckietown_msgs.srv import (
     ChangePatternResponse,
     SetCustomLEDPattern,
     SetCustomLEDPatternResponse)
-from sensor_msgs.msg import CompressedImage
+from sensor_msgs.msg import CompressedImage, CameraInfo
 from std_msgs.msg import ColorRGBA
 
 # In the ROS node, you just need a callback on the camera image stream that
@@ -40,9 +40,9 @@ class ARBasicsNode(DTROS):
             node_name=node_name,
             node_type=NodeType.DRIVER)
 
+        self.hostname = rospy.get_param("~veh")
         self.augmenter = Augmenter()
         self.bridge = CvBridge()
-        self.hostname = rospy.get_param("~veh")
 
         # Read in yaml ====
         yaml_file = rospy.get_param("~map_file")
@@ -65,15 +65,26 @@ class ARBasicsNode(DTROS):
             self.callback_image
         )
 
+        self.camera_info_sub = rospy.Subscriber(
+            f"/{self.hostname}/camera_node/camera_info",
+            CameraInfo,
+            self.callback_camera_info
+        )
+
         self.image = None
 
     def callback_image(self, message):
-        """Callback for the image topic."""
+        """Callback for the /camera_node/image/compressed topic."""
         cv_img = self.bridge.compressed_imgmsg_to_cv2(
             message, desired_encoding='passthrough'
         )
 
+        self.image = self.augmenter.process_image(cv_img)
         self.image = self.augmenter.render_segments(cv_img, self.cvmap)
+
+    def callback_camera_info(self, message):
+        """Callback for the camera_node/camera_info topic."""
+        self.augmenter.from_camera_info(message)
 
     def on_shutdown(self):
         """Shutdown procedure.

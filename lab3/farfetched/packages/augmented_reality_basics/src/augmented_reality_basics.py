@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
-
+from image_geometry import PinholeCameraModel
+from sensor_msgs.msg import CameraInfo
 
 class Augmenter:
     def __init__(self) -> None:
@@ -15,10 +16,18 @@ class Augmenter:
             'black': ['rgb', [0, 0, 0]]
         }
 
-    def process_image(self, image):
+        self.camera_model = PinholeCameraModel()
+
+    def from_camera_info(self, camera_info_msg: CameraInfo):
+        """Updates camera_model with camera_info
+        """
+        self.camera_model.fromCameraInfo(camera_info_msg)
+
+    def process_image(self, raw):
         """Undistorts raw images.
         """
-        return
+        rectified = np.zeros_like(raw)
+        return self.camera_model.rectifyImage(raw, rectified)
 
     def point_to_pixel(self, image: np.ndarray, point: list):
         """Converts a map file point into coordiantes
@@ -48,7 +57,8 @@ class Augmenter:
         transforms points in ground coordinates (i.e. the robot reference frame)
         to pixels in the image.
         """
-        return
+        return None
+
 
     def render_segments(self, image: np.ndarray, cvmap: dict):
         """Plots the segments from the map files onto the image.
