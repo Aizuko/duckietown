@@ -12,7 +12,7 @@ from duckietown.dtros import DTROS, NodeType
 from sensor_msgs.msg import CompressedImage
 from cv_bridge import CvBridge, CvBridgeError
 
-import rospkg 
+import rospkg
 
 
 """
@@ -24,24 +24,39 @@ To help you with that, we have provided you with the Renderer class that render 
 """
 
 class ARNode(DTROS):
-
     def __init__(self, node_name):
-
         # Initialize the DTROS parent class
         super(ARNode, self).__init__(node_name=node_name,node_type=NodeType.GENERIC)
-        self.veh = rospy.get_namespace().strip("/")
+        self.hostname = rospy.get_param("~veh")
 
-        rospack = rospkg.RosPack()
         # Initialize an instance of Renderer giving the model in input.
-        self.renderer = Renderer(rospack.get_path('augmented_reality_apriltag') + '/src/models/duckie.obj')
+        rospack = rospkg.RosPack()
+        self.renderer = Renderer(rospack.get_path('augmented_reality_apriltag')
+                                 + '/src/models/duckie.obj')
 
-        #
-        #   Write your code here
-        #
+        at_detector = Detector(searchpath=['apriltags'],
+                                    families='tag36h11',
+                                    nthreads=1,
+                                    quad_decimate=1.0,
+                                    quad_sigma=0.0,
+                                    refine_edges=1,
+                                    decode_sharpening=0.25,
+                                    debug=0)
 
+        self.detect = lambda img: at_detector.detect(img,
+                                                     estimate_tag_pose=False,
+                                                     camera_params=None,
+                                                     tag_size=None)
 
+        # Standard subscribers and publishers
+        self.pub = rospy.Publisher('~compressed', CompressedImage, queue_size=2)
 
-    
+        rospy.Subscriber(f'/{self.hostname}/camera_node/image/compressed',
+                         CompressedImage, self.april_cb)
+
+    def april_cb(self, compressed):
+        pass
+
     def projection_matrix(self, intrinsic, homography):
         """
             Write here the compuatation for the projection matrix, namely the matrix
