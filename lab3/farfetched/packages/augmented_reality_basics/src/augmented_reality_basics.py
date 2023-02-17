@@ -88,9 +88,6 @@ class Augmenter:
             pt_b (np.ndarray): end point of segment
             color (str): color of segment
         """
-
-        print(f"Image type: {type(image)}")
-
         cv2.line(
             image,
             pt_a,

@@ -1,21 +1,23 @@
 #!/usr/bin/env python3
 import os
-import rospy
 import time
-import yaml
 from pathlib import Path
 
 import cv2
 import numpy as np
-
-from duckietown_msgs.srv import SetCustomLEDPattern, ChangePattern
-from duckietown_msgs.srv import SetCustomLEDPatternResponse, ChangePatternResponse
-from duckietown_msgs.msg import LEDPattern
-from std_msgs.msg import ColorRGBA
-from sensor_msgs.msg import CompressedImage
-
-from duckietown.dtros import DTROS, TopicType, NodeType
+import rospy
+import yaml
 from augmented_reality_basics import Augmenter
+from cv_bridge import CvBridge
+from duckietown.dtros import DTROS, NodeType, TopicType
+from duckietown_msgs.msg import LEDPattern
+from duckietown_msgs.srv import (
+    ChangePattern,
+    ChangePatternResponse,
+    SetCustomLEDPattern,
+    SetCustomLEDPatternResponse)
+from sensor_msgs.msg import CompressedImage
+from std_msgs.msg import ColorRGBA
 
 # In the ROS node, you just need a callback on the camera image stream that
 # uses the Augmenter class to modify the input image. Therefore, implement
@@ -28,7 +30,9 @@ from augmented_reality_basics import Augmenter
 # Subscribe to the image topic /robot name/camera_node/image/compressed.
 # When you receive an image, project the map features onto it, and then publish
 # the result to the topic /robot name/node_name/map file basename/image/compressed
-# where map file basename is the basename of the file without the yaml extension.
+# where map file basename is the basename of the file without the yaml
+# extension.
+
 
 class ARBasicsNode(DTROS):
     def __init__(self, node_name):
@@ -37,6 +41,7 @@ class ARBasicsNode(DTROS):
             node_type=NodeType.DRIVER)
 
         self.augmenter = Augmenter()
+        self.bridge = CvBridge()
         self.hostname = rospy.get_param("~veh")
 
         # Read in yaml ====
@@ -62,10 +67,11 @@ class ARBasicsNode(DTROS):
 
         self.image = None
 
-    def callback_image(self, compressed):
+    def callback_image(self, message):
         """Callback for the image topic."""
-        raw_bytes = np.frombuffer(compressed.data, dtype=np.uint8)
-        cv_img = cv2.imdecode(raw_bytes, cv2.IMREAD_COLOR)
+        cv_img = self.bridge.compressed_imgmsg_to_cv2(
+            message, desired_encoding='passthrough'
+        )
 
         self.image = self.augmenter.render_segments(cv_img, self.cvmap)
 
@@ -80,10 +86,12 @@ class ARBasicsNode(DTROS):
         rate = rospy.Rate(1)
 
         while not rospy.is_shutdown():
-            if ar_node.image is not None:
-                ar_node.pub.publish(ar_node.image)
+            if self.image is not None:
+                message = self.bridge.cv2_to_compressed_imgmsg(
+                    self.image, dst_format="jpeg"
+                )
+                ar_node.pub.publish(message)
             rate.sleep()
-
 
 
 if __name__ == "__main__":
@@ -94,7 +102,10 @@ if __name__ == "__main__":
     rospy.spin()
 
 # Load the intrinsic / extrinsic calibration parameters for the given robot.
-# Read the map file corresponding to the map_file parameter given in the roslaunch command above.
+# Read the map file corresponding to the map_file parameter given in the
+# roslaunch command above.
 # Subscribe to the image topic /robot name/camera_node/image/compressed.
-# When you receive an image, project the map features onto it, and then publish the result to the topic /robot name/node_name/map file basename/image/compressed where map file basename is the basename of the file without the yaml extension.
-
+# When you receive an image, project the map features onto it, and then
+# publish the result to the topic /robot name/node_name/map file
+# basename/image/compressed where map file basename is the basename of the
+# file without the yaml extension.
