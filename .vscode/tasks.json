@@ -17,7 +17,7 @@
       }
     },
     {
-      "label": "test",
+      "label": "Test",
       "type": "shell",
       "command": "dts devel run -H csc22902.local",
       "options": {
@@ -27,7 +27,10 @@
       "presentation": {
         "reveal": "always",
         "panel": "shared"
-      }
+      },
+      "dependsOn": [
+        "Build"
+      ]
     }
   ]
 }
