@@ -11,6 +11,7 @@ import sys
 from duckietown.dtros import DTROS, NodeType
 from sensor_msgs.msg import CompressedImage
 from cv_bridge import CvBridge, CvBridgeError
+from dt_apriltags import Detector
 
 import rospkg
 
@@ -25,9 +26,11 @@ To help you with that, we have provided you with the Renderer class that render 
 
 class ARNode(DTROS):
     def __init__(self, node_name):
-        # Initialize the DTROS parent class
-        super(ARNode, self).__init__(node_name=node_name,node_type=NodeType.GENERIC)
+        super(ARNode, self).__init__(node_name=node_name,
+                                     node_type=NodeType.GENERIC)
+
         self.hostname = rospy.get_param("~veh")
+        self.bridge = CvBridge()
 
         # Initialize an instance of Renderer giving the model in input.
         rospack = rospkg.RosPack()
@@ -50,12 +53,26 @@ class ARNode(DTROS):
 
         # Standard subscribers and publishers
         self.pub = rospy.Publisher('~compressed', CompressedImage, queue_size=2)
+        self.compressed = None
 
-        rospy.Subscriber(f'/{self.hostname}/camera_node/image/compressed',
-                         CompressedImage, self.april_cb)
+        rospy.Subscriber(
+            f'/{self.hostname}/camera_node/image/compressed',
+            CompressedImage,
+            self.april_cb,
+        )
 
     def april_cb(self, compressed):
-        pass
+        read_img = self.readImage(compressed)
+        tags = self.detect(read_img)
+        self.compressed = compressed
+
+    def pub_loop(self, rate=1):
+        rate = rospy.Rate(rate)
+
+        while not rospy.is_shutdown():
+            if self.compressed is not None:
+                self.pub.publish(self.compressed)
+            rate.sleep()
 
     def projection_matrix(self, intrinsic, homography):
         """
@@ -105,7 +122,5 @@ class ARNode(DTROS):
 
 
 if __name__ == '__main__':
-    # Initialize the node
     camera_node = ARNode(node_name='augmented_reality_apriltag_node')
-    # Keep it spinning to keep the node alive
-    rospy.spin()
+    camera_node.pub_loop()
