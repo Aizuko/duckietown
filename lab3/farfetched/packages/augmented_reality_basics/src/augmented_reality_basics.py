@@ -36,10 +36,9 @@ class Augmenter:
             raise NotImplementedError
         elif reference_frame == "image01":
             pixel = np.array([
-                image.shape[1] * coordinates[0],
-                image.shape[0] * coordinates[1]
+                (image.shape[1] - 1) * coordinates[0],
+                (image.shape[0] - 1) * coordinates[1]
             ])
-
             return pixel
         else:
             raise ValueError("Invalid reference frame")
