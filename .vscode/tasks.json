@@ -19,7 +19,7 @@
     {
       "label": "Test",
       "type": "shell",
-      "command": "dts devel run -H csc22902.local",
+      "command": "dts devel run -H csc22902.local -v /data:/data",
       "options": {
         "cwd": "${workspaceFolder}/lab3/farfetched"
       },

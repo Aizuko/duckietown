@@ -41,7 +41,8 @@ class ARBasicsNode(DTROS):
             node_type=NodeType.DRIVER)
 
         self.hostname = rospy.get_param("~veh")
-        self.augmenter = Augmenter()
+        H = self.load_homography_matrix()
+        self.augmenter = Augmenter(H)
         self.bridge = CvBridge()
 
         # Read in yaml ====
@@ -72,19 +73,34 @@ class ARBasicsNode(DTROS):
         )
 
         self.image = None
+        self.raw_image = None
 
     def callback_image(self, message):
         """Callback for the /camera_node/image/compressed topic."""
-        cv_img = self.bridge.compressed_imgmsg_to_cv2(
+        self.raw_image = self.bridge.compressed_imgmsg_to_cv2(
             message, desired_encoding='passthrough'
         )
-
-        self.image = self.augmenter.process_image(cv_img)
-        self.image = self.augmenter.render_segments(self.image, self.cvmap)
 
     def callback_camera_info(self, message):
         """Callback for the camera_node/camera_info topic."""
         self.augmenter.from_camera_info(message)
+
+    def load_homography_matrix(self):
+        """Load homography matrix from extrinsic calibration file."""
+        for filename in [self.hostname, "default"]:
+            try:
+                path = "/data/config/calibrations/camera_extrinsic/"
+                path += f"{filename}.yaml"
+                with open(path) as f:
+                    data = yaml.load(f, Loader=yaml.CLoader)
+                    rospy.loginfo(
+                        f"Loaded camera extrinsic calibration file: {path}"
+                    )
+                    return np.array(data['homography']).reshape(3, 3)
+            except FileNotFoundError:
+                rospy.logwarn(
+                    f"Camera extrinsic calibration file not found: {path}"
+                )
 
     def on_shutdown(self):
         """Shutdown procedure.
@@ -94,10 +110,14 @@ class ARBasicsNode(DTROS):
         pass
 
     def run(self):
-        rate = rospy.Rate(1)
+        rate = rospy.Rate(30)
 
         while not rospy.is_shutdown():
-            if self.image is not None:
+            if self.raw_image is not None:
+                self.image = self.augmenter.process_image(self.raw_image)
+                self.image = self.augmenter.render_segments(
+                    self.image, self.cvmap
+                )
                 message = self.bridge.cv2_to_compressed_imgmsg(
                     self.image, dst_format="jpeg"
                 )
@@ -112,11 +132,3 @@ if __name__ == "__main__":
 
     rospy.spin()
 
-# Load the intrinsic / extrinsic calibration parameters for the given robot.
-# Read the map file corresponding to the map_file parameter given in the
-# roslaunch command above.
-# Subscribe to the image topic /robot name/camera_node/image/compressed.
-# When you receive an image, project the map features onto it, and then
-# publish the result to the topic /robot name/node_name/map file
-# basename/image/compressed where map file basename is the basename of the
-# file without the yaml extension.

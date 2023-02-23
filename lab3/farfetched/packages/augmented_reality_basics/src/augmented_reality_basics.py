@@ -3,8 +3,9 @@ import numpy as np
 from image_geometry import PinholeCameraModel
 from sensor_msgs.msg import CameraInfo
 
+
 class Augmenter:
-    def __init__(self) -> None:
+    def __init__(self, H: np.ndarray) -> None:
         self.defined_colors = {
             'red': ['rgb', [1, 0, 0]],
             'green': ['rgb', [0, 1, 0]],
@@ -17,6 +18,7 @@ class Augmenter:
         }
 
         self.camera_model = PinholeCameraModel()
+        self.H = H
 
     def from_camera_info(self, camera_info_msg: CameraInfo):
         """Updates camera_model with camera_info
@@ -40,25 +42,41 @@ class Augmenter:
             tuple: coordinates in image
         """
         reference_frame, coordinates = point
+        coordinates = np.array(coordinates)
+        shape = np.array(image.shape[:2][::-1]) - 1
         if reference_frame == "axle":
-            raise NotImplementedError
+            return self.ground2pixel(coordinates, self.H)
         elif reference_frame == "camera":
-            raise NotImplementedError
+            raise self.ground2pixel(coordinates)
         elif reference_frame == "image01":
-            pixel = np.array([
-                (image.shape[1] - 1) * coordinates[0],
-                (image.shape[0] - 1) * coordinates[1]
-            ])
+            pixel = shape * coordinates
             return pixel
         else:
             raise ValueError("Invalid reference frame")
 
-    def ground2pixel(self, ground_coordinates):
+    def ground2pixel(self, ground_coordinates, H=np.eye(3)):
         """
         transforms points in ground coordinates (i.e. the robot reference frame)
-        to pixels in the image.
+        to pixels in the image
+
+        Args:
+            ground_coordinates (3 * 1)): point in ground coordinates
+            H (3 * 3): homography matrix
+
+        Returns:
+            pixel (2 * 1): point in pixel coordinates
+
+        Source:
+        https://github.com/duckietown/dt-core/blob/
+        6d8e99a5849737f86cab72b04fd2b449528226be/packages/
+        complete_image_pipeline/include/image_processing/
+        ground_projection_geometry.py#L161
         """
-        return None
+        ground_coordinates[2] = 1
+        pixel = np.linalg.solve(H, ground_coordinates)
+        pixel /= pixel[2]
+        pixel = pixel[:2].astype(np.int64)
+        return pixel
 
 
     def render_segments(self, image: np.ndarray, cvmap: dict):
