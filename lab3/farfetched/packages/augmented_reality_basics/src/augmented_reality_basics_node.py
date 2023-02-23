@@ -80,7 +80,7 @@ class ARBasicsNode(DTROS):
         )
 
         self.image = self.augmenter.process_image(cv_img)
-        self.image = self.augmenter.render_segments(cv_img, self.cvmap)
+        self.image = self.augmenter.render_segments(self.image, self.cvmap)
 
     def callback_camera_info(self, message):
         """Callback for the camera_node/camera_info topic."""

@@ -27,7 +27,8 @@ class Augmenter:
         """Undistorts raw images.
         """
         rectified = np.zeros_like(raw)
-        return self.camera_model.rectifyImage(raw, rectified)
+        self.camera_model.rectifyImage(raw, rectified)
+        return rectified
 
     def point_to_pixel(self, image: np.ndarray, point: list):
         """Converts a map file point into coordiantes
