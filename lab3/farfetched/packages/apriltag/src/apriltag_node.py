@@ -101,11 +101,12 @@ class AprilTagNode(DTROS):
             )
             corner_a = detection.corners[i]
             corner_b = detection.corners[(i + 1) % 4]
+            bgr = tag.color[::-1]
             cv2.line(
                 image,
                 corner_a.astype(np.int64),
                 corner_b.astype(np.int64),
-                tag.color,
+                bgr,
                 2
             )
             text = str(detection.tag_id)
@@ -122,7 +123,7 @@ class AprilTagNode(DTROS):
                 center,
                 font,
                 font_scale,
-                tag.color[::-1],
+                bgr,
                 font_thickness
             )
 
