@@ -24,15 +24,6 @@ from std_msgs.msg import ColorRGBA
 # a method called callback that writes the augmented image to the appropriate
 # topic.
 
-# Load the intrinsic / extrinsic calibration parameters for the given robot.
-# Read the map file corresponding to the map_file parameter given in the roslaunch
-# command above.
-# Subscribe to the image topic /robot name/camera_node/image/compressed.
-# When you receive an image, project the map features onto it, and then publish
-# the result to the topic /robot name/node_name/map file basename/image/compressed
-# where map file basename is the basename of the file without the yaml
-# extension.
-
 
 class ARBasicsNode(DTROS):
     def __init__(self, node_name):
@@ -131,4 +122,3 @@ if __name__ == "__main__":
     ar_node.run()
 
     rospy.spin()
-
