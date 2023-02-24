@@ -9,9 +9,10 @@ import rospy
 import yaml
 import sys
 from duckietown.dtros import DTROS, NodeType
-from sensor_msgs.msg import CompressedImage
+from sensor_msgs.msg import CompressedImage, CameraInfo
 from cv_bridge import CvBridge, CvBridgeError
 from dt_apriltags import Detector
+from image_geometry import PinholeCameraModel
 
 import rospkg
 
@@ -51,9 +52,11 @@ class ARNode(DTROS):
                                                      camera_params=None,
                                                      tag_size=None)
 
+        self.camera_model = PinholeCameraModel()
+
         # Standard subscribers and publishers
         self.pub = rospy.Publisher('~compressed', CompressedImage, queue_size=2)
-        self.compressed = None
+        self.raw_image = None
 
         rospy.Subscriber(
             f'/{self.hostname}/camera_node/image/compressed',
@@ -61,28 +64,70 @@ class ARNode(DTROS):
             self.april_cb,
         )
 
-    def april_cb(self, compressed):
-        read_img = self.readImage(compressed)
-        tags = self.detect(read_img)
-        self.compressed = compressed
 
-    def pub_loop(self, rate=1):
+        self.camera_info_sub = rospy.Subscriber(
+            f"/{self.hostname}/camera_node/camera_info",
+            CameraInfo,
+            self.callback_camera_info
+        )
+
+    def callback_camera_info(self, message):
+        """Callback for the camera_node/camera_info topic."""
+        self.camera_model.fromCameraInfo(message)
+
+    def april_cb(self, compressed):
+        self.raw_image = self.readImage(compressed)
+
+
+    def pub_loop(self, rate=30):
         rate = rospy.Rate(rate)
 
         while not rospy.is_shutdown():
-            if self.compressed is not None:
-                self.pub.publish(self.compressed)
+            if self.raw_image is None:
+                rate.sleep()
+                continue
+            image = self.raw_image.copy()
+            grayscale = cv2.cvtColor(self.raw_image, cv2.COLOR_BGR2GRAY)
+            tags = self.detect(grayscale)
+            for tag in tags:
+                projection_matrix = self.projection_matrix(tag.homography)
+                image = self.renderer.render(image, projection_matrix)
+            message = self.bridge.cv2_to_compressed_imgmsg(
+                image, dst_format="jpeg"
+            )
+            self.pub.publish(message)
             rate.sleep()
 
-    def projection_matrix(self, intrinsic, homography):
+    def projection_matrix(self, homography):
         """
             Write here the compuatation for the projection matrix, namely the matrix
             that maps the camera reference frame to the AprilTag reference frame.
-        """
 
-        #
-        # Write your code here
-        #
+            Source:
+            https://bitesofcode.wordpress.com/2018/09/16/
+            augmented-reality-with-python-and-opencv-part-2/
+        """
+        camera_parameters = self.camera_model.intrinsicMatrix()
+        # Compute rotation along the x and y axis as well as the translation
+        rot_and_transl = np.linalg.inv(camera_parameters) @ homography
+        col_1 = rot_and_transl[:, 0].T
+        col_2 = rot_and_transl[:, 1].T
+        col_3 = rot_and_transl[:, 2].T
+        # normalise vectors
+        l = math.sqrt(np.linalg.norm(col_1, 2) * np.linalg.norm(col_2, 2))
+        rot_1 = col_1 / l
+        rot_2 = col_2 / l
+        translation = col_3 / l
+        # compute the orthonormal basis
+        c = rot_1 + rot_2
+        p = np.cross(rot_1, rot_2)
+        d = np.cross(c, p)
+        rot_1 = c / np.linalg.norm(c, 2) + d / np.linalg.norm(d, 2) * 1 / math.sqrt(2)
+        rot_2 = c / np.linalg.norm(c, 2) - d / np.linalg.norm(d, 2) * 1 / math.sqrt(2)
+        rot_3 = np.cross(rot_1, rot_2)
+        # finally, compute the 3D projection matrix from the model to the current frame
+        projection = np.stack((rot_1, rot_2, rot_3, translation)).T
+        return camera_parameters @ projection
 
     def readImage(self, msg_image):
         """
