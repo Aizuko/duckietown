@@ -75,20 +75,33 @@ def canny_detection(image: np.ndarray):
     cv2.imshow('uncanny', image)
     return
 
-while cap.isOpened():
-    ret, image = cap.read()
-    image = cv2.resize(image, (0, 0), fx=0.25, fy=0.25)
-    #image = image[118:-10, 30:-220]  # Crop to camera only
-    #image = image[318:-10, 30:-230]  # Crop to lower camera
-    image = image[208:-20, 40:-240]  # Crop to lower camera tight
+def run():
+    while cap.isOpened():
+        ret, image = cap.read()
+        image = cv2.resize(image, (0, 0), fx=0.25, fy=0.25)
+        #image = image[118:-10, 30:-220]  # Crop to camera only
+        #image = image[318:-10, 30:-230]  # Crop to lower camera
+        image = image[208:-20, 40:-240]  # Crop to lower camera tight
 
-    channel_masking(image)
-    canny_detection(image)
+        channel_masking(image)
+        #canny_detection(image)
 
-    key = cv2.waitKey(1)
+        key = cv2.waitKey(1)
 
-    if key == ord('q'):
-        break
+        if key == ord('q'):
+            return
+        elif key == ord(' '):
+            while True:
+                key = cv2.waitKey(300)
 
-cap.release()
-cv2.destroyAllWindows()
+                if key == ord(' '):
+                    break
+                elif key == ord('q'):
+                    return
+
+
+if __name__ == '__main__':
+    run()
+    cap.release()
+    cv2.destroyAllWindows()
+
