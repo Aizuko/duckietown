@@ -46,7 +46,17 @@ def channel_masking(image: np.ndarray):
 
     white_grey = cv2.cvtColor(white_channel, cv2.COLOR_BGR2GRAY)
     white_conts, _ = cv2.findContours(white_grey, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-    white_channel = cv2.drawContours(white_channel, white_conts, -1, (0,255,0), 3)
+
+    if len(white_conts) > 0:
+        c = max(white_conts, key=cv2.contourArea)
+        M = cv2.moments(c)
+        cx = int(M['m10']/M['m00'])
+        cy = int(M['m01']/M['m00'])
+        cv2.line(white_channel, (cx,0),(cx,720),(255,0,0),1)
+        cv2.line(white_channel, (0,cy),(1280,cy),(255,0,0),1)
+        cv2.drawContours(white_channel, white_conts, -1, (0,255,0), 1)
+
+    #white_channel = cv2.drawContours(white_channel, white_conts, -1, (0,255,0), 3)
 
     cv2.imshow('white', white_channel)
     #cv2.imshow('red', red_channel)
