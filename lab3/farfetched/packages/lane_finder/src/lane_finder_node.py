@@ -44,7 +44,7 @@ class ARBasicsNode(DTROS):
         )
 
         self.img_sub = rospy.Subscriber(
-            f"/{self.hostname}/camera_node/image/compressed",
+            f"/{self.hostname}/homography_publisher/image/compressed",
             CompressedImage,
             self.callback_image
         )
@@ -97,8 +97,9 @@ class ARBasicsNode(DTROS):
 
         while not rospy.is_shutdown():
             if self.raw_image is not None:
-                self.image = self.augmenter.process_image(self.raw_image)
-                self.image = self.augmenter.mask_lanes(self.image)
+                #self.image = self.augmenter.process_image(self.raw_image)
+
+                self.image = self.augmenter.mask_lanes(self.raw_image)
                 #self.image = self.augmenter.render_segments(
                 #    self.image, self.cvmap
                 #)
