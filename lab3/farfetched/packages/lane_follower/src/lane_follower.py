@@ -9,13 +9,11 @@ import yaml
 import sys
 from numpy import pi
 from duckietown.dtros import DTROS, NodeType
-from duckietown_msgs.msg import WheelsCmdStamped, Pose2DStamped
+from duckietown_msgs.msg import WheelsCmdStamped, Twist2DStamped, Pose2DStamped
 from farfetched_msgs.msg import FarfetchedPose
 from sensor_msgs.msg import CompressedImage
 from cv_bridge import CvBridge, CvBridgeError
 from dt_apriltags import Detector
-
-import rospkg
 
 
 class LaneFollowerPIDNode(DTROS):
@@ -50,10 +48,6 @@ class LaneFollowerPIDNode(DTROS):
         self.d_rad = None
         self.i = None
 
-        # Final power publishings
-        self.power_left = None
-        self.power_right = None
-
         self.sub = rospy.Subscriber(
             f"/{self.hostname}/~todo",
             FarfetchedPose,
@@ -61,11 +55,18 @@ class LaneFollowerPIDNode(DTROS):
         )
 
         self.pub_move = rospy.Publisher(
-            f'/{self.hostname}/wheels_driver_node/wheels_cmd',
-            WheelsCmdStamped,
+            f'/{self.hostname}/car_cmd_switch_node/cmd',
+            Twist2DStamped,
             queue_size=1,
             dt_topic_type=TopicType.DRIVER,
         )
+
+        #self.pub_move = rospy.Publisher(
+        #    f'/{self.hostname}/wheels_driver_node/wheels_cmd',
+        #    WheelsCmdStamped,
+        #    queue_size=1,
+        #    dt_topic_type=TopicType.DRIVER,
+        #)
 
     def rotational_offset(self, radians):
         """ Returns a rotational offset in [-pi, pi] with respect to the target
@@ -116,10 +117,10 @@ class LaneFollowerPIDNode(DTROS):
 
     def pub_loop(self):
         while not rospy.is_shutdown():
-            if self.power_left is not None and self.power_right is not None:
-                cmd = WheelsCmdStamped()
-                cmd.vel_left = self.power_left
-                cmd.vel_right = self.power_right
+            if self.p_dist is not None and self.p_rad is not None:
+                cmd = Twist2DStamped()
+                cmd.v = self.p_dist
+                cmd.omega = self.p_rad
                 self.pub_move.publish(cmd)
 
 

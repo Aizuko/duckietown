@@ -12,5 +12,12 @@ AR vision node for segmenting out the lines
                 output="screen" >
             <param name="veh" value="$(arg veh)" />
         </node>
+
+        <node pkg="lane_finder"
+                type="homography_publisher_node.py"
+                name="homography_publisher"
+                output="screen" >
+            <param name="veh" value="$(arg veh)" />
+        </node>
     </group>
 </launch>

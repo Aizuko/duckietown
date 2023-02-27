@@ -105,7 +105,7 @@ class ARBasicsNode(DTROS):
                 message = self.bridge.cv2_to_compressed_imgmsg(
                     self.image, dst_format="jpeg"
                 )
-                ar_node.pub.publish(message)
+                self.pub.publish(message)
             rate.sleep()
 
 

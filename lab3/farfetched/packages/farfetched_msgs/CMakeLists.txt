@@ -116,7 +116,7 @@ generate_messages(
 
 catkin_package(
 #  INCLUDE_DIRS include
-#  LIBRARIES duckietown_msgs
+#  LIBRARIES farfetched_msgs   # Maybe uncomment this?
    CATKIN_DEPENDS
    #geometry_msgs
    roscpp rospy
