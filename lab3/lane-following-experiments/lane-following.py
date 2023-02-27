@@ -1,7 +1,8 @@
 import cv2
 import numpy as np
 
-cap = cv2.VideoCapture('apriltag.mov')
+#cap = cv2.VideoCapture('apriltag.mov')
+cap = cv2.VideoCapture('recording.mp4')
 
 
 def rgb2bgr(r, g, b):
@@ -52,15 +53,28 @@ def channel_masking(image: np.ndarray):
         M = cv2.moments(c)
         cx = int(M['m10']/M['m00'])
         cy = int(M['m01']/M['m00'])
-        cv2.line(white_channel, (cx,0),(cx,720),(255,0,0),1)
-        cv2.line(white_channel, (0,cy),(1280,cy),(255,0,0),1)
+        cv2.line(white_channel, (cx,0),(cx,720),  (0,255,0),1)
+        cv2.line(white_channel, (0,cy),(1280,cy), (0,255,0),1)
         cv2.drawContours(white_channel, white_conts, -1, (0,255,0), 1)
+
+    yellow_grey = cv2.cvtColor(yellow_channel, cv2.COLOR_BGR2GRAY)
+    yellow_conts, _ = cv2.findContours(yellow_grey, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+
+    if len(yellow_conts) > 0:
+        c = max(yellow_conts, key=cv2.contourArea)
+        M = cv2.moments(c)
+        cx = int(M['m10']/(M['m00'] or 1))
+        cy = int(M['m01']/(M['m00'] or 1))
+        cv2.line(yellow_channel, (cx,0),(cx,720), (0,255,0),1)
+        cv2.line(yellow_channel, (0,cy),(1280,cy),(0,255,0),1)
+        cv2.drawContours(yellow_channel, yellow_conts, -1, (0,255,0), 1)
 
     #white_channel = cv2.drawContours(white_channel, white_conts, -1, (0,255,0), 3)
 
     cv2.imshow('white', white_channel)
     #cv2.imshow('red', red_channel)
-    #cv2.imshow('yellow', yellow_channel)
+    cv2.imshow('yellow', yellow_channel)
+    cv2.imshow('raw', image)
     return
 
 def canny_detection(image: np.ndarray):
@@ -91,7 +105,9 @@ def run():
         image = cv2.resize(image, (0, 0), fx=0.25, fy=0.25)
         #image = image[118:-10, 30:-220]  # Crop to camera only
         #image = image[318:-10, 30:-230]  # Crop to lower camera
-        image = image[208:-20, 40:-240]  # Crop to lower camera tight
+        #image = image[208:-20, 40:-240]  # Crop to lower camera tight
+
+        image = image[60:-20, :-220]  # From fullscreen waybook view
 
         channel_masking(image)
         #canny_detection(image)
