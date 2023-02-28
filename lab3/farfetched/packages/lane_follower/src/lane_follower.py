@@ -9,8 +9,9 @@ import yaml
 import sys
 from numpy import pi
 from duckietown.dtros import DTROS, NodeType
-from duckietown_msgs.msg import WheelsCmdStamped, Twist2DStamped, Pose2DStamped
 from farfetched_msgs.msg import FarfetchedPose
+from duckietown_msgs.msg import WheelsCmdStamped, Twist2DStamped, Pose2DStamped
+from duckietown.dtros import DTROS, NodeType, TopicType
 from sensor_msgs.msg import CompressedImage
 from cv_bridge import CvBridge, CvBridgeError
 from dt_apriltags import Detector
@@ -49,9 +50,9 @@ class LaneFollowerPIDNode(DTROS):
         self.i = None
 
         self.sub = rospy.Subscriber(
-            f"/{self.hostname}/~todo",
+            f"/{self.hostname}/lane_finder_node/pose",
             FarfetchedPose,
-            self.pose_cb,
+            self.pose_cb_test,
         )
 
         self.pub_move = rospy.Publisher(
@@ -75,6 +76,9 @@ class LaneFollowerPIDNode(DTROS):
         b = self.target_rad
 
         return (a - b + 2*pi + pi) % (2*pi) - pi
+
+    def pose_cb_test(self, pose):
+        rospy.loginfo(pose)
 
     def pose_cb(self, pose):
         """ Updates the P and D values based on the pose
@@ -127,5 +131,5 @@ class LaneFollowerPIDNode(DTROS):
 if __name__ == '__main__':
     node = LaneFollowerPIDNode(node_name='lane_follower_pid_node')
 
-    node.pub_loop()
+    #node.pub_loop()
     rospy.spin()  # Just in case?
