@@ -42,14 +42,25 @@ class LaneFinderNode(DTROS):
 
         self.hostname = rospy.get_param("~veh")
         self.bridge = CvBridge()
-        H = self.load_homography_matrix()
-        self.augmenter = Augmenter(H)
+        self.raw_image = None
 
         # Setup publisher path ====
         self.pub = rospy.Publisher(
             f"/{self.hostname}/lane_finder_node/pose",
             FarfetchedPose,
             queue_size=2,
+        )
+
+        self.pub_white = rospy.Publisher(
+            f"/{self.hostname}/lane_finder_node/debug/white/compressed",
+            CompressedImage,
+            queue_size=1,
+        )
+
+        self.pub_yellow = rospy.Publisher(
+            f"/{self.hostname}/lane_finder_node/debug/yellow/compressed",
+            CompressedImage,
+            queue_size=1,
         )
 
         self.img_sub = rospy.Subscriber(
@@ -62,31 +73,15 @@ class LaneFinderNode(DTROS):
         self.yellow_x = None
         return
 
-
     def callback_image(self, message):
         """Callback for the /camera_node/image/compressed topic."""
         self.raw_image = self.bridge.compressed_imgmsg_to_cv2(
             message, desired_encoding='passthrough'
         )
 
-    def load_homography_matrix(self):
-        """Load homography matrix from extrinsic calibration file."""
-        for filename in [self.hostname, "default"]:
-            try:
-                path = "/data/config/calibrations/camera_extrinsic/"
-                path += f"{filename}.yaml"
-                with open(path) as f:
-                    data = yaml.load(f, Loader=yaml.CLoader)
-                    rospy.loginfo(
-                        f"Loaded camera extrinsic calibration file: {path}"
-                    )
-                    return np.array(data['homography']).reshape(3, 3)
-            except FileNotFoundError:
-                rospy.logwarn(
-                    f"Camera extrinsic calibration file not found: {path}"
-                )
-
     def channel_masking(self, image: np.ndarray):
+        image = image[len(image)//2:, :]  # Only use bottom half
+
         white_channel = mask_range_rgb(image.copy(), [160, 0, 0],   [255, 61, 255], [255]*3)
         red_channel = mask_range_rgb(image.copy(), [130, 100, 0], [255, 255, 20], [255]*3)
         yellow_channel = mask_range_rgb(image.copy(), [100, 40, 0], [240, 255, 80], [255]*3)
@@ -102,43 +97,65 @@ class LaneFinderNode(DTROS):
             c = max(white_conts, key=cv2.contourArea)
             M = cv2.moments(c)
             cx = int(M['m10']/M['m00'])
-            cy = int(M['m01']/M['m00'])  # We don't use this
+            cy = int(M['m01']/M['m00'])
             self.white_x = cx
+            self.white_y = cy
+            cv2.line(white_channel, (cx,0),(cx,720), (0,255,0),1)
+            cv2.line(white_channel, (0,cy),(1280,cy),(0,255,0),1)
+            cv2.drawContours(white_channel, white_conts, -1, (0,255,0), 1)
         else:
             self.white_x = None
+            self.white_y = None
 
         yellow_grey = cv2.cvtColor(yellow_channel, cv2.COLOR_BGR2GRAY)
         yellow_conts, _ = cv2.findContours(yellow_grey, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+
+        w = self.bridge.cv2_to_compressed_imgmsg(white_channel, dst_format="jpeg")
+        self.pub_white.publish(w)
 
         if len(yellow_conts) > 0:
             c = max(yellow_conts, key=cv2.contourArea)
             M = cv2.moments(c)
             cx = int(M['m10']/(M['m00'] or 1))
-            cy = int(M['m01']/(M['m00'] or 1))  # We don't use this
+            cy = int(M['m01']/(M['m00'] or 1))
             self.yellow_x = cx
+            self.yellow_y = cy
+
+            cv2.line(yellow_channel, (cx,0),(cx,720), (0,255,0),1)
+            cv2.line(yellow_channel, (0,cy),(1280,cy),(0,255,0),1)
+            cv2.drawContours(yellow_channel, yellow_conts, -1, (0,255,0), 1)
         else:
             self.yellow_x = None
+            self.yellow_y = None
 
+        y = self.bridge.cv2_to_compressed_imgmsg(yellow_channel, dst_format="jpeg")
+        self.pub_yellow.publish(y)
         return
 
     def run(self):
-        rate = rospy.Rate(30)
+        rate = rospy.Rate(5)
 
         while not rospy.is_shutdown():
-            if self.yellow_x is None and self.white_x is None:
-                msg = FarfetchedPose()
-                msg.lateral_offset = 0.0
-                msg.rotational_offset_rad = 0.0
-                msg.is_in_lane = False
-                msg.is_located = False
-                self.pub.publish(msg)
+            if self.raw_image is not None:
+                self.channel_masking(self.raw_image)
+            msg = FarfetchedPose()
+
+            if self.yellow_x is not None and self.yellow_y is not None:
+                msg.yellow_x = self.yellow_x
+                msg.yellow_y = self.yellow_y
+                msg.is_yellow_detected = True
             else:
-                msg = FarfetchedPose()
-                msg.lateral_offset = 0.0
-                msg.rotational_offset_rad = 0.0
-                msg.is_in_lane = False
-                msg.is_located = True
-                self.pub.publish(msg)
+                msg.is_yellow_detected = False
+
+            if self.white_x is not None and self.white_y is not None:
+                msg.white_x = self.white_x
+                msg.white_y = self.white_y
+                msg.is_white_detected = True
+            else:
+                msg.is_white_detected = False
+
+            self.pub.publish(msg)
+            rospy.loginfo("Publishing message")
 
             rate.sleep()
 

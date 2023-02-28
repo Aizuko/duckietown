@@ -17,6 +17,115 @@ from cv_bridge import CvBridge, CvBridgeError
 from dt_apriltags import Detector
 
 
+class LaneFollowerBasicsNode(DTROS):
+    """ Bins based on how bad the current lateral positioning is """
+    def __init__(self, node_name):
+        super(LaneFollowerBasicsNode, self).__init__(node_name=node_name,
+                                     node_type=NodeType.GENERIC)
+
+        self.hostname = rospy.get_param("~veh")
+
+        self.white_x = None
+        self.yellow_x = None
+
+        self.speed_l = None
+        self.speed_r = None
+
+        self.sub = rospy.Subscriber(
+            f"/{self.hostname}/lane_finder_node/pose",
+            FarfetchedPose,
+            self.pose_cb,
+        )
+
+        self.pub_move = rospy.Publisher(
+            f'/{self.hostname}/wheels_driver_node/wheels_cmd',
+            WheelsCmdStamped,
+            queue_size=1,
+            dt_topic_type=TopicType.DRIVER,
+        )
+
+    def pose_cb(self, pose):
+        self.white_x = pose.white_x
+        self.yellow_x = pose.yellow_x
+
+        # Throw away white line data
+
+        if self.yellow_x is None:
+            self.speed_l = 0.4
+            self.speed_r = 0.4
+        elif 0 < self.yellow_x < 100:
+            self.speed_l = 0.4
+            self.speed_r = 0.5
+            rospy.loginfo("Left soft")
+        elif 100 < self.yellow_x < 200:
+            self.speed_l = 0.4
+            self.speed_r = 0.3
+            rospy.loginfo("Right soft")
+        elif 200 < self.yellow_x < 300:
+            self.speed_l = 0.5
+            self.speed_r = 0.3
+            rospy.loginfo("Right medium")
+        elif 300 < self.yellow_x:
+            self.speed_l = 0.6
+            self.speed_r = 0.2
+            rospy.loginfo("Right hard")
+
+        return
+
+        if self.white_x is None and self.yellow_x is None:
+            self.speed_l = 0.4
+            self.speed_r = 0.4
+            rospy.loginfo("Undetected... going forward")
+        elif self.white_x is None:
+            self.speed_l = 0.4
+            self.speed_r = 0.0
+            rospy.loginfo("Right spin")
+        elif self.yellow_x is None:  # Assume it's an intersection?
+            self.speed_l = 0.4
+            self.speed_r = 0.4
+            rospy.loginfo("Probs at intersection")
+        elif self.white_x < 350:
+            self.speed_l = 0.2
+            self.speed_r = 0.6
+            rospy.loginfo("Left hard")
+        elif self.white_x < 250:
+            self.speed_l = 0.2
+            self.speed_r = 0.4
+            rospy.loginfo("Left soft")
+        elif self.yellow_x > 200:
+            self.speed_l = 0.6
+            self.speed_r = 0.2
+            rospy.loginfo("Right hard")
+        elif self.yellow_x > 100:
+            self.speed_l = 0.4
+            self.speed_r = 0.2
+            rospy.loginfo("Right soft")
+        else:
+            self.speed_l = 0.4
+            self.speed_r = 0.4
+            rospy.loginfo("Flying smooth")
+
+    def on_shutdown(self):
+        cmd = WheelsCmdStamped()
+        cmd.vel_left = 0.0
+        cmd.vel_right = 0.0
+
+        for _ in range(10):
+            self.pub_move.publish(cmd)
+
+    def pub_loop(self):
+        while not rospy.is_shutdown():
+            if self.speed_l is not None and self.speed_r is not None:
+                cmd = WheelsCmdStamped()
+                cmd.vel_left = self.speed_l
+                cmd.vel_right = self.speed_r
+                self.pub_move.publish(cmd)
+            else:
+                rospy.loginfo("Waiting to start...")
+
+        self.on_shutdown()
+
+
 class LaneFollowerPIDNode(DTROS):
     """
     Attempts to minimize the
@@ -129,7 +238,9 @@ class LaneFollowerPIDNode(DTROS):
 
 
 if __name__ == '__main__':
-    node = LaneFollowerPIDNode(node_name='lane_follower_pid_node')
+    #node = LaneFollowerPIDNode(node_name='lane_follower_pid_node')
+    node = LaneFollowerBasicsNode(node_name='lane_follower_basics_node')
 
-    #node.pub_loop()
+    rospy.on_shutdown(node.on_shutdown)  # Stop on crash
+    node.pub_loop()
     rospy.spin()  # Just in case?
