@@ -21,26 +21,36 @@ class DeadReckoningNode(DTROS):
     based upon wheel encoder values.
 
     Args:
-        node_name (:obj:`str`): a unique, descriptive name for the node that ROS will use
+        node_name (:obj:`str`): a unique, descriptive name for the node that ROS
+            will use
 
     Configuration:
         ~veh (:obj:`str`): Robot name
         ~publish_hz (:obj:`float`): Frequency at which to publish odometry
-        ~encoder_stale_dt (:obj:`float`): Time in seconds after encoders are considered stale
-        ~wheelbase (:obj:`float`): Lateral distance between the center of wheels (in meters)
-        ~ticks_per_meter (:obj:`int`): Total encoder ticks associated with one meter of travel
+        ~encoder_stale_dt (:obj:`float`): Time in seconds after encoders are
+            considered stale
+        ~wheelbase (:obj:`float`): Lateral distance between the center of wheels
+            (in meters)
+        ~ticks_per_meter (:obj:`int`): Total encoder ticks associated with one
+            meter of travel
         ~debug (:obj: `bool`): Enable/disable debug output
 
     Publisher:
         ~odom (:obj:`Odometry`): The computed odometry
 
     Subscribers:
-        ~left_wheel_encoder_node/tick (:obj:`WheelEncoderStamped`): Encoder ticks for left wheel
-        ~right_wheel_encoder_node/tick (:obj:`WheelEncoderStamped`): Encoder ticks for right wheel
+        ~left_wheel_encoder_node/tick (:obj:`WheelEncoderStamped`): Encoder
+            ticks for left wheel
+        ~right_wheel_encoder_node/tick (:obj:`WheelEncoderStamped`): Encoder
+            ticks for right wheel
     """
 
     def __init__(self, node_name):
-        super(DeadReckoningNode, self).__init__(node_name=node_name, node_type=NodeType.LOCALIZATION)
+        super(
+            DeadReckoningNode,
+            self).__init__(
+            node_name=node_name,
+            node_type=NodeType.LOCALIZATION)
         self.node_name = node_name
 
         self.veh = rospy.get_param("~veh")
@@ -48,8 +58,10 @@ class DeadReckoningNode(DTROS):
         self.encoder_stale_dt = rospy.get_param("~encoder_stale_dt")
         self.ticks_per_meter = rospy.get_param("~ticks_per_meter")
         self.wheelbase = rospy.get_param("~wheelbase")
-        self.origin_frame = rospy.get_param("~origin_frame").replace("~", self.veh)
-        self.target_frame = rospy.get_param("~target_frame").replace("~", self.veh)
+        self.origin_frame = rospy.get_param(
+            "~origin_frame").replace("~", self.veh)
+        self.target_frame = rospy.get_param(
+            "~target_frame").replace("~", self.veh)
         self.debug = rospy.get_param("~debug", False)
 
         self.left_encoder_last = None
@@ -76,9 +88,11 @@ class DeadReckoningNode(DTROS):
         self.total_dist = 0
 
         # Setup subscribers
-        self.sub_encoder_left = message_filters.Subscriber("~left_wheel", WheelEncoderStamped)
+        self.sub_encoder_left = message_filters.Subscriber(
+            "~left_wheel", WheelEncoderStamped)
 
-        self.sub_encoder_right = message_filters.Subscriber("~right_wheel", WheelEncoderStamped)
+        self.sub_encoder_right = message_filters.Subscriber(
+            "~right_wheel", WheelEncoderStamped)
 
         # Setup the time synchronizer
         self.ts_encoders = message_filters.ApproximateTimeSynchronizer(
@@ -90,7 +104,10 @@ class DeadReckoningNode(DTROS):
         self.pub = rospy.Publisher("~odom", Odometry, queue_size=10)
 
         # Setup timer
-        self.timer = rospy.Timer(rospy.Duration(1 / self.publish_hz), self.cb_timer)
+        self.timer = rospy.Timer(
+            rospy.Duration(
+                1 / self.publish_hz),
+            self.cb_timer)
         self._print_time = 0
         self._print_every_sec = 30
         # tf broadcaster for odometry TF
@@ -135,7 +152,10 @@ class DeadReckoningNode(DTROS):
         dt = timestamp - self.encoders_timestamp_last
 
         if dt < 1e-6:
-            self.logwarn("Time since last encoder message (%f) is too small. Ignoring" % dt)
+            self.logwarn(
+                f"Time since last encoder message ({dt:f}) is too small. "
+                "Ignoring"
+            )
             return
 
         self.tv = distance / dt
@@ -143,17 +163,23 @@ class DeadReckoningNode(DTROS):
 
         if self.debug:
             self.loginfo(
-                "Left wheel:\t Time = %.4f\t Ticks = %d\t Distance = %.4f m"
-                % (left_encoder.header.stamp.to_sec(), left_encoder.data, left_distance)
+                "Left wheel:"
+                f"\t Time = {left_encoder.header.stamp.to_sec():.4f}"
+                f"\t Ticks = {int(left_encoder.data)}"
+                "\t Distance = {left_distance:.4f} m"
             )
 
             self.loginfo(
-                "Right wheel:\t Time = %.4f\t Ticks = %d\t Distance = %.4f m"
-                % (right_encoder.header.stamp.to_sec(), right_encoder.data, right_distance)
+                "Right wheel:"
+                f"\t Time = {right_encoder.header.stamp.to_sec():.4f}"
+                f"\t Ticks = {int(right_encoder.data)}"
+                f"\t Distance = {right_distance:.4f} m"
             )
 
             self.loginfo(
-                "TV = %.2f m/s\t RV = %.2f deg/s\t DT = %.4f" % (self.tv, self.rv * 180 / math.pi, dt)
+                f"TV = {self.tv:.2f} m/s"
+                f"\t RV = {self.rv * 180 / math.pi:.2f} deg/s"
+                f"\t DT = {dt:.4f}"
             )
 
         dist = self.tv * dt
@@ -177,15 +203,17 @@ class DeadReckoningNode(DTROS):
             if abs(dt) > self.encoder_stale_dt:
                 if need_print:
                     self.logwarn(
-                        "No encoder messages received for %.2f seconds. "
-                        "Setting translational and rotational velocities to zero" % dt
+                        f"No encoder messages received for {dt:.2f} seconds. "
+                        "Setting translational and rotational velocities to "
+                        "zero"
                     )
                 self.rv = 0.0
                 self.tv = 0.0
         else:
             if need_print:
                 self.logwarn(
-                    "No encoder messages received. " "Setting translational and rotational velocities to zero"
+                    "No encoder messages received. "
+                    "Setting translational and rotational velocities to zero"
                 )
             self.rv = 0.0
             self.tv = 0.0
@@ -199,9 +227,15 @@ class DeadReckoningNode(DTROS):
         odom = Odometry()
         odom.header.stamp = rospy.Time.now()  # Ideally, should be encoder time
         odom.header.frame_id = self.origin_frame
-        odom.pose.pose = Pose(Point(self.x, self.y, self.z), Quaternion(*self.q))
+        odom.pose.pose = Pose(
+            Point(
+                self.x, self.y, self.z), Quaternion(
+                *self.q))
         odom.child_frame_id = self.target_frame
-        odom.twist.twist = Twist(Vector3(self.tv, 0.0, 0.0), Vector3(0.0, 0.0, self.rv))
+        odom.twist.twist = Twist(
+            Vector3(
+                self.tv, 0.0, 0.0), Vector3(
+                0.0, 0.0, self.rv))
 
         self.pub.publish(odom)
 
@@ -210,7 +244,8 @@ class DeadReckoningNode(DTROS):
                 header=odom.header,
                 child_frame_id=self.target_frame,
                 transform=Transform(
-                    translation=Vector3(self.x, self.y, self.z), rotation=Quaternion(*self.q)
+                    translation=Vector3(self.x, self.y, self.z),
+                    rotation=Quaternion(*self.q)
                 ),
             )
         )
