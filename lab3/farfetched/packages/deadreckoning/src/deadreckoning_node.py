@@ -63,6 +63,7 @@ class DeadReckoningNode(DTROS):
         self.target_frame = rospy.get_param(
             "~target_frame").replace("~", self.veh)
         self.debug = rospy.get_param("~debug", False)
+        self.reading_bag = rospy.get_param("~reading_bag", False)
 
         self.left_encoder_last = None
         self.right_encoder_last = None
@@ -135,6 +136,8 @@ class DeadReckoningNode(DTROS):
         dtr = right_encoder.header.stamp - self.right_encoder_last.header.stamp
         if dtl.to_sec() < 0 or dtr.to_sec() < 0:
             self.loginfo("Ignoring stale encoder message")
+            if self.reading_bag:
+                self.left_encoder_last = None
             return
 
         left_dticks = left_encoder.data - self.left_encoder_last.data

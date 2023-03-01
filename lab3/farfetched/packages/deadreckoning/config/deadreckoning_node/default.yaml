@@ -21,3 +21,6 @@ target_frame: "~/odometry"
 
 # Verbose output
 debug: False
+
+# Reading from bag
+reading_bag: True
