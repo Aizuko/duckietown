@@ -107,21 +107,42 @@ def another_cont(image):
     yellow_grey = cv2.cvtColor(yellow_channel, cv2.COLOR_BGR2GRAY)
     ret, thresh = cv2.threshold(yellow_grey, 127, 255, 0)
     a, b = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-    cnts = a[4]
-    cv2.drawContours(yellow_channel, [cnts], 0, (0,255,0), 3)
-    cv2.imshow('cont', yellow_channel)
+    #cnts = a[4]
+    #cv2.drawContours(yellow_channel, [cnts], 0, (0,255,0), 3)
+
+    conts_sort = sorted(a, key=lambda x: -cv2.contourArea(x))
+
+    # https://stackoverflow.com/questions/7263621/how-to-find-corners-on-a-image-using-opencv
+
+
+    for i in range(100):
+        c = conts_sort[i]
+        cv2.drawContours(yellow_channel, [c], 0, (0,255,0), 3)
+
+        M = cv2.moments(c)
+        cx = int(M['m10']/(M['m00'] or 1))
+        cy = int(M['m01']/(M['m00'] or 1))
+
+        print(cx,cy)
+        cv2.line(yellow_channel, (cx,0),(cx,y), (0,255,0),1)
+        cv2.line(yellow_channel, (0,cy),(x,cy),(0,255,0),1)
+
+        cv2.imshow('cont', yellow_channel)
+        key = cv2.waitKey(8000)
+        if key == ord('q'):
+            break
 
 if __name__ == '__main__':
     image = cv2.imread('screenshot_shm.png')
-        #image = cv2.resize(image, (0, 0), fx=0.25, fy=0.25)
-        #image = image[118:-10, 30:-220]  # Crop to camera only
-        #image = image[318:-10, 30:-230]  # Crop to lower camera
-        #image = image[208:-20, 40:-240]  # Crop to lower camera tight
+    y, x, _ = image.shape
+
+    image = image[y//3:2*y//3, :]  # Middle third
+    cv2.line(image, (x//2, 0), (x//2, y-1), (0,254,0), thickness=2)
 
     #image = image[60:-20, :-220]  # From fullscreen waybook view
 
+
     another_cont(image)
-    cv2.waitKey(8000)
     exit(0)
     channel_masking(image)
     canny_detection(image)
