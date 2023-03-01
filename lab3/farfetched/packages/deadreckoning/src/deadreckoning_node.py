@@ -43,6 +43,7 @@ class DeadReckoningNode(DTROS):
             ticks for left wheel
         ~right_wheel_encoder_node/tick (:obj:`WheelEncoderStamped`): Encoder
             ticks for right wheel
+        ~teleport (:obj:`Transform`): Teleportation transform
     """
 
     def __init__(self, node_name):
@@ -93,6 +94,13 @@ class DeadReckoningNode(DTROS):
 
         self.sub_encoder_right = message_filters.Subscriber(
             "~right_wheel", WheelEncoderStamped)
+
+        self.sub_teleport = rospy.Subscriber(
+            "~teleport",
+            Transform,
+            self.cb_teleport,
+            queue_size=1
+        )
 
         # Setup the time synchronizer
         self.ts_encoders = message_filters.ApproximateTimeSynchronizer(
@@ -225,6 +233,16 @@ class DeadReckoningNode(DTROS):
         self.publish_odometry()
         if need_print:
             self._print_time = time.time()
+
+    def cb_teleport(self, transform: Transform):
+        self.x = transform.translation.x
+        self.y = transform.translation.y
+        self.z = transform.translation.z
+        self.q = transform.rotation
+        self.yaw = tr.euler_from_quaternion(self.q)[2]
+        self.timestamp = transform.header.stamp.to_sec()
+        self.tv = 0.0
+        self.rv = 0.0
 
     def publish_odometry(self):
         odom = Odometry()
