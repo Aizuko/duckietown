@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 
-import time
 import math
-import rospy
+import time
+
 import message_filters
-
-from nav_msgs.msg import Odometry
-from geometry_msgs.msg import Quaternion, Twist, Pose, Point, Vector3, TransformStamped, Transform
-
+import numpy as np
+import rospy
 from duckietown.dtros import DTROS, NodeType
 from duckietown_msgs.msg import WheelEncoderStamped
-from tf2_ros import TransformBroadcaster
-
+from geometry_msgs.msg import Point, Pose, Quaternion, Transform, TransformStamped, Twist, Vector3
+from nav_msgs.msg import Odometry
+from std_msgs.msg import Header
 from tf import transformations as tr
+from tf2_ros import StaticTransformBroadcaster, TransformBroadcaster
 
 
 class DeadReckoningNode(DTROS):
@@ -58,12 +58,11 @@ class DeadReckoningNode(DTROS):
         self.encoder_stale_dt = rospy.get_param("~encoder_stale_dt")
         self.ticks_per_meter = rospy.get_param("~ticks_per_meter")
         self.wheelbase = rospy.get_param("~wheelbase")
-        self.origin_frame = rospy.get_param(
-            "~origin_frame").replace("~", self.veh)
-        self.target_frame = rospy.get_param(
-            "~target_frame").replace("~", self.veh)
+        self.origin_frame = rospy.get_param("~origin_frame")
+        self.target_frame = rospy.get_param("~target_frame")
         self.debug = rospy.get_param("~debug", False)
         self.reading_bag = rospy.get_param("~reading_bag", False)
+        self.apriltags = rospy.get_param("~apriltags", [])
 
         self.left_encoder_last = None
         self.right_encoder_last = None
@@ -113,7 +112,8 @@ class DeadReckoningNode(DTROS):
         self._print_every_sec = 30
         # tf broadcaster for odometry TF
         self._tf_broadcaster = TransformBroadcaster()
-
+        self._tf_static_broadcaster = StaticTransformBroadcaster()
+        self.broadcast_apriltags()
         self.loginfo("Initialized")
 
     def cb_ts_encoders(self, left_encoder, right_encoder):
@@ -252,6 +252,28 @@ class DeadReckoningNode(DTROS):
                 ),
             )
         )
+
+    def broadcast_apriltags(self):
+        transforms = []
+        for apriltag in self.apriltags:
+            q = tr.quaternion_from_euler(
+                apriltag["yaw"] * np.pi,
+                apriltag["pitch"] * np.pi,
+                apriltag["roll"] * np.pi
+            )
+            transform = TransformStamped(
+                header=Header(
+                    stamp=rospy.Time.now(),
+                    frame_id=self.origin_frame
+                ),
+                child_frame_id=f"at_{apriltag['id']}_static",
+                transform=Transform(
+                    translation=Vector3(apriltag["x"], apriltag["y"], apriltag["z"]),
+                    rotation=Quaternion(*q)
+                ),
+            )
+            transforms.append(transform)
+        self._tf_static_broadcaster.sendTransform(transforms)
 
     @staticmethod
     def angle_clamp(theta):

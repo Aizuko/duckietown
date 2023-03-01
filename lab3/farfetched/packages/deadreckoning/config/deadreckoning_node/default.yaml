@@ -14,10 +14,10 @@ ticks_per_meter: 656
 wheelbase: 0.1
 
 # origin reference frame name
-origin_frame: "~/world"
+origin_frame: "world"
 
 # target reference frame name
-target_frame: "~/odometry"
+target_frame: "odometry"
 
 # Verbose output
 debug: False

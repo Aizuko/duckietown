@@ -7,6 +7,7 @@
     <arg name="pkg_name" value="deadreckoning"/>
     <arg name="node_name" default="deadreckoning_node"/>
     <arg name="param_file_name" default="default" doc="Specify a param file. ex: experiment_1."/>
+    <arg name="room_name" default="csc229" doc="Specify a room name."/>
 
 
     <group ns="$(arg veh)">
@@ -16,6 +17,8 @@
             <param name="veh" value="$(arg veh)" />
             <rosparam command="load"
                 file="$(find deadreckoning)/config/$(arg node_name)/$(arg param_file_name).yaml"/>
+            <rosparam command="load"
+                file="$(find deadreckoning)/config/$(arg node_name)/$(arg room_name).yaml"/>
         </node>
     </group>
 </launch>
