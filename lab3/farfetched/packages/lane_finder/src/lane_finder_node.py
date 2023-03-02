@@ -63,8 +63,10 @@ class LaneFinderNode(DTROS):
         self.horizontal_target_err = None
         self.is_processed = False
 
-        self.low_hsv = (21, 15, 134)
-        self.high_hsv = (66, 255, 255)
+        #self.low_hsv = (21, 15, 134)
+        #self.high_hsv = (66, 255, 255)
+        self.low_hsv = (13, 70, 170)
+        self.high_hsv = (32, 135, 255)
 
         self.counter = 0  # Debug counter
 
@@ -153,7 +155,7 @@ class LaneFinderNode(DTROS):
                 cv2.circle(image, ext_top, 8,   RED, -1)
                 cv2.circle(image, ext_bot, 8,   RED, -1)
 
-                self.target = (cx + cy, cy)
+                self.target = (cx - cy, cy)
                 self.horizontal_target_err = int(self.target[0] - x//2)
 
                 self.counter += 1
