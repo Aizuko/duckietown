@@ -92,7 +92,8 @@ def process(image: np.ndarray, low_hsv: list, high_hsv: list, y: int, x: int):
 
 
 if __name__ == '__main__':
-    image_set = ['./1677625016.png', './1677625035.png']
+    image_set = ['1677789529.png', '1677789713.png','1677789529.png']
+     #'./1677625016.png', './1677625035.png']
 
     is_show_mask = False
     is_show_conts = True
@@ -105,9 +106,14 @@ if __name__ == '__main__':
 
         #process(image, (22, 79, 147), (41, 161, 215), 1, i+1)
         # Alternative masking (better?)
-        process(image, (21, 15, 134), (66, 255, 255), 2, i+1)
+        # Good masks for right-hand-side: (21, 15, 134), (66, 255, 255)
+        #process(image, (21, 15, 134), (66, 255, 255), 2, i+1)
+        #
+        # This masking removes the bottom of apriltags too
+        process(image, (13, 70, 170), (32, 135, 255), 3, i+1)
 
     wait_or_quit()
     exit(0)
 
 # https://pyimagesearch.com/2016/04/11/finding-extreme-points-in-contours-with-opencv/
+# https://docs.opencv.org/3.4/da/d97/tutorial_threshold_inRange.html
