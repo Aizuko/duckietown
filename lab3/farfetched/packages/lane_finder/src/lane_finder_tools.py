@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 from image_geometry import PinholeCameraModel
 from sensor_msgs.msg import CameraInfo
-
+from functools import lru_cache
 
 class Augmenter:
     def __init__(self, H: np.ndarray) -> None:
@@ -25,12 +25,24 @@ class Augmenter:
         """
         self.camera_model.fromCameraInfo(camera_info_msg)
 
-    def process_image(self, raw):
+    def process_image(self, raw_image: np.ndarray):
         """Undistorts raw images.
         """
-        rectified = np.zeros_like(raw)
-        self.camera_model.rectifyImage(raw, rectified)
-        return cv2.warpPerspective(rectified, self.H, (raw.shape[1], raw.shape[0]))#, raw.shape[:2][-1])
+        h, w, _ = raw_image.shape
+        rectified_image = np.zeros_like(raw_image)
+        self.camera_model.rectifyImage(raw_image, rectified_image)
+        H = self.get_transformed_homography(h, w)
+        ground_image = cv2.warpPerspective(rectified_image, H, (w, h))
+        return ground_image
+
+    @lru_cache()
+    def get_transformed_homography(self, h: int, w: int):
+        T = np.array([
+            [w, 0, -w/10],
+            [0, h, h/2],
+            [0, 0, 1]
+        ])
+        return T @ self.H
 
     def point_to_pixel(self, image: np.ndarray, point: list):
         """Converts a map file point into coordiantes

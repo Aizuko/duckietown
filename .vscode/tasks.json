@@ -4,32 +4,73 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "Build",
+      "label": "Local Build",
       "type": "shell",
-      "command": "docker -H csc22902.local build -t duckietown/farfetched:latest-arm64v8 .",
+      "command": "docker build -t duckietown/farfetched:latest-arm64v8 .",
       "options": {
-        "cwd": "${workspaceFolder}/lab3/farfetched"
+        "cwd": "${workspaceFolder}/lab3/farfetched",
       },
-      "group": "build",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
       "presentation": {
         "reveal": "always",
         "panel": "shared"
       }
     },
     {
-      "label": "Test",
+      "label": "Local Test",
       "type": "shell",
-      "command": "dts devel run -H csc22902.local -v /data:/data",
+      "command": "dts devel run",
       "options": {
         "cwd": "${workspaceFolder}/lab3/farfetched"
       },
-      "group": "test",
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      },
       "presentation": {
         "reveal": "always",
         "panel": "shared"
       },
       "dependsOn": [
-        "Build"
+        "Local Build"
+      ]
+    },
+    {
+      "label": "Remote Build",
+      "type": "shell",
+      "command": "docker -H csc22902.local build -t duckietown/farfetched:latest-arm64v8 .",
+      "options": {
+        "cwd": "${workspaceFolder}/lab3/farfetched"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Remote Test",
+      "type": "shell",
+      "command": "dts devel run -H csc22902.local",
+      "options": {
+        "cwd": "${workspaceFolder}/lab3/farfetched"
+      },
+      "group": {
+        "kind": "test",
+        "isDefault": false
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "dependsOn": [
+        "Remote Build"
       ]
     }
   ]

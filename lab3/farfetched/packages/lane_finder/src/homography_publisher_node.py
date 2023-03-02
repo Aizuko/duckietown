@@ -98,10 +98,6 @@ class HomoPub(DTROS):
         while not rospy.is_shutdown():
             if self.raw_image is not None:
                 self.image = self.augmenter.process_image(self.raw_image)
-                #self.image = self.augmenter.mask_lanes(self.image)
-                #self.image = self.augmenter.render_segments(
-                #    self.image, self.cvmap
-                #)
                 message = self.bridge.cv2_to_compressed_imgmsg(
                     self.image, dst_format="jpeg"
                 )
