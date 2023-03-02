@@ -55,7 +55,11 @@ def process(image: np.ndarray, low_hsv: list, high_hsv: list, y: int, x: int):
     if len(conts) > 0:
         conts_sort = sorted(conts, key=lambda x: -cv2.contourArea(x))
 
-        for c in conts_sort[:2]:
+        for c in conts_sort[:1]:
+            rect = cv2.minAreaRect(c)
+            box = np.intp(cv2.boxPoints(rect))
+            cv2.drawContours(image, [box], 0, RED, 2)
+
             ext_left = tuple(c[c[:, :, 0].argmin()][0])
             ext_right = tuple(c[c[:, :, 0].argmax()][0])
             ext_top = tuple(c[c[:, :, 1].argmin()][0])
@@ -75,15 +79,13 @@ def process(image: np.ndarray, low_hsv: list, high_hsv: list, y: int, x: int):
 
             points = [ ext_left, ext_right, ext_top, ext_bot ]
             a, b = min_dist_in_set(points)
+
+            if a[0] < b[0]:
+                a, b = b, a
             unit = (a-b) / cv.norm(a-b)
-            scaled = np.intp(unit * cy) + np.array([cx,cy])
+            scaled = np.intp(unit * 7 * cy//9) + np.array([cx,cy])
             cv2.line(image, (cx,cy), scaled, TEAL, 3)
             cv2.line(image, a, b, TEAL, 3)
-
-
-            rect = cv2.minAreaRect(c)
-            box = np.intp(cv2.boxPoints(rect))
-            cv2.drawContours(image, [box], 0, (0,0,255), 2)
 
     if is_show_conts:
         cv2.imshow(f"Contours method {y} image {x}", image)
@@ -97,8 +99,9 @@ if __name__ == '__main__':
 
     for i, image_str in enumerate(image_set):
         image = cv2.imread(image_str)
-        image = image[image.shape[0]//3:9*image.shape[0]//10, :]  # Bottom 2/3
-        #image = image[image.shape[0]//3:5*image.shape[0]//6, :]  # Middle third
+        ix = image.shape[0]
+        image = image[ix//3:9*ix//10, :]
+        #image = image[ix//3:5*ix//6, :]
 
         #process(image, (22, 79, 147), (41, 161, 215), 1, i+1)
         # Alternative masking (better?)

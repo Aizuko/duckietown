@@ -67,7 +67,7 @@ class LaneFinderNode(DTROS):
         self.high_hsv = (66, 255, 255)
 
         # Setup publisher path ====
-        self.pub = rospy.Publisher(
+        self.pub_pose = rospy.Publisher(
             f"/{self.hostname}/lane_finder_node/pose",
             FarfetchedPose,
             queue_size=2,
@@ -104,7 +104,7 @@ class LaneFinderNode(DTROS):
         image = image[image.shape[0]//3:4*image.shape[0]//5, :]
         image = cv.blur(image, (5,5))
 
-        x, y, _ = image.shape
+        y, x, _ = image.shape
 
         self.pub_raw.publish(
             self.bridge.cv2_to_compressed_imgmsg(image, dst_format="jpeg")
@@ -168,10 +168,12 @@ class LaneFinderNode(DTROS):
                 #unit = (a-b) / cv.norm(a-b)
                 #scaled = np.intp(unit * cy) + np.array([cx,cy])
                 self.target = (cx + cy, cy)
-                rospy.loginfo(f"{self.target}, {x//2}, {x}, {y}, {cx}, {cy}")
-                self.horizontal_target_err = self.target[0] - x;
+                self.horizontal_target_err = int(self.target[0] - x//2)
+                rospy.loginfo(f"{self.target}, {x//2}, == {self.horizontal_target_err}")
 
                 cv2.line(image, (cx, cy), self.target, TEAL, 3)
+                cv2.line(image, (x//2, 0), (x//2, y), TEAL, 3)
+
                 #cv2.line(image, a, b, TEAL, 3)
                 break
 
@@ -192,10 +194,12 @@ class LaneFinderNode(DTROS):
                 )
                 self.pub_yellow.publish(msg)
 
-                pose = FarfetchedPose()
-                pose.horizontal_target_err = self.horizontal_target_err
-                pose.is_yellow_detected = True
-                #rospy.loginfo(pose)
+                pmsg = FarfetchedPose()
+                pmsg.horizontal_target_err = int(self.horizontal_target_err)
+                pmsg.is_yellow_detected = True
+
+                self.pub_pose.publish(pmsg)
+                rospy.loginfo("Published pose message")
 
             rate.sleep()
 

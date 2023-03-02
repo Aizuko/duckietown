@@ -24,7 +24,10 @@ class LaneFollowerJasper(DTROS):
 
         self.hostname = rospy.get_param("~veh")
 
+        self.vertical = 40
         self.horizontal_err = None
+        self.omega = None
+        self.velocity = 0.3
 
         self.sub = rospy.Subscriber(
             f"/{self.hostname}/lane_finder_node/pose",
@@ -41,17 +44,14 @@ class LaneFollowerJasper(DTROS):
 
     def pose_cb(self, pose):
         self.horizontal_err = pose.horizontal_target_err
-        self.omega = 9
-        return
+        self.omega = -np.arctan(self.horizontal_err / self.vertical)
 
-
-        rospy.loginfo(f"Speeds: {self.speed_l} :: {self.speed_r}")
-
+        rospy.loginfo(f"0-Mega: {self.omega}")
 
     def on_shutdown(self):
-        cmd = WheelsCmdStamped()
-        cmd.vel_left = 0.0
-        cmd.vel_right = 0.0
+        cmd = Twist2DStamped()
+        cmd.v = 0.0
+        cmd.omega = 0.0
 
         for _ in range(10):
             self.pub_move.publish(cmd)
@@ -59,9 +59,9 @@ class LaneFollowerJasper(DTROS):
     def pub_loop(self):
         rate = rospy.Rate(10)
         while not rospy.is_shutdown():
-            if self.speed_l is not None and self.speed_r is not None:
+            if self.omega is not None:
                 cmd = Twist2DStamped()
-                cmd.velocity = self.velocity
+                cmd.v = self.velocity
                 cmd.omega = self.omega
 
                 self.pub_move.publish(cmd)
@@ -117,7 +117,6 @@ class LaneFollowerGradient(DTROS):
             self.speed_r += min((self.white_x - 320) / 130, 0.6)
 
         rospy.loginfo(f"Speeds: {self.speed_l} :: {self.speed_r}")
-
 
     def on_shutdown(self):
         cmd = WheelsCmdStamped()
@@ -365,7 +364,8 @@ class LaneFollowerPIDNode(DTROS):
 if __name__ == '__main__':
     #node = LaneFollowerPIDNode(node_name='lane_follower_pid_node')
     #node = LaneFollowerBasicsNode(node_name='lane_follower_basics_node')
-    node = LaneFollowerGradient(node_name='lane_follower_gradient_node')
+    #node = LaneFollowerGradient(node_name='lane_follower_gradient_node')
+    node = LaneFollowerJasper(node_name='lane_follower_jasper_nav')
 
     rospy.on_shutdown(node.on_shutdown)  # Stop on crash
     node.pub_loop()
