@@ -66,6 +66,8 @@ class LaneFinderNode(DTROS):
         self.low_hsv = (21, 15, 134)
         self.high_hsv = (66, 255, 255)
 
+        self.counter = 0  # Debug counter
+
         # Setup publisher path ====
         self.pub_pose = rospy.Publisher(
             f"/{self.hostname}/lane_finder_node/pose",
@@ -134,10 +136,6 @@ class LaneFinderNode(DTROS):
 
                 contour_center = np.array([cx, cy])
 
-                #rospy.loginfo(f"{0.3*y} < {cy} < {0.7*y} :: {y}")
-                #if not (0.3*y < cy < 0.7*y):
-                #    continue
-
                 cv2.circle(image, (cx, cy), 8,  RED, -1)
 
                 rect = cv2.minAreaRect(c)
@@ -155,21 +153,13 @@ class LaneFinderNode(DTROS):
                 cv2.circle(image, ext_top, 8,   RED, -1)
                 cv2.circle(image, ext_bot, 8,   RED, -1)
 
-                points = [ ext_left, ext_right, ext_top, ext_bot ]
-
-                #if (m := min_dist_in_set(points)) is not None:
-                #    if cv.norm(m[0], m[1]) < 5:
-                #        continue
-                #    elif m[0][0] < m[1][0]:
-                #        a, b = m[1], m[0]
-                #    else:
-                #        a, b = m
-
-                #unit = (a-b) / cv.norm(a-b)
-                #scaled = np.intp(unit * cy) + np.array([cx,cy])
                 self.target = (cx + cy, cy)
                 self.horizontal_target_err = int(self.target[0] - x//2)
-                rospy.loginfo(f"{self.target}, {x//2}, == {self.horizontal_target_err}")
+
+                self.counter += 1
+                if self.counter == 10:
+                    self.counter = 0
+                    rospy.loginfo(f"{self.target}, {x//2}, == {self.horizontal_target_err}")
 
                 cv2.line(image, (cx, cy), self.target, TEAL, 3)
                 cv2.line(image, (x//2, 0), (x//2, y), TEAL, 3)
@@ -181,7 +171,7 @@ class LaneFinderNode(DTROS):
         self.is_processed = True
 
     def run(self):
-        rate = rospy.Rate(3)
+        rate = rospy.Rate(30)
 
         while not rospy.is_shutdown():
             if self.raw_image is not None and not self.is_processed:
@@ -199,7 +189,7 @@ class LaneFinderNode(DTROS):
                 pmsg.is_yellow_detected = True
 
                 self.pub_pose.publish(pmsg)
-                rospy.loginfo("Published pose message")
+                #rospy.loginfo("Published pose message")
 
             rate.sleep()
 

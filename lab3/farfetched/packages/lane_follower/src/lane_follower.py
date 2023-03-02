@@ -28,6 +28,7 @@ class LaneFollowerJasper(DTROS):
         self.horizontal_err = None
         self.omega = None
         self.velocity = 0.3
+        self.counter = 0  # Debugging
 
         self.sub = rospy.Subscriber(
             f"/{self.hostname}/lane_finder_node/pose",
@@ -45,8 +46,11 @@ class LaneFollowerJasper(DTROS):
     def pose_cb(self, pose):
         self.horizontal_err = pose.horizontal_target_err
         self.omega = -np.arctan(self.horizontal_err / self.vertical)
+        self.counter += 1
 
-        rospy.loginfo(f"0-Mega: {self.omega}")
+        if self.counter == 10:
+            self.counter = 0
+            rospy.loginfo(f"0-Mega: {self.omega}")
 
     def on_shutdown(self):
         cmd = Twist2DStamped()
@@ -57,12 +61,13 @@ class LaneFollowerJasper(DTROS):
             self.pub_move.publish(cmd)
 
     def pub_loop(self):
-        rate = rospy.Rate(10)
+        rate = rospy.Rate(30)
+
         while not rospy.is_shutdown():
             if self.omega is not None:
                 cmd = Twist2DStamped()
                 cmd.v = self.velocity
-                cmd.omega = self.omega
+                cmd.omega = np.sign(self.omega) * min(np.pi - 0.02, np.abs(self.omega*2))
 
                 self.pub_move.publish(cmd)
             else:
