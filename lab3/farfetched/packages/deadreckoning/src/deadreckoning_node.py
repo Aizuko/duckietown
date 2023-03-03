@@ -121,7 +121,7 @@ class DeadReckoningNode(DTROS):
         # tf broadcaster for odometry TF
         self._tf_broadcaster = TransformBroadcaster()
         self._tf_static_broadcaster = StaticTransformBroadcaster()
-        self.broadcast_apriltags()
+        self.broadcast_static()
         self.loginfo("Initialized")
 
     def cb_ts_encoders(self, left_encoder, right_encoder):
@@ -271,7 +271,7 @@ class DeadReckoningNode(DTROS):
             )
         )
 
-    def broadcast_apriltags(self):
+    def broadcast_static(self):
         transforms = []
         for apriltag in self.apriltags:
             q = tr.quaternion_from_euler(
@@ -291,6 +291,21 @@ class DeadReckoningNode(DTROS):
                 ),
             )
             transforms.append(transform)
+
+        q = tr.quaternion_from_euler(0, 0, 0)
+        transforms.append(
+            TransformStamped(
+                header=Header(
+                    stamp=rospy.Time.now(),
+                    frame_id=self.target_frame
+                ),
+                child_frame_id=f"{self.veh}/footprint",
+                transform=Transform(
+                    translation=Vector3(0, 0, 0),
+                    rotation=Quaternion(*q)
+                )
+            )
+        )
         self._tf_static_broadcaster.sendTransform(transforms)
 
     @staticmethod
