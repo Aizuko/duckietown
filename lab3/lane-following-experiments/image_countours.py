@@ -117,7 +117,14 @@ def another_cont(image):
 
     for i in range(100):
         c = conts_sort[i]
+        rect = cv2.minAreaRect(c)
+        print(rect)
         cv2.drawContours(yellow_channel, [c], 0, (0,255,0), 3)
+
+        box = cv2.boxPoints(rect)
+        box = np.int0(box)
+        cv2.drawContours(yellow_channel, [box], 0, (0,255,0), 1)
+        #cv2.rectangle(yellow_channel, (int(rect[0][0]), int(rect[0][1])), (int(rect[1][0]), int(rect[1][1])), (0,255,0))
 
         M = cv2.moments(c)
         cx = int(M['m10']/(M['m00'] or 1))

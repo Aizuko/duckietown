@@ -168,12 +168,16 @@ class AprilTagNode(DTROS):
             colors (list[float]): RGB values from 0 to 255
         """
         led_message = LEDPattern()
-        for _ in range(5):
+        for i in range(5):
             rgba = ColorRGBA()
-            rgba.r = colors[0] / 255
-            rgba.g = colors[1] / 255
-            rgba.b = colors[2] / 255
-            rgba.a = 1.0
+            if 3 <= i <= 4:
+                rgba.r = colors[0] / 255
+                rgba.g = colors[1] / 255
+                rgba.b = colors[2] / 255
+                rgba.a = 1.0
+            else:
+                rgba.r = rgba.g = rgba.b = rgba.a = 0.0
+
             led_message.rgb_vals.append(rgba)
         return led_message
 
