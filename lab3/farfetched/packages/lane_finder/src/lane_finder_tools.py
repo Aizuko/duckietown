@@ -30,7 +30,7 @@ class Augmenter:
         """
         rectified = np.zeros_like(raw)
         self.camera_model.rectifyImage(raw, rectified)
-        return rectified
+        return cv2.warpPerspective(rectified, self.H, (raw.shape[1], raw.shape[0]))#, raw.shape[:2][-1])
 
     def point_to_pixel(self, image: np.ndarray, point: list):
         """Converts a map file point into coordiantes
