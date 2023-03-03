@@ -181,7 +181,7 @@ class AprilTagNode(DTROS):
         for detection in detections:
             H = np.eye(4)
             H[:3, :3] = detection.pose_R
-            H[:3, 3] = detection.pose_t.reshape((3, 1))
+            H[:3, 3] = detection.pose_t.flatten()
             translation = tr.translation_from_matrix(H)
             q = tr.quaternion_from_matrix(H)
             transform = TransformStamped(
