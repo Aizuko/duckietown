@@ -1,22 +1,20 @@
 #!/usr/bin/env python3
-import math
-import os
-import sys
 from typing import List
 
 import cv2
 import numpy as np
-import rospkg
 import rospy
-import yaml
-from cv_bridge import CvBridge, CvBridgeError
+from cv_bridge import CvBridge
 from dt_apriltags import Detection, Detector
 from duckietown.dtros import DTROS, NodeType
 from duckietown_msgs.msg import LEDPattern
+from geometry_msgs.msg import Quaternion, Transform, TransformStamped, Vector3
 from image_geometry import PinholeCameraModel
 from sensor_msgs.msg import CameraInfo, CompressedImage
-from std_msgs.msg import ColorRGBA
-from tag import Tag, TagType, TAG_ID_TO_TAG
+from std_msgs.msg import ColorRGBA, Header
+from tag import TAG_ID_TO_TAG, Tag, TagType
+from tf import transformations as tr
+from tf2_ros import TransformBroadcaster
 
 """
 
@@ -72,6 +70,8 @@ class AprilTagNode(DTROS):
             self.cb_camera_info
         )
 
+        self.tf_broadcaster = TransformBroadcaster()
+
     def process_image(self, raw):
         """Undistorts raw images.
         """
@@ -114,7 +114,8 @@ class AprilTagNode(DTROS):
             center = detection.center.astype(np.int64)
             font_scale = 1
             font_thickness = 2
-            text_size = cv2.getTextSize(text, font, font_scale, font_thickness)[0]
+            text_size = cv2.getTextSize(
+                text, font, font_scale, font_thickness)[0]
             center[0] -= text_size[0] // 2
             center[1] += text_size[1] // 2
             cv2.putText(
@@ -131,7 +132,9 @@ class AprilTagNode(DTROS):
         white = (255, 255, 255)
         priority_tag = None
         for detection in detections:
-            tag = TAG_ID_TO_TAG.get(detection.tag_id, Tag(detection.tag_id, None))
+            tag = TAG_ID_TO_TAG.get(
+                detection.tag_id, Tag(
+                    detection.tag_id, None))
             if tag is None:
                 rospy.logwarn(f"Unknown tag id: {tag.tag_id}")
                 continue
@@ -168,6 +171,26 @@ class AprilTagNode(DTROS):
         self.camera_model.rectifyImage(image, rectified)
         return rectified
 
+    def broadcast_transforms(self, detections: List[Detection]):
+        transforms = []
+        for detection in detections:
+            H = detection.homography
+            translation = tr.translation_from_matrix(H)
+            q = tr.quaternion_from_matrix(H)
+            transform = TransformStamped(
+                header=Header(
+                    stamp=rospy.Time.now(),
+                    frame_id=f"{self.hostname}/camera_optical_frame"
+                ),
+                child_frame_id=f"at_{detection.tag_id}",
+                transform=Transform(
+                    translation=Vector3(*translation),
+                    rotation=Quaternion(*q)
+                ),
+            )
+            transforms.append(transform)
+        self.tf_broadcaster.sendTransform(transforms)
+
     def run(self, rate=30):
         rate = rospy.Rate(rate)
 
@@ -178,10 +201,11 @@ class AprilTagNode(DTROS):
             image = self.raw_image.copy()
             image = self.rectify(image)
             grayscale = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-            tags = self.detect(grayscale)
-            for tag in tags:
-                self.render_tag(image, tag)
-            color = self.get_led_color(tags)
+            detections = self.detect(grayscale)
+            for detection in detections:
+                self.render_tag(image, detection)
+            self.broadcast_transforms(detections)
+            color = self.get_led_color(detections)
             message = self.bridge.cv2_to_compressed_imgmsg(
                 image, dst_format="jpeg"
             )
