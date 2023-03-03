@@ -89,7 +89,7 @@ class AprilTagNode(DTROS):
     def detect(self, image):
         return self.detector.detect(
             image,
-            estimate_tag_pose=False,
+            estimate_tag_pose=True,
             camera_params=None,
             tag_size=None
         )
@@ -174,7 +174,9 @@ class AprilTagNode(DTROS):
     def broadcast_transforms(self, detections: List[Detection]):
         transforms = []
         for detection in detections:
-            H = detection.homography
+            H = np.eye(4)
+            H[:3, :3] = detection.pose_R
+            H[:3, 3] = detection.pose_t
             translation = tr.translation_from_matrix(H)
             q = tr.quaternion_from_matrix(H)
             transform = TransformStamped(
