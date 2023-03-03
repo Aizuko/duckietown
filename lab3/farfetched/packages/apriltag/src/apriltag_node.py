@@ -45,6 +45,7 @@ class AprilTagNode(DTROS):
         )
 
         self.camera_model = PinholeCameraModel()
+        self.raw_image = None
 
         # Standard subscribers and publishers
         self.pub = rospy.Publisher(
@@ -56,7 +57,6 @@ class AprilTagNode(DTROS):
             LEDPattern,
             queue_size=10,
         )
-        self.raw_image = None
 
         self.compressed_sub = rospy.Subscriber(
             f'/{self.hostname}/camera_node/image/compressed',
@@ -90,8 +90,13 @@ class AprilTagNode(DTROS):
         return self.detector.detect(
             image,
             estimate_tag_pose=True,
-            camera_params=None,
-            tag_size=None
+            camera_params=[
+                self.camera_model.fx(),
+                self.camera_model.fy(),
+                self.camera_model.cx(),
+                self.camera_model.cy()
+            ],
+            tag_size=0.05
         )
 
     def render_tag(self, image: np.ndarray, detection: Detection):
