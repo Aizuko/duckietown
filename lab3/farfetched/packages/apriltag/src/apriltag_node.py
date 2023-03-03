@@ -14,7 +14,7 @@ from sensor_msgs.msg import CameraInfo, CompressedImage
 from std_msgs.msg import ColorRGBA, Header
 from tag import TAG_ID_TO_TAG, Tag, TagType
 from tf import transformations as tr
-from tf2_ros import TransformBroadcaster
+from tf2_ros import Buffer, TransformBroadcaster, TransformListener
 
 """
 
@@ -48,14 +48,20 @@ class AprilTagNode(DTROS):
         self.raw_image = None
 
         # Standard subscribers and publishers
-        self.pub = rospy.Publisher(
+        self.img_pub = rospy.Publisher(
             '~compressed', CompressedImage, queue_size=1
         )
 
         self.led_pattern_pub = rospy.Publisher(
             f'/{self.hostname}/led_emitter_node/led_pattern',
             LEDPattern,
-            queue_size=10,
+            queue_size=1,
+        )
+
+        self.pub_teleport = rospy.Publisher(
+            f"/{self.hostname}/deadreckoning/teleport",
+            Transform,
+            queue_size=1
         )
 
         self.compressed_sub = rospy.Subscriber(
@@ -71,6 +77,8 @@ class AprilTagNode(DTROS):
         )
 
         self.tf_broadcaster = TransformBroadcaster()
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer)
 
     def process_image(self, raw):
         """Undistorts raw images.
@@ -178,25 +186,47 @@ class AprilTagNode(DTROS):
 
     def broadcast_transforms(self, detections: List[Detection]):
         transforms = []
+        min_distance = np.inf
+        closest_tag_id = None
         for detection in detections:
-            H = np.eye(4)
-            H[:3, :3] = detection.pose_R
-            H[:3, 3] = detection.pose_t.flatten()
-            translation = tr.translation_from_matrix(H)
-            q = tr.quaternion_from_matrix(H)
-            transform = TransformStamped(
+            T_AC = np.eye(4)
+            T_AC[:3, :3] = detection.pose_R
+            T_AC[:3, 3] = detection.pose_t.flatten()
+            translation = tr.translation_from_matrix(T_AC)
+            distance = np.linalg.norm(translation, 2)
+            q = tr.quaternion_from_matrix(T_AC)
+            transform = Transform(
+                translation=Vector3(*translation),
+                rotation=Quaternion(*q)
+            )
+            tag_id = detection.tag_id
+            transform_stamped = TransformStamped(
                 header=Header(
                     stamp=rospy.Time.now(),
                     frame_id=f"{self.hostname}/camera_optical_frame"
                 ),
-                child_frame_id=f"at_{detection.tag_id}",
-                transform=Transform(
-                    translation=Vector3(*translation),
-                    rotation=Quaternion(*q)
-                ),
+                child_frame_id=f"at_{tag_id}",
+                transform=transform,
             )
-            transforms.append(transform)
+            if distance < min_distance:
+                min_distance = distance
+                closest_tag_id = tag_id
+            transforms.append(transform_stamped)
         self.tf_broadcaster.sendTransform(transforms)
+
+        if closest_tag_id is not None:
+            transform_apriltag_footprint = self.tf_buffer.lookup_transform(
+                f"at_{closest_tag_id}",
+                f"{self.hostname}/footprint",
+                0
+            )
+            transform_apriltag_static_world = self.tf_buffer.lookup_transform(
+                f"at_{closest_tag_id}_static",
+                f"{self.hostname}/world",
+                0
+            )
+            transform = transform_apriltag_footprint * transform_apriltag_static_world
+            self.pub_teleport.publish(transform)
 
     def run(self, rate=30):
         rate = rospy.Rate(rate)
@@ -216,7 +246,7 @@ class AprilTagNode(DTROS):
             message = self.bridge.cv2_to_compressed_imgmsg(
                 image, dst_format="jpeg"
             )
-            self.pub.publish(message)
+            self.img_pub.publish(message)
             led_message = self.create_led_message(color)
             self.led_pattern_pub.publish(led_message)
             rate.sleep()
