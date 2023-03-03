@@ -23,4 +23,4 @@ target_frame: "odometry"
 debug: False
 
 # Reading from bag
-reading_bag: True
+reading_bag: False

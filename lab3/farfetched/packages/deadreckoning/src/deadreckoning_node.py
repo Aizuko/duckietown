@@ -72,8 +72,8 @@ class DeadReckoningNode(DTROS):
 
         # Current pose, forward velocity, and angular rate
         self.timestamp = None
-        self.x = 0.0
-        self.y = 0.0
+        self.x = 0.32
+        self.y = 0.32
         self.z = 0.0
         self.yaw = 0.0
         self.q = [0.0, 0.0, 0.0, 1.0]
