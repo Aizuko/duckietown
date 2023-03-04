@@ -235,32 +235,22 @@ class DeadReckoningNode(DTROS):
             self._print_time = time.time()
 
     def cb_teleport(self, transform: Transform):
-        # self.x = transform.translation.x
-        # self.y = transform.translation.y
-        # self.z = transform.translation.z
-        # rospy.loginfo(
-        #     f"Teleporting to {self.x:.2f}, {self.y:.2f}, {self.z:.2f}"
-        # )
-        # self.q = np.array([
-        #     transform.rotation.x,
-        #     transform.rotation.y,
-        #     transform.rotation.z,
-        #     transform.rotation.w
-        # ])
-        # self.yaw = tr.euler_from_quaternion(self.q)[2]
-        # self.timestamp = rospy.Time.now()
-        # self.tv = 0.0
-        # self.rv = 0.0
-        self._tf_broadcaster.sendTransform(
-            TransformStamped(
-                header=Header(
-                    frame_id=self.origin_frame,
-                    stamp=rospy.Time.now()
-                ),
-                child_frame_id=self.target_frame,
-                transform=transform,
-            )
+        self.x = transform.translation.x
+        self.y = transform.translation.y
+        self.z = 0.0
+        rospy.loginfo(
+            f"Teleporting to {self.x:.2f}, {self.y:.2f}, {self.z:.2f}"
         )
+        self.q = np.array([
+            transform.rotation.x,
+            transform.rotation.y,
+            transform.rotation.z,
+            transform.rotation.w
+        ])
+        self.yaw = tr.euler_from_quaternion(self.q)[2]
+        self.timestamp = rospy.Time.now()
+        self.tv = 0.0
+        self.rv = 0.0
 
     def publish_odometry(self):
         odom = Odometry()
