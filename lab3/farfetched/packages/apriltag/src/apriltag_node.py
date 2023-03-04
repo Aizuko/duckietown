@@ -269,15 +269,6 @@ class AprilTagNode(DTROS):
                     transform_at_static_world.rotation.w
                 ])
             )
-            rospy.loginfo(
-                [
-                    [
-                        transform_at_static_world.translation.x,
-                        transform_at_static_world.translation.y,
-                        transform_at_static_world.translation.z
-                    ]
-                ]
-            )
             T_odometry_world = T_odometry_at @ T_at_static_world
             translation = tr.translation_from_matrix(T_odometry_world)
             q = tr.quaternion_from_matrix(T_odometry_world)
