@@ -187,7 +187,12 @@ class LaneFinderNode(DTROS):
                 self.pub_yellow.publish(msg)
 
                 pmsg = FarfetchedPose()
-                pmsg.horizontal_target_err = int(self.horizontal_target_err)
+                if self.horizontal_target_err is not None:
+                    pmsg.horizontal_target_err = int(
+                        self.horizontal_target_err
+                    )
+                else:
+                    pmsg.horizontal_target_err = 0
                 pmsg.is_yellow_detected = True
 
                 self.pub_pose.publish(pmsg)

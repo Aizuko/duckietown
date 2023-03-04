@@ -14,7 +14,7 @@ from sensor_msgs.msg import CameraInfo, CompressedImage
 from std_msgs.msg import ColorRGBA, Header
 from tag import TAG_ID_TO_TAG, Tag, TagType
 from tf import transformations as tr
-from tf2_ros import Buffer, TransformBroadcaster, TransformListener
+from tf2_ros import Buffer, ConnectivityException, TransformBroadcaster, TransformListener
 
 """
 
@@ -49,7 +49,9 @@ class AprilTagNode(DTROS):
 
         # Standard subscribers and publishers
         self.img_pub = rospy.Publisher(
-            '~compressed', CompressedImage, queue_size=1
+            '~compressed',
+            CompressedImage,
+            queue_size=1
         )
 
         self.led_pattern_pub = rospy.Publisher(
@@ -59,7 +61,7 @@ class AprilTagNode(DTROS):
         )
 
         self.pub_teleport = rospy.Publisher(
-            f"/{self.hostname}/deadreckoning/teleport",
+            f"/{self.hostname}/deadreckoning_node/teleport",
             Transform,
             queue_size=1
         )
@@ -68,12 +70,14 @@ class AprilTagNode(DTROS):
             f'/{self.hostname}/camera_node/image/compressed',
             CompressedImage,
             self.cb_compressed,
+            queue_size=1,
         )
 
         self.camera_info_sub = rospy.Subscriber(
             f"/{self.hostname}/camera_node/camera_info",
             CameraInfo,
-            self.cb_camera_info
+            self.cb_camera_info,
+            queue_size=1,
         )
 
         self.tf_broadcaster = TransformBroadcaster()
@@ -193,12 +197,12 @@ class AprilTagNode(DTROS):
         min_distance = np.inf
         closest_tag_id = None
         for detection in detections:
-            T_AC = np.eye(4)
-            T_AC[:3, :3] = detection.pose_R
-            T_AC[:3, 3] = detection.pose_t.flatten()
-            translation = tr.translation_from_matrix(T_AC)
+            T_at_camera = np.eye(4)
+            T_at_camera[:3, :3] = detection.pose_R
+            T_at_camera[:3, 3] = detection.pose_t.flatten()
+            translation = tr.translation_from_matrix(T_at_camera)
             distance = np.linalg.norm(translation, 2)
-            q = tr.quaternion_from_matrix(T_AC)
+            q = tr.quaternion_from_matrix(T_at_camera)
             transform = Transform(
                 translation=Vector3(*translation),
                 rotation=Quaternion(*q)
@@ -219,18 +223,69 @@ class AprilTagNode(DTROS):
         self.tf_broadcaster.sendTransform(transforms)
 
         if closest_tag_id is not None:
-            transform_apriltag_footprint = self.tf_buffer.lookup_transform(
-                f"at_{closest_tag_id}",
-                f"{self.hostname}/footprint",
-                0
+            try:
+                transform_odometry_at = self.tf_buffer.lookup_transform(
+                    f"at_{closest_tag_id}",
+                    "odometry",
+                    rospy.Time(0),
+                    rospy.Duration(1.0)
+                ).transform
+            except ConnectivityException as e:
+                rospy.logwarn_throttle(1.0, str(e))
+                return
+            T_odometry_at = tr.compose_matrix(
+                translate=([
+                    transform_odometry_at.translation.x,
+                    transform_odometry_at.translation.y,
+                    transform_odometry_at.translation.z
+                ]),
+                angles=tr.euler_from_quaternion([
+                    transform_odometry_at.rotation.x,
+                    transform_odometry_at.rotation.y,
+                    transform_odometry_at.rotation.z,
+                    transform_odometry_at.rotation.w
+                ])
             )
-            transform_apriltag_static_world = self.tf_buffer.lookup_transform(
-                f"at_{closest_tag_id}_static",
-                f"{self.hostname}/world",
-                0
+            try:
+                transform_at_static_world = self.tf_buffer.lookup_transform(
+                    "world",
+                    f"at_{closest_tag_id}_static",
+                    rospy.Time(0),
+                    rospy.Duration(1.0)
+                ).transform
+            except Exception as e:
+                rospy.logwarn_throttle(1.0, str(e))
+                return
+            T_at_static_world = tr.compose_matrix(
+                translate=([
+                    transform_at_static_world.translation.x,
+                    transform_at_static_world.translation.y,
+                    transform_at_static_world.translation.z
+                ]),
+                angles=tr.euler_from_quaternion([
+                    transform_at_static_world.rotation.x,
+                    transform_at_static_world.rotation.y,
+                    transform_at_static_world.rotation.z,
+                    transform_at_static_world.rotation.w
+                ])
             )
-            transform = transform_apriltag_footprint * transform_apriltag_static_world
-            self.pub_teleport.publish(transform)
+            rospy.loginfo(
+                [
+                    [
+                        transform_at_static_world.translation.x,
+                        transform_at_static_world.translation.y,
+                        transform_at_static_world.translation.z
+                    ]
+                ]
+            )
+            T_odometry_world = T_odometry_at @ T_at_static_world
+            translation = tr.translation_from_matrix(T_odometry_world)
+            q = tr.quaternion_from_matrix(T_odometry_world)
+            transform_odometry_world = Transform(
+                translation=Vector3(*translation),
+                rotation=Quaternion(*q)
+            )
+            self.pub_teleport.publish(transform_odometry_world)
 
     def run(self, rate=30):
         rate = rospy.Rate(rate)

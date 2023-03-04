@@ -71,7 +71,7 @@ class LaneFollowerJasper(DTROS):
 
                 self.pub_move.publish(cmd)
             else:
-                rospy.loginfo("Waiting to start...")
+                rospy.loginfo_throttle(5, "Waiting to start...")
             rate.sleep()
 
         self.on_shutdown()

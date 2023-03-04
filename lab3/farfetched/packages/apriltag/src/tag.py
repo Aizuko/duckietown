@@ -13,6 +13,7 @@ class Tag:
         self.type = type
         self.color = TAG_TYPE_TO_COLOR[type]
 
+
 TAG_TYPE_TO_COLOR = {
     TagType.StopSign: (255, 0, 0),
     TagType.TIntersection: (0, 0, 255),
@@ -24,7 +25,8 @@ TAG_ID_TO_TAG = {
     162: Tag(162, TagType.StopSign),
     169: Tag(169, TagType.StopSign),
     58: Tag(58, TagType.TIntersection),
-    62: Tag(63, TagType.TIntersection),
+    62: Tag(62, TagType.TIntersection),
+    63: Tag(63, TagType.TIntersection),
     153: Tag(153, TagType.TIntersection),
     133: Tag(133, TagType.TIntersection),
     93: Tag(93, TagType.UofA),

@@ -238,9 +238,17 @@ class DeadReckoningNode(DTROS):
         self.x = transform.translation.x
         self.y = transform.translation.y
         self.z = transform.translation.z
-        self.q = transform.rotation
+        rospy.loginfo(
+            f"Teleporting to {self.x:.2f}, {self.y:.2f}, {self.z:.2f}"
+        )
+        self.q = np.array([
+            transform.rotation.x,
+            transform.rotation.y,
+            transform.rotation.z,
+            transform.rotation.w
+        ])
         self.yaw = tr.euler_from_quaternion(self.q)[2]
-        self.timestamp = transform.header.stamp.to_sec()
+        self.timestamp = rospy.Time.now()
         self.tv = 0.0
         self.rv = 0.0
 
