@@ -249,8 +249,6 @@ class DeadReckoningNode(DTROS):
         ])
         self.yaw = tr.euler_from_quaternion(self.q)[2]
         self.timestamp = rospy.Time.now()
-        self.tv = 0.0
-        self.rv = 0.0
 
     def publish_odometry(self):
         odom = Odometry()
