@@ -155,8 +155,8 @@ class LaneFinderNode(DTROS):
                 cv2.circle(image, ext_top, 8,   RED, -1)
                 cv2.circle(image, ext_bot, 8,   RED, -1)
 
-                self.target = (cx - cy, cy)
-                self.horizontal_target_err = int(self.target[0] + x//2)
+                self.target = (cx + cy, cy)
+                self.horizontal_target_err = int(self.target[0] - x / 2)
 
                 self.counter += 1
                 if self.counter == 10:
