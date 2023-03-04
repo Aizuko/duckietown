@@ -225,8 +225,8 @@ class AprilTagNode(DTROS):
         if closest_tag_id is not None:
             try:
                 transform_odometry_at = self.tf_buffer.lookup_transform(
-                    f"at_{closest_tag_id}",
                     "odometry",
+                    f"at_{closest_tag_id}",
                     rospy.Time(0),
                     rospy.Duration(1.0)
                 ).transform
@@ -249,7 +249,7 @@ class AprilTagNode(DTROS):
             try:
                 transform_at_static_world = self.tf_buffer.lookup_transform(
                     "world",
-                    f"at_{closest_tag_id}_static",
+                    f"at_{closest_tag_id}",
                     rospy.Time(0),
                     rospy.Duration(1.0)
                 ).transform
