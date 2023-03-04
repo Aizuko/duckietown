@@ -74,7 +74,7 @@ class LaneFinderNode(DTROS):
         self.pub_pose = rospy.Publisher(
             f"/{self.hostname}/lane_finder_node/pose",
             FarfetchedPose,
-            queue_size=2,
+            queue_size=1,
         )
 
         self.pub_yellow = rospy.Publisher(
@@ -90,10 +90,10 @@ class LaneFinderNode(DTROS):
         )
 
         self.img_sub = rospy.Subscriber(
-            #f"/{self.hostname}/homography_publisher/image/compressed",
             f"/{self.hostname}/camera_node/image/compressed",
             CompressedImage,
-            self.callback_image
+            self.callback_image,
+            queue_size=1
         )
 
     def callback_image(self, message):

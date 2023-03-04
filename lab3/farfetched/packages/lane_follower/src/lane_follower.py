@@ -290,6 +290,7 @@ class LaneFollowerPIDNode(DTROS):
             f"/{self.hostname}/lane_finder_node/pose",
             FarfetchedPose,
             self.pose_cb_test,
+            queue_size=1
         )
 
         self.pub_move = rospy.Publisher(
