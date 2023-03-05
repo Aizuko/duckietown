@@ -14,9 +14,11 @@ dt-launchfile-init
 
 # launching app
 #dt-exec roslaunch augmented_reality_basics augmented_reality_basics.launch map_file:="maps/hud.yaml" veh:="$VEHICLE_NAME"
-#dt-exec roslaunch apriltag apriltag.launch veh:="$VEHICLE_NAME"
+#dt-exec roslaunch apriltag apriltag.launch veh:="$VEHICLE_NAME" &
+dt-exec roslaunch lane_finder lane_finder.launch veh:="$VEHICLE_NAME"
+dt-exec roslaunch lane_follower lane_follower.launch veh:="$VEHICLE_NAME"
 
-dt-exec roslaunch deadreckoning main.launch veh:="$VEHICLE_NAME"
+#dt-exec roslaunch deadreckoning main.launch veh:="$VEHICLE_NAME"
 
 # roscore&
 # sleep 5

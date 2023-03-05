@@ -63,10 +63,10 @@ class LaneFinderNode(DTROS):
         self.horizontal_target_err = None
         self.is_processed = False
 
-        self.low_hsv = (21, 15, 134)
-        self.high_hsv = (66, 255, 255)
-        #self.low_hsv = (13, 70, 170)
-        #self.high_hsv = (32, 135, 255)
+        #self.low_hsv = (21, 15, 134)
+        #self.high_hsv = (66, 255, 255)
+        self.low_hsv = (13, 70, 170)
+        self.high_hsv = (32, 135, 255)
 
         self.counter = 0  # Debug counter
 
@@ -74,7 +74,7 @@ class LaneFinderNode(DTROS):
         self.pub_pose = rospy.Publisher(
             f"/{self.hostname}/lane_finder_node/pose",
             FarfetchedPose,
-            queue_size=1,
+            queue_size=2,
         )
 
         self.pub_yellow = rospy.Publisher(
@@ -90,10 +90,10 @@ class LaneFinderNode(DTROS):
         )
 
         self.img_sub = rospy.Subscriber(
+            #f"/{self.hostname}/homography_publisher/image/compressed",
             f"/{self.hostname}/camera_node/image/compressed",
             CompressedImage,
-            self.callback_image,
-            queue_size=1
+            self.callback_image
         )
 
     def callback_image(self, message):
@@ -155,8 +155,8 @@ class LaneFinderNode(DTROS):
                 cv2.circle(image, ext_top, 8,   RED, -1)
                 cv2.circle(image, ext_bot, 8,   RED, -1)
 
-                self.target = (cx + cy, cy)
-                self.horizontal_target_err = int(self.target[0] - x / 2)
+                self.target = (cx - cy, cy)
+                self.horizontal_target_err = int(self.target[0] - x//2)
 
                 self.counter += 1
                 if self.counter == 10:
@@ -179,7 +179,7 @@ class LaneFinderNode(DTROS):
             if self.raw_image is not None and not self.is_processed:
                 self.process()
 
-            if self.processed_image is not None:
+            if self.processed_image is not None and self.horizontal_target_err is not None:
                 msg = self.bridge.cv2_to_compressed_imgmsg(
                     self.processed_image,
                     dst_format="jpeg",
@@ -187,12 +187,7 @@ class LaneFinderNode(DTROS):
                 self.pub_yellow.publish(msg)
 
                 pmsg = FarfetchedPose()
-                if self.horizontal_target_err is not None:
-                    pmsg.horizontal_target_err = int(
-                        self.horizontal_target_err
-                    )
-                else:
-                    pmsg.horizontal_target_err = 0
+                pmsg.horizontal_target_err = int(self.horizontal_target_err)
                 pmsg.is_yellow_detected = True
 
                 self.pub_pose.publish(pmsg)

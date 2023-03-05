@@ -307,4 +307,4 @@ class AprilTagNode(DTROS):
 
 if __name__ == '__main__':
     camera_node = AprilTagNode(node_name='apriltag_node')
-    camera_node.run()
+    camera_node.run(1)
