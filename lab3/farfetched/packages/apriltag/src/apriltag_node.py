@@ -233,6 +233,9 @@ class AprilTagNode(DTROS):
             except ConnectivityException as e:
                 rospy.logwarn_throttle(1.0, str(e))
                 return
+            except:
+                rospy.logwarn_throttle(1.0, "Another exception fired")
+                return
             T_odometry_at = tr.compose_matrix(
                 translate=([
                     transform_odometry_at.translation.x,
@@ -278,7 +281,7 @@ class AprilTagNode(DTROS):
             )
             self.pub_teleport.publish(transform_odometry_world)
 
-    def run(self, rate=30):
+    def run(self, rate=3):
         rate = rospy.Rate(rate)
 
         while not rospy.is_shutdown():
