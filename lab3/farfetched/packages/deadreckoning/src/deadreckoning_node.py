@@ -112,10 +112,7 @@ class DeadReckoningNode(DTROS):
         self.pub = rospy.Publisher("~odom", Odometry, queue_size=10)
 
         # Setup timer
-        self.timer = rospy.Timer(
-            rospy.Duration(
-                1 / self.publish_hz),
-            self.cb_timer)
+        self.timer = rospy.Timer(rospy.Duration(1), self.cb_timer)
         self._print_time = 0
         self._print_every_sec = 30
         # tf broadcaster for odometry TF
