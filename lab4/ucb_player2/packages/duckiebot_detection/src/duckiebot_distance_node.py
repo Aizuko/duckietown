@@ -14,7 +14,7 @@ from sensor_msgs.msg import CameraInfo
 from std_msgs.msg import String, Float32, Header
 from geometry_msgs.msg import TransformStamped, Transform, Vector3, Quaternion
 from tf import transformations as tr
-
+from tf2_ros import TransformBroadcaster
 
 class DuckiebotDistanceNode(DTROS):
     """
@@ -57,6 +57,8 @@ class DuckiebotDistanceNode(DTROS):
             queue_size=1
         )
         self.pcm = PinholeCameraModel()
+
+        self.tf_broadcaster = TransformBroadcaster()
 
         self.log("Initialization completed")
 
@@ -116,17 +118,10 @@ class DuckiebotDistanceNode(DTROS):
                     translation_vector = -np.dot(R_inv, translation_vector)
                     distance_to_vehicle = -translation_vector[2]
 
-                    rospy.logdebug(R)
-                    rospy.logdebug(translation_vector)
-                    self.pub_robot_transform(R, translation_vector)
-
                     ##### publish the distance information to a topic###
                     self.pub_distance_to_robot_ahead.publish(Float32(distance_to_vehicle))
 
-                    q = tr.quaternion_from_matrix(R)
-
-                    self.pub_transform_to_robot_ahead.publish(
-                        TransformStamped(
+                    transform = TransformStamped(
                             header=Header(
                                 stamp=rospy.Time.now(),
                                 frame_id=f"{self.host}/camera_optical_frame",
@@ -134,10 +129,12 @@ class DuckiebotDistanceNode(DTROS):
                             child_frame_id=f"{self.host}/robot_ahead",
                             transform=Transform(
                                 translation=Vector3(*translation_vector),
-                                rotation=Quaternion(*q),
+                                rotation=Quaternion(*tr.quaternion_from_matrix(R)),
                             ),
                         )
-                    )
+
+                    self.pub_transform_to_robot_ahead.publish(transform)
+                    self.tf_broadcaster.sendTransform(transform)
 
                 else:
                     self.log(
