@@ -11,7 +11,9 @@ from duckietown_msgs.msg import BoolStamped, VehicleCorners
 from duckietown_msgs.srv import ChangePattern
 from image_geometry import PinholeCameraModel
 from sensor_msgs.msg import CameraInfo
-from std_msgs.msg import String, Float32
+from std_msgs.msg import String, Float32, Header
+from geometry_msgs.msg import TransformStamped, Transform, Vector3, Quaternion
+from tf import transformations as tr
 
 
 class DuckiebotDistanceNode(DTROS):
@@ -20,15 +22,15 @@ class DuckiebotDistanceNode(DTROS):
     """
 
     def __init__(self, node_name):
-    
-    	
+
+
         # Initialize the DTROS parent class
         super(DuckiebotDistanceNode, self).__init__(node_name=node_name, node_type=NodeType.PERCEPTION)
         self.host = str(os.environ['VEHICLE_NAME'])
-	
+
 	#Distance between the centers of the circles on the back
         self.distance_between_centers = 0.0125
-        
+
         #Maximum tolerable reprojection error.
         #If a reprojection error higher than that is observed. May require some actions
         self.max_reproj_pixelerror_pose_estimation = 1.5
@@ -40,18 +42,22 @@ class DuckiebotDistanceNode(DTROS):
         self.last_calc_circle_pattern = None
         self.circlepattern_dist = None
         self.circlepattern = None
-        
+
         # subscribers
         self.sub_centers = rospy.Subscriber("/{}/duckiebot_detection_node/centers".format(self.host), VehicleCorners, self.cb_process_centers, queue_size=1)
         self.sub_info = rospy.Subscriber(
             "/{}/camera_node/camera_info".format(self.host), CameraInfo, self.cb_process_camera_info, queue_size=1
         )
 
-
         # publishers
         self.pub_distance_to_robot_ahead = rospy.Publisher("/{}/duckiebot_distance_node/distance".format(self.host), Float32, queue_size=1)
+        self.pub_transform_to_robot_ahead = rospy.Publisher(
+            f"/{self.host}/duckiebot_distance_node/transform",
+            TransformStamped,
+            queue_size=1
+        )
         self.pcm = PinholeCameraModel()
-        
+
         self.log("Initialization completed")
 
 
@@ -109,10 +115,29 @@ class DuckiebotDistanceNode(DTROS):
                     R_inv = np.transpose(R)
                     translation_vector = -np.dot(R_inv, translation_vector)
                     distance_to_vehicle = -translation_vector[2]
-                    
-                    #####publish the distance information to a topic###
+
+                    rospy.logdebug(R)
+                    rospy.logdebug(translation_vector)
+                    self.pub_robot_transform(R, translation_vector)
+
+                    ##### publish the distance information to a topic###
                     self.pub_distance_to_robot_ahead.publish(Float32(distance_to_vehicle))
 
+                    q = tr.quaternion_from_matrix(R)
+
+                    self.pub_transform_to_robot_ahead.publish(
+                        TransformStamped(
+                            header=Header(
+                                stamp=rospy.Time.now(),
+                                frame_id=f"{self.host}/camera_optical_frame",
+                            ),
+                            child_frame_id=f"{self.host}/robot_ahead",
+                            transform=Transform(
+                                translation=Vector3(*translation_vector),
+                                rotation=Quaternion(*q),
+                            ),
+                        )
+                    )
 
                 else:
                     self.log(
