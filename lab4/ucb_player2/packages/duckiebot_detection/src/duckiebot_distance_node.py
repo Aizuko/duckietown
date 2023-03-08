@@ -136,6 +136,9 @@ class DuckiebotDistanceNode(DTROS):
                     self.pub_distance_to_robot_ahead.publish(
                         Float32(distance_to_vehicle))
 
+                    T = np.eye(4)
+                    T[:3, :3] = R
+
                     transform = TransformStamped(
                         header=Header(
                             stamp=rospy.Time.now(),
@@ -144,7 +147,7 @@ class DuckiebotDistanceNode(DTROS):
                         child_frame_id=f"{self.host}/robot_ahead",
                         transform=Transform(
                             translation=Vector3(*translation_vector),
-                            rotation=Quaternion(*tr.quaternion_from_matrix(R)),
+                            rotation=Quaternion(*tr.quaternion_from_matrix(T)),
                         ),
                     )
 
