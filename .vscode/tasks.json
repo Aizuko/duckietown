@@ -8,7 +8,7 @@
       "type": "shell",
       "command": "docker build -t duckietown/farfetched:latest-arm64v8 .",
       "options": {
-        "cwd": "${workspaceFolder}/lab3/farfetched",
+        "cwd": "${workspaceFolder}/lab4/ucb_player2",
       },
       "group": {
         "kind": "build",
@@ -24,7 +24,7 @@
       "type": "shell",
       "command": "dts devel run",
       "options": {
-        "cwd": "${workspaceFolder}/lab3/farfetched"
+        "cwd": "${workspaceFolder}/lab4/ucb_player2"
       },
       "group": {
         "kind": "test",
@@ -41,9 +41,9 @@
     {
       "label": "Remote Build",
       "type": "shell",
-      "command": "docker -H csc22902.local build -t duckietown/farfetched:latest-arm64v8 .",
+      "command": "docker -H csc22927.local build -t duckietown/ucb_player2:latest-arm64v8 .",
       "options": {
-        "cwd": "${workspaceFolder}/lab3/farfetched"
+        "cwd": "${workspaceFolder}/lab4/ucb_player2"
       },
       "group": {
         "kind": "build",
@@ -57,9 +57,9 @@
     {
       "label": "Remote Test",
       "type": "shell",
-      "command": "dts devel run -H csc22902.local",
+      "command": "dts devel run -H csc22927.local",
       "options": {
-        "cwd": "${workspaceFolder}/lab3/farfetched"
+        "cwd": "${workspaceFolder}/lab4/ucb_player2"
       },
       "group": {
         "kind": "test",

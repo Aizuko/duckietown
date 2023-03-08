@@ -9,6 +9,6 @@
     "/home/steven/Github/dt-ros-commons/packages/duckietown/include",
     "/home/steven/Github/code/catkin_ws/devel/lib/python3/dist-packages"
   ],
-  "terminal.integrated.cwd": "lab3/farfetched",
+  "terminal.integrated.cwd": "lab4/ucb_player2",
   "python.formatting.provider": "autopep8",
 }
