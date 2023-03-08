@@ -16,6 +16,7 @@ from geometry_msgs.msg import TransformStamped, Transform, Vector3, Quaternion
 from tf import transformations as tr
 from tf2_ros import TransformBroadcaster
 
+
 class DuckiebotDistanceNode(DTROS):
     """
     responsible for estimating the relative pose to a detected back pattern of a robot
@@ -23,18 +24,21 @@ class DuckiebotDistanceNode(DTROS):
 
     def __init__(self, node_name):
 
-
         # Initialize the DTROS parent class
-        super(DuckiebotDistanceNode, self).__init__(node_name=node_name, node_type=NodeType.PERCEPTION)
+        super(
+            DuckiebotDistanceNode,
+            self).__init__(
+            node_name=node_name,
+            node_type=NodeType.PERCEPTION)
         self.host = str(os.environ['VEHICLE_NAME'])
 
-	#Distance between the centers of the circles on the back
+        # Distance between the centers of the circles on the back
         self.distance_between_centers = 0.0125
 
-        #Maximum tolerable reprojection error.
-        #If a reprojection error higher than that is observed. May require some actions
+        # Maximum tolerable reprojection error.
+        # If a reprojection error higher than that is observed. May require
+        # some actions
         self.max_reproj_pixelerror_pose_estimation = 1.5
-
 
         self.bridge = CvBridge()
 
@@ -44,13 +48,18 @@ class DuckiebotDistanceNode(DTROS):
         self.circlepattern = None
 
         # subscribers
-        self.sub_centers = rospy.Subscriber("/{}/duckiebot_detection_node/centers".format(self.host), VehicleCorners, self.cb_process_centers, queue_size=1)
-        self.sub_info = rospy.Subscriber(
-            "/{}/camera_node/camera_info".format(self.host), CameraInfo, self.cb_process_camera_info, queue_size=1
-        )
+        self.sub_centers = rospy.Subscriber(
+            "/{}/duckiebot_detection_node/centers".format(
+                self.host),
+            VehicleCorners,
+            self.cb_process_centers,
+            queue_size=1)
+        self.sub_info = rospy.Subscriber("/{}/camera_node/camera_info".format(
+            self.host), CameraInfo, self.cb_process_camera_info, queue_size=1)
 
         # publishers
-        self.pub_distance_to_robot_ahead = rospy.Publisher("/{}/duckiebot_distance_node/distance".format(self.host), Float32, queue_size=1)
+        self.pub_distance_to_robot_ahead = rospy.Publisher(
+            "/{}/duckiebot_distance_node/distance".format(self.host), Float32, queue_size=1)
         self.pub_transform_to_robot_ahead = rospy.Publisher(
             f"/{self.host}/duckiebot_distance_node/transform",
             TransformStamped,
@@ -61,7 +70,6 @@ class DuckiebotDistanceNode(DTROS):
         self.tf_broadcaster = TransformBroadcaster()
 
         self.log("Initialization completed")
-
 
     def cb_process_camera_info(self, msg):
         """
@@ -87,10 +95,14 @@ class DuckiebotDistanceNode(DTROS):
         # check if there actually was a detection
         detection = vehicle_centers_msg.detection.data
         if detection:
-            self.calc_circle_pattern(vehicle_centers_msg.H, vehicle_centers_msg.W)
-            points = np.zeros((vehicle_centers_msg.H * vehicle_centers_msg.W, 2))
+            self.calc_circle_pattern(
+                vehicle_centers_msg.H,
+                vehicle_centers_msg.W)
+            points = np.zeros(
+                (vehicle_centers_msg.H * vehicle_centers_msg.W, 2))
             for i in range(len(points)):
-                points[i] = np.array([vehicle_centers_msg.corners[i].x, vehicle_centers_msg.corners[i].y])
+                points[i] = np.array(
+                    [vehicle_centers_msg.corners[i].x, vehicle_centers_msg.corners[i].y])
 
             success, rotation_vector, translation_vector = cv2.solvePnP(
                 objectPoints=self.circlepattern,
@@ -109,8 +121,10 @@ class DuckiebotDistanceNode(DTROS):
                 )
 
                 mean_reproj_error = np.mean(
-                    np.sqrt(np.sum((np.squeeze(points_reproj) - points) ** 2, axis=1))
-                )
+                    np.sqrt(
+                        np.sum(
+                            (np.squeeze(points_reproj) - points) ** 2,
+                            axis=1)))
 
                 if mean_reproj_error < self.max_reproj_pixelerror_pose_estimation:
                     (R, jac) = cv2.Rodrigues(rotation_vector)
@@ -119,19 +133,20 @@ class DuckiebotDistanceNode(DTROS):
                     distance_to_vehicle = -translation_vector[2]
 
                     ##### publish the distance information to a topic###
-                    self.pub_distance_to_robot_ahead.publish(Float32(distance_to_vehicle))
+                    self.pub_distance_to_robot_ahead.publish(
+                        Float32(distance_to_vehicle))
 
                     transform = TransformStamped(
-                            header=Header(
-                                stamp=rospy.Time.now(),
-                                frame_id=f"{self.host}/camera_optical_frame",
-                            ),
-                            child_frame_id=f"{self.host}/robot_ahead",
-                            transform=Transform(
-                                translation=Vector3(*translation_vector),
-                                rotation=Quaternion(*tr.quaternion_from_matrix(R)),
-                            ),
-                        )
+                        header=Header(
+                            stamp=rospy.Time.now(),
+                            frame_id=f"{self.host}/camera_optical_frame",
+                        ),
+                        child_frame_id=f"{self.host}/robot_ahead",
+                        transform=Transform(
+                            translation=Vector3(*translation_vector),
+                            rotation=Quaternion(*tr.quaternion_from_matrix(R)),
+                        ),
+                    )
 
                     self.pub_transform_to_robot_ahead.publish(transform)
                     self.tf_broadcaster.sendTransform(transform)
@@ -142,8 +157,9 @@ class DuckiebotDistanceNode(DTROS):
                         "Reporting detection at 0cm for safety."
                     )
             else:
-                self.log("Pose estimation failed. " "Reporting detection at 0cm for safety.")
-
+                self.log(
+                    "Pose estimation failed. "
+                    "Reporting detection at 0cm for safety.")
 
     def calc_circle_pattern(self, height, width):
         """
@@ -154,21 +170,34 @@ class DuckiebotDistanceNode(DTROS):
             width (`int`): number of columns in the pattern
 
         """
-        # check if the version generated before is still valid, if not, or first time called, create
+        # check if the version generated before is still valid, if not, or
+        # first time called, create
 
-        if self.last_calc_circle_pattern is None or self.last_calc_circle_pattern != (height, width):
+        if self.last_calc_circle_pattern is None or self.last_calc_circle_pattern != (
+                height, width):
             self.circlepattern_dist = self.distance_between_centers
             self.circlepattern = np.zeros([height * width, 3])
             for i in range(0, width):
                 for j in range(0, height):
-                    self.circlepattern[i + j * width, 0] = (
-                        self.circlepattern_dist * i - self.circlepattern_dist * (width - 1) / 2
-                    )
-                    self.circlepattern[i + j * width, 1] = (
-                        self.circlepattern_dist * j - self.circlepattern_dist * (height - 1) / 2
-                    )
+                    self.circlepattern[i +
+                                       j *
+                                       width, 0] = (self.circlepattern_dist *
+                                                    i -
+                                                    self.circlepattern_dist *
+                                                    (width -
+                                                     1) /
+                                                    2)
+                    self.circlepattern[i +
+                                       j *
+                                       width, 1] = (self.circlepattern_dist *
+                                                    j -
+                                                    self.circlepattern_dist *
+                                                    (height -
+                                                     1) /
+                                                    2)
 
 
 if __name__ == "__main__":
-    duckiebot_distance_node = DuckiebotDistanceNode(node_name="duckiebot_distance_node")
+    duckiebot_distance_node = DuckiebotDistanceNode(
+        node_name="duckiebot_distance_node")
     rospy.spin()
