@@ -14,7 +14,6 @@
     "stopline_area_max": 2000,
     "run_rate": 8,
     "deque_maxlen": 8,
-    "debug": true,
     "placeholder": false
   }
 }
