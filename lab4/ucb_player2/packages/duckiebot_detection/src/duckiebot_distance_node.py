@@ -138,7 +138,7 @@ class DuckiebotDistanceNode(DTROS):
 
                     T = np.eye(4)
                     T[:3, :3] = R
-                    T[:3, 3] = translation_vector
+                    T[:3, 3] = translation_vector.flatten()
                     T = np.linalg.inv(T)
 
                     transform = TransformStamped(

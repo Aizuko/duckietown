@@ -87,6 +87,7 @@ class LaneFollowNode(DTROS, FrozenClass):
 
         # Transform
         self.robot_transform_queue = deque(maxlen=6)
+        self.robot_transform_time = None
 
         # Shutdown hook
         rospy.on_shutdown(self.on_shutdown)
@@ -117,10 +118,10 @@ class LaneFollowNode(DTROS, FrozenClass):
             self.tof_callback,
             queue_size=1,
         )
-        self.transform_sub = rospy.Subscriber(
+        self.robot_ahead_transform_sub = rospy.Subscriber(
             f"/{self.veh}/duckiebot_distance_node/transform",
             TransformStamped,
-            self.transform_callback,
+            self.robot_ahead_transform_callback,
             queue_size=1,
         )
         self.vel_pub = rospy.Publisher(
@@ -174,20 +175,23 @@ class LaneFollowNode(DTROS, FrozenClass):
     def tof_callback(self, msg):
         self.tof_dist.append(msg.range)  # Keep full backlog
 
-    def robot_ahead_transform_callback(self, msg):
-        rospy.loginfo_throttle(10, f"TRANSFORM: {msg}")
+    def robot_ahead_transform_callback(self, msg: TransformStamped):
         transform = msg.transform
-        T = tr.compose_matrix(translate=([
-            transform.translation.x,
-            transform.translation.y,
-            transform.translation.z
-        ]),
-        angles=tr.euler_from_quaternion([
-            transform.rotation.x,
-            transform.rotation.y,
-            transform.rotation.z,
-            transform.rotation.w
-        ]))
+        self.robot_transform_time = msg.header.stamp.to_sec()
+        T = tr.compose_matrix(
+            translate=([
+                transform.translation.x,
+                transform.translation.y,
+                transform.translation.z
+            ]),
+            angles=tr.euler_from_quaternion([
+                transform.rotation.x,
+                transform.rotation.y,
+                transform.rotation.z,
+                transform.rotation.w
+            ])
+        )
+        rospy.loginfo_throttle(10, f"T: {msg}")
         self.robot_transform_queue.append(T)
 
     def stop_callback(self, msg):
@@ -247,7 +251,7 @@ class LaneFollowNode(DTROS, FrozenClass):
 
         self.vel_pub.publish(self.twist)
 
-        if self.tof_dist[-1] < SAFE_DISTANCE or self.t:
+        if self.distance_to_robot_ahead() <= TRACKING_DISTANCE:
             self.state = DuckieState.Tracking
 
     def check_stop(self):
@@ -279,8 +283,20 @@ class LaneFollowNode(DTROS, FrozenClass):
         #     self.twist.omega = P + D
 
         # self.vel_pub.publish(self.twist)
-        if self.tof_dist[-1] > TRACKING_DISTANCE:
+
+        if self.distance_to_robot_ahead() > TRACKING_DISTANCE:
             self.state = DuckieState.LaneFollowing
+
+    def distance_to_robot_ahead(self):
+        distance_estimates = []
+        if len(self.tof_dist):
+            distance_estimates.append(self.tof_dist[-1])
+        if (self.robot_transform_time and self.robot_transform_time >
+                rospy.get_time() - 1):
+            latest_transform = self.robot_transform_queue[-1]
+            latest_translate = latest_transform[:3, 3]
+            distance_estimates.append(np.linalg.norm(latest_translate))
+        return min(distance_estimates)
 
     def run(self, rate=8):
         rate = rospy.Rate(8)
