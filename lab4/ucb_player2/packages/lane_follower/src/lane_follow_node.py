@@ -7,9 +7,10 @@ import numpy as np
 import rospy
 from cv_bridge import CvBridge
 from duckietown.dtros import DTROS, NodeType
-from duckietown_msgs.msg import Twist2DStamped
+from duckietown_msgs.msg import LEDPattern, Twist2DStamped
 from geometry_msgs.msg import TransformStamped
 from sensor_msgs.msg import CompressedImage, Range
+from std_msgs.msg import ColorRGBA
 from tf import transformations as tr
 
 # TODO: extact into config file for faster tuning
@@ -17,9 +18,9 @@ ROAD_MASK = [(20, 60, 0), (50, 255, 255)]
 STOP_MASK = [(0, 70, 150), (20, 255, 255)]
 DEBUG = True
 IS_ENGLISH = False
-TRACKING_DISTANCE = 0.5
-SAFE_DISTANCE = 0.1
 
+OFF_COLOR = ColorRGBA()
+OFF_COLOR.r = OFF_COLOR.g = OFF_COLOR.b = OFF_COLOR.a = 0.0
 
 @unique
 class DuckieState(Enum):
@@ -31,6 +32,22 @@ class DuckieState(Enum):
     BlindForward = auto()
     Tracking = auto()
 
+@unique
+class LEDColor(Enum):
+    Red     = [1., 0., 0.]
+    Green   = [0., 1., 0.]
+    Blue    = [0., 0., 1.]
+    Yellow  = [1., 1., 0.]
+    Teal    = [0., 1., 1.]
+    Magenta = [1., 0., 1.]
+
+@unique
+class LEDIndex(Enum):
+    All     = set(range(0,5))
+    Left    = set([0, 1])
+    Right   = set([3, 4])
+    Back    = set([1, 3])
+    Front   = set([0, 4])
 
 class FrozenClass(object):
     __isfrozen = False
@@ -66,6 +83,10 @@ class LaneFollowNode(DTROS, FrozenClass):
 
         # Stopping
         self.stop_duration = 3
+        self.tracking_distance = 0.5
+
+        # Tracking
+        self.safe_distance = 0.2
 
         # ╔─────────────────────────────────────────────────────────────────────╗
         # │ Dyηαmic ναriαblεs                                                   |
@@ -131,6 +152,11 @@ class LaneFollowNode(DTROS, FrozenClass):
         self.vel_pub = rospy.Publisher(
             f"/{self.veh}/car_cmd_switch_node/cmd",
             Twist2DStamped,
+            queue_size=1,
+        )
+        self.led_pub = rospy.Publisher(
+            f'/{self.veh}/led_emitter_node/led_pattern',
+            LEDPattern,
             queue_size=1,
         )
 
@@ -226,10 +252,13 @@ class LaneFollowNode(DTROS, FrozenClass):
         self.twist.v = self.velocity
 
         if state is DuckieState.BlindForward:
+            self.set_leds(LEDColor.Green, LEDIndex.Yellow)
             self.twist.omega = 0
         elif state is DuckieState.BlindTurnLeft:
+            self.set_leds(LEDColor.Green, LEDIndex.Teal)
             self.twist.omega = np.pi / 2
         elif state is DuckieState.BlindTurnRight:
+            self.set_leds(LEDColor.Green, LEDIndex.Magenta)
             self.twist.omega = -np.pi / 2
         else:
             raise Exception(f"Invalid state {state} for blind driving")
@@ -312,18 +341,33 @@ class LaneFollowNode(DTROS, FrozenClass):
             distance_estimates.append(np.linalg.norm(latest_translate))
         return min(distance_estimates)
 
+    def set_leds(self, color: LEDColor, index_set: LEDIndex):
+        led_msg = LEDPattern()
+
+        on_color = ColorRGBA()
+        on_color.r, on_color.g, on_color.b = color
+        on_color.a = 1.0
+
+        for i in range(5):
+            leg_msg.rgb_vals.append(on_color if i in index_set else OFF_COLOR)
+
+        self.led_pub.publish(msg)
+
     def run(self, rate=8):
         rate = rospy.Rate(8)
 
         while not rospy.is_shutdown():
             rospy.loginfo_throttle(1, f"STATE: {self.state}")
             if self.state is DuckieState.LaneFollowing:
+                self.set_leds(LEDColor.Green, LEDIndex.Back)
                 self.follow_lane()
             elif self.state is DuckieState.Stopped:
+                self.set_leds(LEDColor.Red, LEDIndex.Back)
                 self.check_stop()
             elif self.state in (DuckieState.BlindTurnLeft, DuckieState.BlindTurnRight, DuckieState.BlindForward):
                 self.drive_bindly(self.state)
             elif self.state is DuckieState.Tracking:
+                self.set_leds(LEDColor.Blue, LEDIndex.Back)
                 self.tracking()
             else:
                 raise Exception(f"Invalid state {self.state}")
