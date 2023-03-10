@@ -41,7 +41,7 @@
     {
       "label": "Remote Build",
       "type": "shell",
-      "command": "docker -H csc22927.local build -t duckietown/ucb_player2:latest-arm64v8 .",
+      "command": "docker -H ${input:bot}.local build -t duckietown/ucb_player2:latest-arm64v8 .",
       "options": {
         "cwd": "${workspaceFolder}/lab4/ucb_player2"
       },
@@ -57,7 +57,7 @@
     {
       "label": "Remote Test",
       "type": "shell",
-      "command": "dts devel run -H csc22927.local",
+      "command": "dts devel run -H ${input:bot}.local",
       "options": {
         "cwd": "${workspaceFolder}/lab4/ucb_player2"
       },
@@ -73,5 +73,15 @@
         "Remote Build"
       ]
     }
-  ]
+  ],
+  "inputs": [{
+    "type": "pickString",
+    "id": "bot",
+    "description": "Bot hostname",
+    "options": [
+      "csc22902",
+      "csc22927",
+    ],
+    "default": "csc22902"
+  },]
 }
