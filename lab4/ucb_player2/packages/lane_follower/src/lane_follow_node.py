@@ -214,7 +214,6 @@ class LaneFollowNode(DTROS, FrozenClass):
 
     def robot_ahead_transform_callback(self, msg: TransformStamped):
         transform = msg.transform
-        self.robot_transform_time = msg.header.stamp.to_sec()
         T = tr.compose_matrix(
             translate=([
                 transform.translation.x,
@@ -228,8 +227,9 @@ class LaneFollowNode(DTROS, FrozenClass):
                 transform.rotation.w
             ])
         )
-        rospy.loginfo_throttle(10, f"T: {msg}")
         self.robot_transform_queue.append(T)
+        self.robot_transform_time = msg.header.stamp.to_sec()
+        rospy.loginfo_throttle(10, f"T: {msg}")
 
     def stop_callback(self, msg):
         img = self.bridge.compressed_imgmsg_to_cv2(msg, "bgr8")
