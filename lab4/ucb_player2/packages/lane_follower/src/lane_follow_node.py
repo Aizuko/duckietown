@@ -351,7 +351,9 @@ class LaneFollowNode(DTROS, FrozenClass):
         on_color.a = 1.0
 
         for i in range(5):
-            led_msg.rgb_vals.append(on_color if i in index_set else OFF_COLOR)
+            led_msg.rgb_vals.append(
+                on_color if i in index_set.value else OFF_COLOR
+            )
 
         self.led_pub.publish(led_msg)
 
