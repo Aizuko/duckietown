@@ -2,8 +2,9 @@
 import rospy
 import cv2
 
+from enum import Enum, unique
 from duckietown.dtros import DTROS, NodeType
-from sensor_msgs.msg import CameraInfo, CompressedImage
+from sensor_msgs.msg import CameraInfo, CompressedImage, Range
 from std_msgs.msg import Float32
 from cv_bridge import CvBridge
 import numpy as np
@@ -14,41 +15,60 @@ STOP_MASK = [(0, 70, 150), (20, 255, 255)]
 DEBUG = True
 ENGLISH = False
 
-class LaneFollowNode(DTROS):
+
+@unique
+class DuckieState(Enum):
+    """States our duckiebot can visit. These modify the LaneFollowNode"""
+    LaneFollowing    = auto()
+    Stopped          = auto()
+    BlindTurnLeft    = auto()
+    BlindTurnRight   = auto()
+    BlindTurnForward = auto()
+    Tracking         = auto()
+
+
+class FrozenClass(object):
+    __isfrozen = False
+    def __setattr__(self, key, value):
+        if self.__isfrozen and not hasattr(self, key):
+            raise TypeError(f"{self} is a frozen class")
+        object.__setattr__(self, key, value)
+
+    def _freeze(self):
+        self.__isfrozen = True
+
+
+class LaneFollowNode(DTROS, FrozenClass):
     def __init__(self, node_name):
-        super(LaneFollowNode, self).__init__(node_name=node_name, node_type=NodeType.GENERIC)
+        super(LaneFollowNode, self).__init__(
+            node_name=node_name, node_type=NodeType.GENERIC)
+
+        #╔─────────────────────────────────────────────────────────────────────╗
+        #│  Cδηsταητs (τδ τμηε)                                                |
+        #╚─────────────────────────────────────────────────────────────────────╝
+        # Utils
         self.node_name = node_name
         self.veh = rospy.get_param("~veh")
-
-        # Publishers & Subscribers
-        self.pub = rospy.Publisher(f"/{self.veh}/output/image/mask/compressed",
-                                   CompressedImage,
-                                   queue_size=1)
-        self.pub_red = rospy.Publisher(
-                                   f"/{self.veh}/output/image/red/compressed",
-                                   CompressedImage,
-                                   queue_size=1)
-        self.sub = rospy.Subscriber(f"/{self.veh}/camera_node/image/compressed",
-                                    CompressedImage,
-                                    self.ajoin_callback,
-                                    queue_size=1,
-                                    buff_size="20MB")
-        self.vel_pub = rospy.Publisher(f"/{self.veh}/car_cmd_switch_node/cmd",
-                                       Twist2DStamped,
-                                       queue_size=1)
-
         self.bridge = CvBridge()
 
-        self.loginfo("Initialized")
-
-        # PID Variables
-        self.error = None
-        if ENGLISH:
-            self.offset = -220
-        else:
-            self.offset = 220
+        # Lane following
+        self.offset = 220 * (-1 if IS_ENGLISH else 1)
         self.velocity = 0.4
         self.twist = Twist2DStamped(v=self.velocity, omega=0)
+        self.P = 0.049
+        self.D = -0.004
+
+        # Stopping
+        self.stop_duration = 3
+
+        #╔─────────────────────────────────────────────────────────────────────╗
+        #│ Dyηαmic ναriαblεs                                                   |
+        #╚─────────────────────────────────────────────────────────────────────╝
+        # State
+        self.state = DuckieState.LaneFollowing
+
+        # PID Variables
+        self.error = None  # Error off target
 
         self.last_error = 0
         self.last_time = rospy.get_time()
@@ -58,13 +78,46 @@ class LaneFollowNode(DTROS):
         self.stop_time = None
         self.last_stop_time = None
 
-        # Constants
-        self.P = 0.049
-        self.D = -0.004
-        self.stop_duration = 3
+        # TOF
+        self.tof_dist = None
 
         # Shutdown hook
         rospy.on_shutdown(self.hook)
+
+        #╔─────────────────────────────────────────────────────────────────────╗
+        #│ Pμblishεrs & Sμbscribεrs                                            |
+        #╚─────────────────────────────────────────────────────────────────────╝
+        self.pub = rospy.Publisher(
+            f"/{self.veh}/output/image/mask/compressed",
+            CompressedImage,
+            queue_size=1,
+        )
+        self.pub_red = rospy.Publisher(
+            f"/{self.veh}/output/image/red/compressed",
+            CompressedImage,
+            queue_size=1,
+        )
+        self.sub = rospy.Subscriber(
+            f"/{self.veh}/camera_node/image/compressed",
+            CompressedImage,
+            self.ajoin_callback,
+            queue_size=1,
+            buff_size="20MB",
+        )
+        self.tof_sub = rospy.Subscriber(
+            f"/{self.veh}/front_center_tof_driver_node/range",
+            Range,
+            self.tof_callback,
+            queue_size=1,
+        )
+        self.vel_pub = rospy.Publisher(
+            f"/{self.veh}/car_cmd_switch_node/cmd",
+            Twist2DStamped,
+            queue_size=1,
+        )
+
+        # Now disallow any new attributes
+        self._freeze()
 
     def ajoin_callback(self, msg):
         self.lane_callback(msg)
@@ -104,6 +157,10 @@ class LaneFollowNode(DTROS):
         if DEBUG:
             rect_img_msg = self.bridge.cv2_to_compressed_imgmsg(crop)
             self.pub.publish(rect_img_msg)
+
+    def tof_callback(self, msg):
+        self.tof_dist = msg.range
+        self.loginfo(f"TOF: {self.tof_dist}")
 
     def stop_callback(self, msg):
         img = self.bridge.compressed_imgmsg_to_cv2(msg, "bgr8")
@@ -155,7 +212,7 @@ class LaneFollowNode(DTROS):
 
         self.vel_pub.publish(self.twist)
 
-    def hook(self):
+    def on_shutdown(self):
         print("SHUTTING DOWN")
         self.twist.v = 0
         self.twist.omega = 0
@@ -166,7 +223,9 @@ class LaneFollowNode(DTROS):
 
 if __name__ == "__main__":
     node = LaneFollowNode("lanefollow_node")
-    rate = rospy.Rate(8)  # 8hz
+    rospy.on_shutdown(node.on_shutdown)
+
+    rate = rospy.Rate(8)
     while not rospy.is_shutdown():
         node.drive()
         rate.sleep()
