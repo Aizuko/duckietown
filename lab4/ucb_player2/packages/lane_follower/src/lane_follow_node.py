@@ -2,9 +2,10 @@
 import rospy
 import cv2
 
-from enum import Enum, unique
+from enum import Enum, unique, auto
 from duckietown.dtros import DTROS, NodeType
 from sensor_msgs.msg import CameraInfo, CompressedImage, Range
+from geometry_msgs.msg import TransformStamped
 from std_msgs.msg import Float32
 from cv_bridge import CvBridge
 import numpy as np
@@ -13,7 +14,7 @@ from duckietown_msgs.msg import WheelsCmdStamped, Twist2DStamped
 ROAD_MASK = [(20, 60, 0), (50, 255, 255)]
 STOP_MASK = [(0, 70, 150), (20, 255, 255)]
 DEBUG = True
-ENGLISH = False
+IS_ENGLISH = False
 
 
 @unique
@@ -80,7 +81,7 @@ class LaneFollowNode(DTROS, FrozenClass):
         self.tof_dist = [0., 0., 0.]
 
         # Shutdown hook
-        rospy.on_shutdown(self.hook)
+        rospy.on_shutdown(self.on_shutdown)
 
         #╔─────────────────────────────────────────────────────────────────────╗
         #│ Pμblishεrs & Sμbscribεrs                                            |
@@ -126,7 +127,7 @@ class LaneFollowNode(DTROS, FrozenClass):
     def ajoin_callback(self, msg):
         self.lane_callback(msg)
 
-        if self.state != DuckieState.Stopped:
+        if self.state is not DuckieState.Stopped:
             self.stop_callback(msg)
 
     def lane_callback(self, msg):
@@ -194,16 +195,14 @@ class LaneFollowNode(DTROS, FrozenClass):
         self.last_error = self.error = 0
         self.twist.v = self.velocity
 
-        match state:
-            case DuckieState.BlindForward:
-                self.twist.omega = 0
-            case DuckieState.BlindTurnLeft:
-                self.twist.omega = np.pi/2
-            case DuckieState.BlindTurnRight:
-                self.twist.omega = -np.pi/2
-            default:
-                raise Exception(
-                    f"Invalid state {state} for blind driving")
+        if state is DuckieState.BlindForward:
+            self.twist.omega = 0
+        elif state is DuckieState.BlindTurnLeft:
+            self.twist.omega = np.pi/2
+        elif state is DuckieState.BlindTurnRight:
+            self.twist.omega = -np.pi/2
+        else:
+            raise Exception(f"Invalid state {state} for blind driving")
 
         self.vel_pub.publish(self.twist)
 
@@ -240,20 +239,17 @@ class LaneFollowNode(DTROS, FrozenClass):
     def run(self, rate=8):
         rate = rospy.Rate(8)
 
-        while not rospy.is_shutdown()
-            match self.state:
-                case DuckieState.LaneFollowing:
-                    self.follow_lane()
-                case DuckieState.Stopped:
-                    self.check_stop()
-                case (DuckieState.BlindTurnLeft
-                    | DuckieState.BlindTurnRight
-                    | DuckieState.BlindForward):
-                    self.drive_bindly(self.state)
-                case DuckieState.Tracking:
-                    self.todo("Use tof to track bot ahead")
-                default:
-                    raise Exception("")
+        while not rospy.is_shutdown():
+            if self.state is DuckieState.LaneFollowing:
+                self.follow_lane()
+            elif self.state is DuckieState.Stopped:
+                self.check_stop()
+            elif self.state in (DuckieState.BlindTurnLeft, DuckieState.BlindTurnRight, DuckieState.BlindForward):
+                self.drive_bindly(self.state)
+            elif self.state is DuckieState.Tracking:
+                self.todo("Use tof to track bot ahead")
+            else:
+                raise Exception(f"Invalid state {self.state}")
 
             rate.sleep()
 
