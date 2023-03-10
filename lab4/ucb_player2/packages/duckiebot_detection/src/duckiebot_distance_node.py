@@ -138,6 +138,8 @@ class DuckiebotDistanceNode(DTROS):
 
                     T = np.eye(4)
                     T[:3, :3] = R
+                    T[:3, 3] = translation_vector
+                    T = np.linalg.inv(T)
 
                     transform = TransformStamped(
                         header=Header(
@@ -146,7 +148,7 @@ class DuckiebotDistanceNode(DTROS):
                         ),
                         child_frame_id=f"{self.host}/robot_ahead",
                         transform=Transform(
-                            translation=Vector3(*translation_vector),
+                            translation=Vector3(*tr.translation_from_matrix(T)),
                             rotation=Quaternion(*tr.quaternion_from_matrix(T)),
                         ),
                     )

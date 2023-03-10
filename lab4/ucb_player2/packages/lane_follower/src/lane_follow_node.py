@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from collections import deque
 from enum import Enum, auto, unique
 
 import cv2
@@ -9,6 +10,7 @@ from duckietown.dtros import DTROS, NodeType
 from duckietown_msgs.msg import Twist2DStamped
 from geometry_msgs.msg import TransformStamped
 from sensor_msgs.msg import CompressedImage, Range
+from tf import transformations as tr
 
 # TODO: extact into config file for faster tuning
 ROAD_MASK = [(20, 60, 0), (50, 255, 255)]
@@ -82,6 +84,9 @@ class LaneFollowNode(DTROS, FrozenClass):
 
         # TOF
         self.tof_dist = [0., 0., 0.]
+
+        # Transform
+        self.robot_transform_queue = deque(maxlen=6)
 
         # Shutdown hook
         rospy.on_shutdown(self.on_shutdown)
@@ -169,8 +174,21 @@ class LaneFollowNode(DTROS, FrozenClass):
     def tof_callback(self, msg):
         self.tof_dist.append(msg.range)  # Keep full backlog
 
-    def transform_callback(self, msg):
+    def robot_ahead_transform_callback(self, msg):
         rospy.loginfo_throttle(10, f"TRANSFORM: {msg}")
+        transform = msg.transform
+        T = tr.compose_matrix(translate=([
+            transform.translation.x,
+            transform.translation.y,
+            transform.translation.z
+        ]),
+        angles=tr.euler_from_quaternion([
+            transform.rotation.x,
+            transform.rotation.y,
+            transform.rotation.z,
+            transform.rotation.w
+        ]))
+        self.robot_transform_queue.append(T)
 
     def stop_callback(self, msg):
         img = self.bridge.compressed_imgmsg_to_cv2(msg, "bgr8")
@@ -228,7 +246,8 @@ class LaneFollowNode(DTROS, FrozenClass):
             self.twist.omega = P + D
 
         self.vel_pub.publish(self.twist)
-        if self.tof_dist[-1] < SAFE_DISTANCE:
+
+        if self.tof_dist[-1] < SAFE_DISTANCE or self.t:
             self.state = DuckieState.Tracking
 
     def check_stop(self):
@@ -243,7 +262,6 @@ class LaneFollowNode(DTROS, FrozenClass):
             self.vel_pub.publish(self.twist)
 
     def tracking(self):
-        pass
         # if self.error is None:
         #     self.twist.omega = 0
         # else:
@@ -261,6 +279,8 @@ class LaneFollowNode(DTROS, FrozenClass):
         #     self.twist.omega = P + D
 
         # self.vel_pub.publish(self.twist)
+        if self.tof_dist[-1] > TRACKING_DISTANCE:
+            self.state = DuckieState.LaneFollowing
 
     def run(self, rate=8):
         rate = rospy.Rate(8)
