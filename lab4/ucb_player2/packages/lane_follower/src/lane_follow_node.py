@@ -271,19 +271,19 @@ class LaneFollowNode(DTROS, FrozenClass):
 
     def tracking(self):
         self.tracking_error = self.distance_to_robot_ahead() - SAFE_DISTANCE
-
         if self.tracking_last_error is None:
             self.tracking_last_error = self.tracking_error
 
+        # PID z
         Pz = -self.tracking_error * self.P
         d_error = (self.tracking_error - self.tracking_last_error)
         d_time = rospy.get_time() - self.last_time
         self.tracking_last_error = self.tracking_error
         self.last_time = rospy.get_time()
         Dz = d_error / d_time * self.D
-
         self.twist.v = Pz + Dz
 
+        # PID x
         if self.error is None:
             self.twist.omega = 0
         else:
@@ -299,7 +299,7 @@ class LaneFollowNode(DTROS, FrozenClass):
 
         if self.distance_to_robot_ahead() > TRACKING_DISTANCE:
             self.state = DuckieState.LaneFollowing
-            self.tracking_d_error = None
+            self.tracking_last_error = None
 
     def distance_to_robot_ahead(self):
         distance_estimates = []
