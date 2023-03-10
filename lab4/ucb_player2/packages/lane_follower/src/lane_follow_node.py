@@ -22,6 +22,7 @@ IS_ENGLISH = False
 OFF_COLOR = ColorRGBA()
 OFF_COLOR.r = OFF_COLOR.g = OFF_COLOR.b = OFF_COLOR.a = 0.0
 
+
 @unique
 class DuckieState(Enum):
     """States our duckiebot can visit. These modify the LaneFollowNode"""
@@ -32,22 +33,25 @@ class DuckieState(Enum):
     BlindForward = auto()
     Tracking = auto()
 
+
 @unique
 class LEDColor(Enum):
-    Red     = [1., 0., 0.]
-    Green   = [0., 1., 0.]
-    Blue    = [0., 0., 1.]
-    Yellow  = [1., 1., 0.]
-    Teal    = [0., 1., 1.]
+    Red = [1., 0., 0.]
+    Green = [0., 1., 0.]
+    Blue = [0., 0., 1.]
+    Yellow = [1., 1., 0.]
+    Teal = [0., 1., 1.]
     Magenta = [1., 0., 1.]
+
 
 @unique
 class LEDIndex(Enum):
-    All     = set(range(0,5))
-    Left    = set([0, 1])
-    Right   = set([3, 4])
-    Back    = set([1, 3])
-    Front   = set([0, 4])
+    All = set(range(0, 5))
+    Left = set([0, 1])
+    Right = set([3, 4])
+    Back = set([1, 3])
+    Front = set([0, 4])
+
 
 class FrozenClass(object):
     __isfrozen = False
@@ -284,7 +288,7 @@ class LaneFollowNode(DTROS, FrozenClass):
 
         self.vel_pub.publish(self.twist)
 
-        if self.distance_to_robot_ahead() <= TRACKING_DISTANCE:
+        if self.distance_to_robot_ahead() <= self.tracking_distance:
             self.state = DuckieState.Tracking
 
     def check_stop(self):
@@ -299,7 +303,7 @@ class LaneFollowNode(DTROS, FrozenClass):
             self.vel_pub.publish(self.twist)
 
     def tracking(self):
-        self.tracking_error = self.distance_to_robot_ahead() - SAFE_DISTANCE
+        self.tracking_error = self.distance_to_robot_ahead() - self.safe_distance
         if self.tracking_last_error is None:
             self.tracking_last_error = self.tracking_error
 
@@ -326,7 +330,7 @@ class LaneFollowNode(DTROS, FrozenClass):
 
         self.vel_pub.publish(self.twist)
 
-        if self.distance_to_robot_ahead() > TRACKING_DISTANCE:
+        if self.distance_to_robot_ahead() > self.tracking_distance:
             self.state = DuckieState.LaneFollowing
             self.tracking_last_error = None
 
@@ -349,9 +353,9 @@ class LaneFollowNode(DTROS, FrozenClass):
         on_color.a = 1.0
 
         for i in range(5):
-            leg_msg.rgb_vals.append(on_color if i in index_set else OFF_COLOR)
+            led_msg.rgb_vals.append(on_color if i in index_set else OFF_COLOR)
 
-        self.led_pub.publish(msg)
+        self.led_pub.publish(led_msg)
 
     def run(self, rate=8):
         rate = rospy.Rate(8)
