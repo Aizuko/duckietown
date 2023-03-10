@@ -23,7 +23,7 @@ class DuckieState(Enum):
     Stopped          = auto()
     BlindTurnLeft    = auto()
     BlindTurnRight   = auto()
-    BlindTurnForward = auto()
+    BlindForward     = auto()
     Tracking         = auto()
 
 
@@ -74,12 +74,10 @@ class LaneFollowNode(DTROS, FrozenClass):
         self.last_time = rospy.get_time()
 
         # Stopline variables
-        self.is_stopped = False
         self.stop_time = None
-        self.last_stop_time = None
 
         # TOF
-        self.tof_dist = None
+        self.tof_dist = [0., 0., 0.]
 
         # Shutdown hook
         rospy.on_shutdown(self.hook)
@@ -122,7 +120,7 @@ class LaneFollowNode(DTROS, FrozenClass):
     def ajoin_callback(self, msg):
         self.lane_callback(msg)
 
-        if not self.is_stopped:
+        if self.state != DuckieState.Stopped:
             self.stop_callback(msg)
 
     def lane_callback(self, msg):
@@ -159,8 +157,8 @@ class LaneFollowNode(DTROS, FrozenClass):
             self.pub.publish(rect_img_msg)
 
     def tof_callback(self, msg):
-        self.tof_dist = msg.range
-        self.loginfo(f"TOF: {self.tof_dist}")
+        self.tof_dist.append(msg.range)
+        self.loginfo(f"TOF: {self.tof_dist[-1]}")
 
     def stop_callback(self, msg):
         img = self.bridge.compressed_imgmsg_to_cv2(msg, "bgr8")
@@ -176,25 +174,35 @@ class LaneFollowNode(DTROS, FrozenClass):
         is_stopline = np.any(np.logical_and(1000 < areas, areas < 2000))
 
         time = rospy.get_time()
-        ltime = self.last_stop_time
+        ltime = self.stop_time
 
         if is_stopline and (ltime is None or time - ltime > 6):
-            self.is_stopped = True
-            self.last_stop_time = time
+            self.state = DuckieState.Stopped
+            self.stop_time = time
 
         if DEBUG:
             rect_img_msg = self.bridge.cv2_to_compressed_imgmsg(crop)
             self.pub_red.publish(rect_img_msg)
 
-    def drive(self):
+    def drive_bindly(self, state):
+        self.last_error = self.error = 0
+        self.twist.v = self.velocity
+
+        match state:
+            case DuckieState.BlindForward:
+                self.twist.omega = 0
+            case DuckieState.BlindTurnLeft:
+                self.twist.omega = np.pi/2
+            case DuckieState.BlindTurnRight:
+                self.twist.omega = -np.pi/2
+            default:
+                raise Exception(
+                    f"Invalid state {state} for blind driving")
+
+        self.vel_pub.publish(self.twist)
+
+    def follow_lane(self):
         if self.error is None:
-            self.twist.omega = 0
-        elif self.is_stopped:
-            if self.last_stop_time is None:
-                print("It shouldn't be none...")
-            elif rospy.get_time() - self.last_stop_time >= self.stop_duration:
-                self.is_stopped = False
-            self.twist.v = 0
             self.twist.omega = 0
         else:
             # P Term
@@ -212,6 +220,37 @@ class LaneFollowNode(DTROS, FrozenClass):
 
         self.vel_pub.publish(self.twist)
 
+    def check_stop(self):
+        delta_time = rospy.get_time() - self.stop_time
+
+        if delta_time >= self.stop_duration:
+            self.state = DuckieState.LaneFollowing
+            self.todo("Choose state based on what it's observed")
+        else:
+            self.twist.v = 0
+            self.twist.omega = 0
+            self.vel_pub.publish(self.twist)
+
+    def run(self, rate=8):
+        rate = rospy.Rate(8)
+
+        while not rospy.is_shutdown()
+            match self.state:
+                case DuckieState.LaneFollowing:
+                    self.follow_lane()
+                case DuckieState.Stopped:
+                    self.check_stop()
+                case (DuckieState.BlindTurnLeft
+                    | DuckieState.BlindTurnRight
+                    | DuckieState.BlindForward):
+                    self.drive_bindly(self.state)
+                case DuckieState.Tracking:
+                    self.todo("Use tof to track")
+                default:
+                    raise Exception("")
+
+            rate.sleep()
+
     def on_shutdown(self):
         print("SHUTTING DOWN")
         self.twist.v = 0
@@ -224,8 +263,5 @@ class LaneFollowNode(DTROS, FrozenClass):
 if __name__ == "__main__":
     node = LaneFollowNode("lanefollow_node")
     rospy.on_shutdown(node.on_shutdown)
-
-    rate = rospy.Rate(8)
-    while not rospy.is_shutdown():
-        node.drive()
-        rate.sleep()
+    node.run()
+    rospy.spin()  # Just in case?
