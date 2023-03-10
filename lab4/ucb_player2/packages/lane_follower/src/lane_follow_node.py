@@ -80,18 +80,16 @@ class LaneFollowNode(DTROS, FrozenClass):
         self.veh = rospy.get_param("~veh")
         self.bridge = CvBridge()
 
-        try:
-            with open("/params.json") as f:
-                self.params = json.load(f)
-        except FileNotFoundError:
-            self.params = {}
+        with open("/params.json") as f:
+            self.params = json.load(f)
 
-        if self.params.get(self.veh) is not None:
-            self.params = self.params[self.veh]
-        else:
-            self.params = self.params["default"]
+        self.params = {
+            **self.params["default"],
+            **(self.params.get(self.veh) or {})
+        }
 
         self.is_english = self.params.get("is_english")
+        self.is_debug = self.params.get("is_debug")
 
         # Lane following
         self.offset = 220 * (2 * int(self.is_english) - 1)
