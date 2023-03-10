@@ -18,7 +18,6 @@ from tf import transformations as tr
 # TODO: extact into config file for faster tuning
 ROAD_MASK = [(20, 60, 0), (50, 255, 255)]
 STOP_MASK = [(0, 70, 150), (20, 255, 255)]
-DEBUG = True
 IS_ENGLISH = False
 
 OFF_COLOR = ColorRGBA()
@@ -92,6 +91,7 @@ class LaneFollowNode(DTROS, FrozenClass):
             self.params = self.params["default"]
 
         self.is_english = self.params.get("is_english")
+        self.debug = True
 
         # Lane following
         self.offset = 220 * (2 * int(self.is_english) - 1)
@@ -218,13 +218,13 @@ class LaneFollowNode(DTROS, FrozenClass):
                 cx = int(M['m10'] / M['m00'])
                 cy = int(M['m01'] / M['m00'])
                 self.error = cx - int(crop_width / 2) + self.offset
-                if DEBUG:
+                if self.debug:
                     cv2.drawContours(crop, contours, max_idx, (0, 255, 0), 3)
                     cv2.circle(crop, (cx, cy), 7, (0, 0, 255), -1)
             except Exception:
                 pass
 
-        if DEBUG:
+        if self.debug:
             rect_img_msg = self.bridge.cv2_to_compressed_imgmsg(crop)
             self.pub.publish(rect_img_msg)
 
@@ -272,7 +272,7 @@ class LaneFollowNode(DTROS, FrozenClass):
             self.state = DuckieState.Stopped
             self.stop_time = time
 
-        if DEBUG:
+        if self.debug:
             rect_img_msg = self.bridge.cv2_to_compressed_imgmsg(crop)
             self.pub_red.publish(rect_img_msg)
 
@@ -311,17 +311,23 @@ class LaneFollowNode(DTROS, FrozenClass):
             self.twist.omega = P + D
 
     def pid_z(self):
-        self.tracking_error = self.distance_to_robot_ahead() - self.safe_distance
+        self.tracking_error = self.safe_distance - self.distance_to_robot_ahead()
         if self.tracking_last_error is None:
             self.tracking_last_error = self.tracking_error
 
-        # PID z
         Pz = -self.tracking_error * self.Pz
         d_error = (self.tracking_error - self.tracking_last_error)
         d_time = rospy.get_time() - self.last_time
         self.tracking_last_error = self.tracking_error
         self.last_time = rospy.get_time()
         Dz = d_error / d_time * self.Dz
+        if self.debug:
+            rospy.logdebug(
+                f"Distance to robot ahead: {self.distance_to_robot_ahead()}"
+            )
+            rospy.logdebug(f"Tracking error: {self.tracking_error}")
+            rospy.logdebug(f"Tracking P: {Pz}")
+            rospy.logdebug(f"Tracking D: {Dz}")
         self.twist.v = Pz + Dz
 
     def follow_lane(self):
