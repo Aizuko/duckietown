@@ -5,6 +5,7 @@ from enum import Enum, auto, unique
 import cv2
 import numpy as np
 import rospy
+import json
 from cv_bridge import CvBridge
 from duckietown.dtros import DTROS, NodeType
 from duckietown_msgs.msg import LEDPattern, Twist2DStamped
@@ -78,19 +79,36 @@ class LaneFollowNode(DTROS, FrozenClass):
         self.veh = rospy.get_param("~veh")
         self.bridge = CvBridge()
 
+        try:
+            with open("/params.json") as f:
+                self.params = json.load(f)
+        except FileNotFoundError:
+            self.params = {}
+
+        if self.params.get(self.veh) is not None:
+            self.params = self.params[self.veh]
+        else:
+            self.params = self.params["default"]
+
+        self.is_english = self.params.get("is_english")
+
         # Lane following
-        self.offset = 220 * (-1 if IS_ENGLISH else 1)
-        self.velocity = 0.4
+        self.offset = 220 * (2 * int(self.is_english) - 1)
+
+        self.velocity = self.params["velocity"]
         self.twist = Twist2DStamped(v=self.velocity, omega=0)
-        self.Px = 0.049
-        self.Dx = -0.004
+        self.Px = self.params["Px"]
+        self.Dx = self.params["Dx"]
 
         # Stopping
-        self.stop_duration = 3
-        self.tracking_distance = 0.5
+        self.stop_duration = self.params["stop_duration"]
+        self.stop_immunity = self.params["stop_immunity"]
+        self.tracking_distance = self.params["tracking_distance"]
+        self.stopline_area_min = self.params["stopline_area_min"]
+        self.stopline_area_max = self.params["stopline_area_max"]
 
         # Tracking
-        self.safe_distance = 0.2
+        self.safe_distance = self.params.get("safe_distance")
 
         # ╔─────────────────────────────────────────────────────────────────────╗
         # │ Dyηαmic ναriαblεs                                                   |
@@ -111,15 +129,15 @@ class LaneFollowNode(DTROS, FrozenClass):
         self.tof_dist = [0., 0., 0.]
 
         # Transform
-        self.robot_transform_queue = deque(maxlen=6)
+        self.robot_transform_queue = deque(maxlen=self.params["deque_maxlen"])
         self.robot_transform_time = None
 
         self.tracking_error = None
         self.tracking_last_error = 0
         self.tracking_last_time = rospy.get_time()
 
-        self.Pz = 0.049
-        self.Dz = -0.004
+        self.Pz = self.params["Pz"]
+        self.Dz = self.params["Dz"]
 
         # Shutdown hook
         rospy.on_shutdown(self.on_shutdown)
@@ -241,12 +259,15 @@ class LaneFollowNode(DTROS, FrozenClass):
                                        cv2.CHAIN_APPROX_NONE)
 
         areas = np.array([cv2.contourArea(a) for a in contours])
-        is_stopline = np.any(np.logical_and(1000 < areas, areas < 2000))
+        is_stopline = np.any(np.logical_and(
+            self.stopline_area_min < areas,
+            areas < self.stopline_area_max
+        ))
 
         time = rospy.get_time()
         ltime = self.stop_time
 
-        if is_stopline and (ltime is None or time - ltime > 6):
+        if is_stopline and (ltime is None or time - ltime > self.stop_immunity):
             self.state = DuckieState.Stopped
             self.stop_time = time
 
@@ -357,8 +378,8 @@ class LaneFollowNode(DTROS, FrozenClass):
 
         self.led_pub.publish(led_msg)
 
-    def run(self, rate=8):
-        rate = rospy.Rate(8)
+    def run(self):
+        rate = rospy.Rate(self.params["run_rate"])
 
         while not rospy.is_shutdown():
             rospy.loginfo_throttle(1, f"STATE: {self.state}")

@@ -1,0 +1,55 @@
+{
+  "default": {
+    "Px": 0.049,
+    "Dx": -0.004,
+    "Pz": 0.049,
+    "Dz": -0.004,
+    "velocity": 0.4,
+    "is_english": false,
+    "is_debug": true,
+    "stop_duration": 3,
+    "stop_immunity": 6,
+    "tracking_distance": 0.5,
+    "stopline_area_min": 1000,
+    "stopline_area_max": 2000,
+    "run_rate": 8,
+
+    "placeholder": false
+  },
+  "csc22902": {
+    "Px": 0.049,
+    "Dx": -0.004,
+    "Pz": 0.049,
+    "Dz": -0.004,
+    "velocity": 0.4,
+    "is_english": false,
+    "is_debug": true,
+    "stop_duration": 3,
+    "stop_immunity": 6,
+    "tracking_distance": 0.5,
+    "stopline_area_min": 1000,
+    "stopline_area_max": 2000,
+    "deque_maxlen": 6,
+    "run_rate": 8,
+
+    "placeholder": false
+  },
+  "csc22927": {
+    "Px": 0.049,
+    "Dx": -0.004,
+    "Pz": 0.049,
+    "Dz": -0.004,
+    "velocity_lane_following": 0.4,
+    "is_english": false,
+    "is_debug": true,
+    "stop_duration": 3,
+    "stop_immunity": 6,
+    "tracking_distance": 0.5,
+    "stopline_area_min": 1000,
+    "stopline_area_max": 2000,
+    "deque_maxlen": 6,
+    "run_rate": 8,
+
+    "placeholder": false
+  }
+}
