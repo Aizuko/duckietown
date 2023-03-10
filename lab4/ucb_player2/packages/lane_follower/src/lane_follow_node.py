@@ -89,6 +89,10 @@ class LaneFollowNode(DTROS, FrozenClass):
         self.robot_transform_queue = deque(maxlen=6)
         self.robot_transform_time = None
 
+        self.tracking_error = None
+        self.tracking_last_error = 0
+        self.tracking_last_time = rospy.get_time()
+
         # Shutdown hook
         rospy.on_shutdown(self.on_shutdown)
 
@@ -266,26 +270,36 @@ class LaneFollowNode(DTROS, FrozenClass):
             self.vel_pub.publish(self.twist)
 
     def tracking(self):
-        # if self.error is None:
-        #     self.twist.omega = 0
-        # else:
-        #     # P Term
-        #     P = -self.error * self.P
+        self.tracking_error = self.distance_to_robot_ahead() - SAFE_DISTANCE
 
-        #     # D Term
-        #     d_error = (self.error - self.last_error) \
-        #         / (rospy.get_time() - self.last_time)
-        #     self.last_error = self.error
-        #     self.last_time = rospy.get_time()
-        #     D = d_error * self.D
+        if self.tracking_last_error is None:
+            self.tracking_last_error = self.tracking_error
 
-        #     self.twist.v = self.velocity
-        #     self.twist.omega = P + D
+        Pz = -self.tracking_error * self.P
+        d_error = (self.tracking_error - self.tracking_last_error)
+        d_time = rospy.get_time() - self.last_time
+        self.tracking_last_error = self.tracking_error
+        self.last_time = rospy.get_time()
+        Dz = d_error / d_time * self.D
 
-        # self.vel_pub.publish(self.twist)
+        self.twist.v = Pz + Dz
+
+        if self.error is None:
+            self.twist.omega = 0
+        else:
+            Px = -self.error * self.P
+            d_error = (self.error - self.last_error)
+            d_t = (rospy.get_time() - self.last_time)
+            self.last_error = self.error
+            self.last_time = rospy.get_time()
+            Dx = d_error / d_t * self.D
+            self.twist.omega = Px + Dx
+
+        self.vel_pub.publish(self.twist)
 
         if self.distance_to_robot_ahead() > TRACKING_DISTANCE:
             self.state = DuckieState.LaneFollowing
+            self.tracking_d_error = None
 
     def distance_to_robot_ahead(self):
         distance_estimates = []
