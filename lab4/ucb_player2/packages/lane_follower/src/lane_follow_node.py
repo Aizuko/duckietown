@@ -9,6 +9,7 @@ import json
 from cv_bridge import CvBridge
 from duckietown.dtros import DTROS, NodeType
 from duckietown_msgs.msg import LEDPattern, Twist2DStamped
+from functools import lru_cache
 from geometry_msgs.msg import TransformStamped
 from sensor_msgs.msg import CompressedImage, Range
 from std_msgs.msg import ColorRGBA
@@ -354,16 +355,14 @@ class LaneFollowNode(DTROS, FrozenClass):
             self.tracking_last_error = None
 
     def distance_to_robot_ahead(self):
-        distance_estimates = []
-        if len(self.tof_dist):
-            distance_estimates.append(self.tof_dist[-1])
         if (self.robot_transform_time and self.robot_transform_time >
                 rospy.get_time() - 1):
             latest_transform = self.robot_transform_queue[-1]
             latest_translate = latest_transform[:3, 3]
-            distance_estimates.append(np.linalg.norm(latest_translate))
-        return min(distance_estimates)
+            return np.linalg.norm(latest_translate)
+        return np.inf
 
+    @lru_cache(maxsize=1)
     def set_leds(self, color: LEDColor, index_set: LEDIndex):
         led_msg = LEDPattern()
 
