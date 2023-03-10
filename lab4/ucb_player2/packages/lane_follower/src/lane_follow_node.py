@@ -333,15 +333,11 @@ class LaneFollowNode(DTROS, FrozenClass):
             self.tracking_last_error = None
 
     def distance_to_robot_ahead(self):
-        distance_estimates = []
-        if len(self.tof_dist):
-            distance_estimates.append(self.tof_dist[-1])
         if (self.robot_transform_time and self.robot_transform_time >
                 rospy.get_time() - 1):
             latest_transform = self.robot_transform_queue[-1]
             latest_translate = latest_transform[:3, 3]
-            distance_estimates.append(np.linalg.norm(latest_translate))
-        return min(distance_estimates)
+            return np.linalg.norm(latest_translate)
 
     def set_leds(self, color: LEDColor, index_set: LEDIndex):
         led_msg = LEDPattern()
