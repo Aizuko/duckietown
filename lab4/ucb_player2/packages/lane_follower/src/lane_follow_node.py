@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-
 import rospy
 import cv2
 
@@ -55,21 +54,23 @@ class LaneFollowNode(DTROS):
         self.last_time = rospy.get_time()
 
         # Stopline variables
-        self.is_stopped = True
+        self.is_stopped = False
         self.stop_time = None
+        self.last_stop_time = None
 
         # Constants
         self.P = 0.049
         self.D = -0.004
-        self.stop_duration = 1
+        self.stop_duration = 3
 
         # Shutdown hook
         rospy.on_shutdown(self.hook)
 
     def ajoin_callback(self, msg):
-        print("Called ajoined")
         self.lane_callback(msg)
-        self.stop_callback(msg)
+
+        if not self.is_stopped:
+            self.stop_callback(msg)
 
     def lane_callback(self, msg):
         img = self.bridge.compressed_imgmsg_to_cv2(msg, "bgr8")
@@ -115,8 +116,14 @@ class LaneFollowNode(DTROS):
                                        cv2.CHAIN_APPROX_NONE)
 
         areas = np.array([cv2.contourArea(a) for a in contours])
+        is_stopline = np.any(np.logical_and(1000 < areas, areas < 2000))
 
-        print(np.flip(np.sort(areas))[:4])
+        time = rospy.get_time()
+        ltime = self.last_stop_time
+
+        if is_stopline and (ltime is None or time - ltime > 6):
+            self.is_stopped = True
+            self.last_stop_time = time
 
         if DEBUG:
             rect_img_msg = self.bridge.cv2_to_compressed_imgmsg(crop)
@@ -126,6 +133,10 @@ class LaneFollowNode(DTROS):
         if self.error is None:
             self.twist.omega = 0
         elif self.is_stopped:
+            if self.last_stop_time is None:
+                print("It shouldn't be none...")
+            elif rospy.get_time() - self.last_stop_time >= self.stop_duration:
+                self.is_stopped = False
             self.twist.v = 0
             self.twist.omega = 0
         else:
@@ -141,9 +152,6 @@ class LaneFollowNode(DTROS):
 
             self.twist.v = self.velocity
             self.twist.omega = P + D
-            #if DEBUG:
-            #    self.loginfo(
-            #        f"{self.error} {P} {D} {self.twist.omega} {self.twist.v}")
 
         self.vel_pub.publish(self.twist)
 
