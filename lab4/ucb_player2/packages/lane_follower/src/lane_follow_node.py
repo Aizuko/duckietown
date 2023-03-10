@@ -8,6 +8,7 @@ import rospy
 from cv_bridge import CvBridge
 from duckietown.dtros import DTROS, NodeType
 from duckietown_msgs.msg import LEDPattern, Twist2DStamped
+from functools import lru_cache
 from geometry_msgs.msg import TransformStamped
 from sensor_msgs.msg import CompressedImage, Range
 from std_msgs.msg import ColorRGBA
@@ -340,6 +341,7 @@ class LaneFollowNode(DTROS, FrozenClass):
             return np.linalg.norm(latest_translate)
         return np.inf
 
+    @lru_cache(maxsize=1)
     def set_leds(self, color: LEDColor, index_set: LEDIndex):
         led_msg = LEDPattern()
 
