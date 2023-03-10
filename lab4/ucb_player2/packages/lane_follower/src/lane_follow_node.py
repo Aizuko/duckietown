@@ -269,7 +269,7 @@ class LaneFollowNode(DTROS, FrozenClass):
 
         self.vel_pub.publish(self.twist)
 
-    def follow_lane(self):
+    def pid_x(self):
         if self.error is None:
             self.twist.omega = 0
         else:
@@ -283,8 +283,25 @@ class LaneFollowNode(DTROS, FrozenClass):
             self.last_time = rospy.get_time()
             D = d_error * self.D
 
-            self.twist.v = self.velocity
             self.twist.omega = P + D
+
+    def pid_z(self):
+        self.tracking_error = self.distance_to_robot_ahead() - self.safe_distance
+        if self.tracking_last_error is None:
+            self.tracking_last_error = self.tracking_error
+
+        # PID z
+        Pz = -self.tracking_error * self.P
+        d_error = (self.tracking_error - self.tracking_last_error)
+        d_time = rospy.get_time() - self.last_time
+        self.tracking_last_error = self.tracking_error
+        self.last_time = rospy.get_time()
+        Dz = d_error / d_time * self.D
+        self.twist.v = Pz + Dz
+
+    def follow_lane(self):
+        self.pid_x()
+        self.twist.v = self.velocity
 
         self.vel_pub.publish(self.twist)
 
@@ -303,30 +320,8 @@ class LaneFollowNode(DTROS, FrozenClass):
             self.vel_pub.publish(self.twist)
 
     def tracking(self):
-        self.tracking_error = self.distance_to_robot_ahead() - self.safe_distance
-        if self.tracking_last_error is None:
-            self.tracking_last_error = self.tracking_error
-
-        # PID z
-        Pz = -self.tracking_error * self.P
-        d_error = (self.tracking_error - self.tracking_last_error)
-        d_time = rospy.get_time() - self.last_time
-        self.tracking_last_error = self.tracking_error
-        self.last_time = rospy.get_time()
-        Dz = d_error / d_time * self.D
-        self.twist.v = Pz + Dz
-
-        # PID x
-        if self.error is None:
-            self.twist.omega = 0
-        else:
-            Px = -self.error * self.P
-            d_error = (self.error - self.last_error)
-            d_t = (rospy.get_time() - self.last_time)
-            self.last_error = self.error
-            self.last_time = rospy.get_time()
-            Dx = d_error / d_t * self.D
-            self.twist.omega = Px + Dx
+        self.pid_x()
+        self.pid_z()
 
         self.vel_pub.publish(self.twist)
 
