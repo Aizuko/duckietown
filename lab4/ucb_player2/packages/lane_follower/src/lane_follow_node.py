@@ -338,6 +338,7 @@ class LaneFollowNode(DTROS, FrozenClass):
             latest_transform = self.robot_transform_queue[-1]
             latest_translate = latest_transform[:3, 3]
             return np.linalg.norm(latest_translate)
+        return np.inf
 
     def set_leds(self, color: LEDColor, index_set: LEDIndex):
         led_msg = LEDPattern()
