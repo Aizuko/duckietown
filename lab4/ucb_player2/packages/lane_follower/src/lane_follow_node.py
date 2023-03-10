@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
-import rospy
-import cv2
+from enum import Enum, auto, unique
 
-from enum import Enum, unique, auto
-from duckietown.dtros import DTROS, NodeType
-from sensor_msgs.msg import CameraInfo, CompressedImage, Range
-from geometry_msgs.msg import TransformStamped
-from std_msgs.msg import Float32
-from cv_bridge import CvBridge
+import cv2
 import numpy as np
-from duckietown_msgs.msg import WheelsCmdStamped, Twist2DStamped
+import rospy
+from cv_bridge import CvBridge
+from duckietown.dtros import DTROS, NodeType
+from duckietown_msgs.msg import Twist2DStamped
+from geometry_msgs.msg import TransformStamped
+from sensor_msgs.msg import CompressedImage, Range
 
 # TODO: extact into config file for faster tuning
 ROAD_MASK = [(20, 60, 0), (50, 255, 255)]
@@ -23,16 +22,17 @@ SAFE_DISTANCE = 0.1
 @unique
 class DuckieState(Enum):
     """States our duckiebot can visit. These modify the LaneFollowNode"""
-    LaneFollowing    = auto()
-    Stopped          = auto()
-    BlindTurnLeft    = auto()
-    BlindTurnRight   = auto()
-    BlindForward     = auto()
-    Tracking         = auto()
+    LaneFollowing = auto()
+    Stopped = auto()
+    BlindTurnLeft = auto()
+    BlindTurnRight = auto()
+    BlindForward = auto()
+    Tracking = auto()
 
 
 class FrozenClass(object):
     __isfrozen = False
+
     def __setattr__(self, key, value):
         if self.__isfrozen and not hasattr(self, key):
             raise TypeError(f"{self} is a frozen class")
@@ -47,9 +47,9 @@ class LaneFollowNode(DTROS, FrozenClass):
         super(LaneFollowNode, self).__init__(
             node_name=node_name, node_type=NodeType.GENERIC)
 
-        #╔─────────────────────────────────────────────────────────────────────╗
-        #│  Cδηsταητs (τδ τμηε)                                                |
-        #╚─────────────────────────────────────────────────────────────────────╝
+        # ╔─────────────────────────────────────────────────────────────────────╗
+        # │  Cδηsταητs (τδ τμηε)                                                |
+        # ╚─────────────────────────────────────────────────────────────────────╝
         # Utils
         self.node_name = node_name
         self.veh = rospy.get_param("~veh")
@@ -65,9 +65,9 @@ class LaneFollowNode(DTROS, FrozenClass):
         # Stopping
         self.stop_duration = 3
 
-        #╔─────────────────────────────────────────────────────────────────────╗
-        #│ Dyηαmic ναriαblεs                                                   |
-        #╚─────────────────────────────────────────────────────────────────────╝
+        # ╔─────────────────────────────────────────────────────────────────────╗
+        # │ Dyηαmic ναriαblεs                                                   |
+        # ╚─────────────────────────────────────────────────────────────────────╝
         # State
         self.state = DuckieState.LaneFollowing
 
@@ -86,9 +86,9 @@ class LaneFollowNode(DTROS, FrozenClass):
         # Shutdown hook
         rospy.on_shutdown(self.on_shutdown)
 
-        #╔─────────────────────────────────────────────────────────────────────╗
-        #│ Pμblishεrs & Sμbscribεrs                                            |
-        #╚─────────────────────────────────────────────────────────────────────╝
+        # ╔─────────────────────────────────────────────────────────────────────╗
+        # │ Pμblishεrs & Sμbscribεrs                                            |
+        # ╚─────────────────────────────────────────────────────────────────────╝
         self.pub = rospy.Publisher(
             f"/{self.veh}/output/image/mask/compressed",
             CompressedImage,
@@ -168,7 +168,6 @@ class LaneFollowNode(DTROS, FrozenClass):
 
     def tof_callback(self, msg):
         self.tof_dist.append(msg.range)  # Keep full backlog
-        self.loginfo(f"TOF: {self.tof_dist[-1]}")
 
     def transform_callback(self, msg):
         rospy.loginfo_throttle(10, f"TRANSFORM: {msg}")
@@ -176,7 +175,6 @@ class LaneFollowNode(DTROS, FrozenClass):
     def stop_callback(self, msg):
         img = self.bridge.compressed_imgmsg_to_cv2(msg, "bgr8")
         crop = img[300:-1, :, :]
-        crop_width = crop.shape[1]
         hsv = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
         mask = cv2.inRange(hsv, STOP_MASK[0], STOP_MASK[1])
         crop = cv2.bitwise_and(crop, crop, mask=mask)
@@ -204,9 +202,9 @@ class LaneFollowNode(DTROS, FrozenClass):
         if state is DuckieState.BlindForward:
             self.twist.omega = 0
         elif state is DuckieState.BlindTurnLeft:
-            self.twist.omega = np.pi/2
+            self.twist.omega = np.pi / 2
         elif state is DuckieState.BlindTurnRight:
-            self.twist.omega = -np.pi/2
+            self.twist.omega = -np.pi / 2
         else:
             raise Exception(f"Invalid state {state} for blind driving")
 
@@ -268,6 +266,7 @@ class LaneFollowNode(DTROS, FrozenClass):
         rate = rospy.Rate(8)
 
         while not rospy.is_shutdown():
+            rospy.loginfo_throttle(1, f"STATE: {self.state}")
             if self.state is DuckieState.LaneFollowing:
                 self.follow_lane()
             elif self.state is DuckieState.Stopped:
