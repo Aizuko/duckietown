@@ -365,8 +365,8 @@ class LaneFollowNode(DTROS, FrozenClass):
                 rospy.get_time() - 1):
             latest_transform = self.robot_transform_queue[-1]
             latest_translate = latest_transform[:3, 3]
-            return np.linalg.norm(latest_translate)
-        return np.inf
+            return min(np.linalg.norm(latest_translate), self.tof_dist[-1])
+        return self.tof_dist[-1]
 
     @lru_cache(maxsize=1)
     def set_leds(self, color: LEDColor, index_set: LEDIndex):
