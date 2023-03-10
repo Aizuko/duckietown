@@ -82,8 +82,8 @@ class LaneFollowNode(DTROS, FrozenClass):
         self.offset = 220 * (-1 if IS_ENGLISH else 1)
         self.velocity = 0.4
         self.twist = Twist2DStamped(v=self.velocity, omega=0)
-        self.P = 0.049
-        self.D = -0.004
+        self.Px = 0.049
+        self.Dx = -0.004
 
         # Stopping
         self.stop_duration = 3
@@ -117,6 +117,9 @@ class LaneFollowNode(DTROS, FrozenClass):
         self.tracking_error = None
         self.tracking_last_error = 0
         self.tracking_last_time = rospy.get_time()
+
+        self.Pz = 0.049
+        self.Dz = -0.004
 
         # Shutdown hook
         rospy.on_shutdown(self.on_shutdown)
@@ -274,14 +277,14 @@ class LaneFollowNode(DTROS, FrozenClass):
             self.twist.omega = 0
         else:
             # P Term
-            P = -self.error * self.P
+            P = -self.error * self.Px
 
             # D Term
             d_error = (self.error - self.last_error) \
                 / (rospy.get_time() - self.last_time)
             self.last_error = self.error
             self.last_time = rospy.get_time()
-            D = d_error * self.D
+            D = d_error * self.Dx
 
             self.twist.omega = P + D
 
@@ -291,12 +294,12 @@ class LaneFollowNode(DTROS, FrozenClass):
             self.tracking_last_error = self.tracking_error
 
         # PID z
-        Pz = -self.tracking_error * self.P
+        Pz = -self.tracking_error * self.Pz
         d_error = (self.tracking_error - self.tracking_last_error)
         d_time = rospy.get_time() - self.last_time
         self.tracking_last_error = self.tracking_error
         self.last_time = rospy.get_time()
-        Dz = d_error / d_time * self.D
+        Dz = d_error / d_time * self.Dz
         self.twist.v = Pz + Dz
 
     def follow_lane(self):
