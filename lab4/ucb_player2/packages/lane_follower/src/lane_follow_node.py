@@ -108,6 +108,12 @@ class LaneFollowNode(DTROS, FrozenClass):
             self.tof_callback,
             queue_size=1,
         )
+        self.transform_sub = rospy.Subscriber(
+            f"/{self.veh}/duckiebot_distance_node/transform",
+            TransformStamped,
+            self.tof_callback,
+            queue_size=1,
+        )
         self.vel_pub = rospy.Publisher(
             f"/{self.veh}/car_cmd_switch_node/cmd",
             Twist2DStamped,
@@ -157,7 +163,7 @@ class LaneFollowNode(DTROS, FrozenClass):
             self.pub.publish(rect_img_msg)
 
     def tof_callback(self, msg):
-        self.tof_dist.append(msg.range)
+        self.tof_dist.append(msg.range)  # Keep full backlog
         self.loginfo(f"TOF: {self.tof_dist[-1]}")
 
     def stop_callback(self, msg):
@@ -245,7 +251,7 @@ class LaneFollowNode(DTROS, FrozenClass):
                     | DuckieState.BlindForward):
                     self.drive_bindly(self.state)
                 case DuckieState.Tracking:
-                    self.todo("Use tof to track")
+                    self.todo("Use tof to track bot ahead")
                 default:
                     raise Exception("")
 
