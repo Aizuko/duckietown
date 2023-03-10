@@ -344,7 +344,7 @@ class LaneFollowNode(DTROS, FrozenClass):
         led_msg = LEDPattern()
 
         on_color = ColorRGBA()
-        on_color.r, on_color.g, on_color.b = color.value()
+        on_color.r, on_color.g, on_color.b = color.value
         on_color.a = 1.0
 
         for i in range(5):
