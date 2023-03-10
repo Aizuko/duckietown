@@ -92,7 +92,9 @@ class LaneFollowNode(DTROS, FrozenClass):
         # Lane following
         self.offset = 220 * (2 * int(self.is_american) - 1)
 
+        self.min_velocity = self.params["min_velocity"]
         self.velocity = self.params["velocity"]
+        self.max_velocity = self.params["max_velocity"]
         self.twist = Twist2DStamped(v=self.velocity, omega=0)
         self.Px = self.params["Px"]
         self.Dx = self.params["Dx"]
@@ -324,7 +326,9 @@ class LaneFollowNode(DTROS, FrozenClass):
             rospy.logdebug(f"Tracking error: {self.tracking_error}")
             rospy.logdebug(f"Tracking P: {Pz}")
             rospy.logdebug(f"Tracking D: {Dz}")
-        self.twist.v = Pz + Dz
+        v = Pz + Dz
+        v = np.sign(v) * np.clip(np.abs(v), self.min_velocity, self.max_velocity)
+        self.twist.v = v
 
     def follow_lane(self):
         self.pid_x()

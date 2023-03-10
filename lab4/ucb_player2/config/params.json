@@ -2,8 +2,10 @@
   "default": {
     "Px": 0.049,
     "Dx": -0.004,
-    "Pz": 0.049,
+    "Pz": 1.2,
     "Dz": 0,
+    "min_velocity": 0,
+    "max_velocity": 0.8,
     "velocity": 0.4,
     "is_american": false,
     "is_debug": true,
