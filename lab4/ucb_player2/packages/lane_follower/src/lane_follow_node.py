@@ -11,10 +11,13 @@ from cv_bridge import CvBridge
 import numpy as np
 from duckietown_msgs.msg import WheelsCmdStamped, Twist2DStamped
 
+# TODO: extact into config file for faster tuning
 ROAD_MASK = [(20, 60, 0), (50, 255, 255)]
 STOP_MASK = [(0, 70, 150), (20, 255, 255)]
 DEBUG = True
 IS_ENGLISH = False
+TRACKING_DISTANCE = 0.5
+SAFE_DISTANCE = 0.1
 
 
 @unique
@@ -112,7 +115,7 @@ class LaneFollowNode(DTROS, FrozenClass):
         self.transform_sub = rospy.Subscriber(
             f"/{self.veh}/duckiebot_distance_node/transform",
             TransformStamped,
-            self.tof_callback,
+            self.transform_callback,
             queue_size=1,
         )
         self.vel_pub = rospy.Publisher(
@@ -156,7 +159,7 @@ class LaneFollowNode(DTROS, FrozenClass):
                 if DEBUG:
                     cv2.drawContours(crop, contours, max_idx, (0, 255, 0), 3)
                     cv2.circle(crop, (cx, cy), 7, (0, 0, 255), -1)
-            except:
+            except Exception:
                 pass
 
         if DEBUG:
@@ -166,6 +169,9 @@ class LaneFollowNode(DTROS, FrozenClass):
     def tof_callback(self, msg):
         self.tof_dist.append(msg.range)  # Keep full backlog
         self.loginfo(f"TOF: {self.tof_dist[-1]}")
+
+    def transform_callback(self, msg):
+        rospy.loginfo_throttle(10, f"TRANSFORM: {msg}")
 
     def stop_callback(self, msg):
         img = self.bridge.compressed_imgmsg_to_cv2(msg, "bgr8")
@@ -224,17 +230,39 @@ class LaneFollowNode(DTROS, FrozenClass):
             self.twist.omega = P + D
 
         self.vel_pub.publish(self.twist)
+        if self.tof_dist[-1] < SAFE_DISTANCE:
+            self.state = DuckieState.Tracking
 
     def check_stop(self):
         delta_time = rospy.get_time() - self.stop_time
 
         if delta_time >= self.stop_duration:
             self.state = DuckieState.LaneFollowing
-            self.todo("Choose state based on what it's observed")
+            # TODO: "Choose state based on what it's observed"
         else:
             self.twist.v = 0
             self.twist.omega = 0
             self.vel_pub.publish(self.twist)
+
+    def tracking(self):
+        pass
+        # if self.error is None:
+        #     self.twist.omega = 0
+        # else:
+        #     # P Term
+        #     P = -self.error * self.P
+
+        #     # D Term
+        #     d_error = (self.error - self.last_error) \
+        #         / (rospy.get_time() - self.last_time)
+        #     self.last_error = self.error
+        #     self.last_time = rospy.get_time()
+        #     D = d_error * self.D
+
+        #     self.twist.v = self.velocity
+        #     self.twist.omega = P + D
+
+        # self.vel_pub.publish(self.twist)
 
     def run(self, rate=8):
         rate = rospy.Rate(8)
@@ -247,7 +275,7 @@ class LaneFollowNode(DTROS, FrozenClass):
             elif self.state in (DuckieState.BlindTurnLeft, DuckieState.BlindTurnRight, DuckieState.BlindForward):
                 self.drive_bindly(self.state)
             elif self.state is DuckieState.Tracking:
-                self.todo("Use tof to track bot ahead")
+                self.tracking()
             else:
                 raise Exception(f"Invalid state {self.state}")
 
