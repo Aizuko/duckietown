@@ -18,7 +18,6 @@ from tf import transformations as tr
 # TODO: extact into config file for faster tuning
 ROAD_MASK = [(20, 60, 0), (50, 255, 255)]
 STOP_MASK = [(0, 70, 150), (20, 255, 255)]
-IS_ENGLISH = False
 
 OFF_COLOR = ColorRGBA()
 OFF_COLOR.r = OFF_COLOR.g = OFF_COLOR.b = OFF_COLOR.a = 0.0
@@ -87,11 +86,11 @@ class LaneFollowNode(DTROS, FrozenClass):
             **(self.params.get(self.veh) or {})
         }
 
-        self.is_english = self.params.get("is_english")
-        self.is_debug = self.params.get("is_debug")
+        self.is_american = self.params["is_american"]
+        self.is_debug = self.params["is_debug"]
 
         # Lane following
-        self.offset = 220 * (2 * int(self.is_english) - 1)
+        self.offset = 220 * (2 * int(self.is_american) - 1)
 
         self.velocity = self.params["velocity"]
         self.twist = Twist2DStamped(v=self.velocity, omega=0)
@@ -106,7 +105,7 @@ class LaneFollowNode(DTROS, FrozenClass):
         self.stopline_area_max = self.params["stopline_area_max"]
 
         # Tracking
-        self.safe_distance = self.params.get("safe_distance")
+        self.safe_distance = self.params["safe_distance"]
 
         # ╔─────────────────────────────────────────────────────────────────────╗
         # │ Dyηαmic ναriαblεs                                                   |
@@ -215,13 +214,13 @@ class LaneFollowNode(DTROS, FrozenClass):
                 cx = int(M['m10'] / M['m00'])
                 cy = int(M['m01'] / M['m00'])
                 self.error = cx - int(crop_width / 2) + self.offset
-                if self.debug:
+                if self.is_debug:
                     cv2.drawContours(crop, contours, max_idx, (0, 255, 0), 3)
                     cv2.circle(crop, (cx, cy), 7, (0, 0, 255), -1)
             except Exception:
                 pass
 
-        if self.debug:
+        if self.is_debug:
             rect_img_msg = self.bridge.cv2_to_compressed_imgmsg(crop)
             self.pub.publish(rect_img_msg)
 
@@ -269,7 +268,7 @@ class LaneFollowNode(DTROS, FrozenClass):
             self.state = DuckieState.Stopped
             self.stop_time = time
 
-        if self.debug:
+        if self.is_debug:
             rect_img_msg = self.bridge.cv2_to_compressed_imgmsg(crop)
             self.pub_red.publish(rect_img_msg)
 
@@ -318,7 +317,7 @@ class LaneFollowNode(DTROS, FrozenClass):
         self.tracking_last_error = self.tracking_error
         self.last_time = rospy.get_time()
         Dz = d_error / d_time * self.Dz
-        if self.debug:
+        if self.is_debug:
             rospy.logdebug(
                 f"Distance to robot ahead: {self.distance_to_robot_ahead()}"
             )
