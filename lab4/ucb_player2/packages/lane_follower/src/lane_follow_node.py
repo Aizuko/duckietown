@@ -26,6 +26,7 @@ OFF_COLOR.r = OFF_COLOR.g = OFF_COLOR.b = OFF_COLOR.a = 0.0
 @unique
 class DuckieState(Enum):
     """States our duckiebot can visit. These modify the LaneFollowNode"""
+
     LaneFollowing = auto()
     Stopped = auto()
     BlindTurnLeft = auto()
@@ -46,11 +47,16 @@ class LEDColor(Enum):
 
 @unique
 class LEDIndex(Enum):
+    # 0 == front left
+    # 1 == NONE
+    # 2 == front right
+    # 3 == back right
+    # 4 == back left
     All = set(range(0, 5))
-    Left = set([0, 1])
-    Right = set([3, 4])
-    Back = set([1, 3])
-    Front = set([0, 4])
+    Left = set([0, 4])
+    Right = set([2, 3])
+    Back = set([3, 4])
+    Front = set([0, 2])
 
 
 class FrozenClass(object):
@@ -279,13 +285,13 @@ class LaneFollowNode(DTROS, FrozenClass):
         self.twist.v = self.velocity
 
         if state is DuckieState.BlindForward:
-            self.set_leds(LEDColor.Green, LEDIndex.Yellow)
+            self.set_leds(LEDColor.Yellow, LEDIndex.Back)
             self.twist.omega = 0
         elif state is DuckieState.BlindTurnLeft:
-            self.set_leds(LEDColor.Green, LEDIndex.Teal)
+            self.set_leds(LEDColor.Teal, LEDIndex.Back)
             self.twist.omega = np.pi / 2
         elif state is DuckieState.BlindTurnRight:
-            self.set_leds(LEDColor.Green, LEDIndex.Magenta)
+            self.set_leds(LEDColor.Magenta, LEDIndex.Back)
             self.twist.omega = -np.pi / 2
         else:
             raise Exception(f"Invalid state {state} for blind driving")
@@ -377,9 +383,7 @@ class LaneFollowNode(DTROS, FrozenClass):
         on_color.a = 1.0
 
         for i in range(5):
-            led_msg.rgb_vals.append(
-                on_color if i in index_set.value else OFF_COLOR
-            )
+            led_msg.rgb_vals.append(on_color if i in index_set.value else OFF_COLOR)
 
         self.led_pub.publish(led_msg)
 
@@ -408,9 +412,12 @@ class LaneFollowNode(DTROS, FrozenClass):
         print("SHUTTING DOWN")
         self.twist.v = 0
         self.twist.omega = 0
+
         self.vel_pub.publish(self.twist)
+        self.set_leds(LEDColor.Off, LEDIndex.All)
         for i in range(8):
             self.vel_pub.publish(self.twist)
+            self.set_leds(LEDColor.Off, LEDIndex.All)
 
 
 if __name__ == "__main__":
