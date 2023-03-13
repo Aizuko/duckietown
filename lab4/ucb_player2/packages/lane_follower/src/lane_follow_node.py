@@ -78,9 +78,9 @@ class LaneFollowNode(DTROS, FrozenClass):
             node_name=node_name, node_type=NodeType.GENERIC
         )
 
-        # ╔─────────────────────────────────────────────────────────────────────╗
-        # │  Cδηsταητs (τδ τμηε)                                                |
-        # ╚─────────────────────────────────────────────────────────────────────╝
+        # ╔────────────────────────────────────────────────────────────────────╗
+        # │  Cδηsταητs (τδ τμηε)                                               |
+        # ╚────────────────────────────────────────────────────────────────────╝
         # Utils
         self.node_name = node_name
         self.veh = rospy.get_param("~veh")
@@ -111,6 +111,7 @@ class LaneFollowNode(DTROS, FrozenClass):
         self.stop_duration = self.params["stop_duration"]
         self.stop_immunity = self.params["stop_immunity"]
         self.tracking_distance = self.params["tracking_distance"]
+        self.tracking_timeout = self.params["tracking_timeout"]
         self.stopline_area_min = self.params["stopline_area_min"]
         self.stopline_area_max = self.params["stopline_area_max"]
 
@@ -118,9 +119,9 @@ class LaneFollowNode(DTROS, FrozenClass):
         self.safe_distance = self.params["safe_distance"]
         self.blind_duration = self.params["blind_duration"]
 
-        # ╔─────────────────────────────────────────────────────────────────────╗
-        # │ Dyηαmic ναriαblεs                                                   |
-        # ╚─────────────────────────────────────────────────────────────────────╝
+        # ╔────────────────────────────────────────────────────────────────────╗
+        # │ Dyηαmic ναriαblεs                                                  |
+        # ╚────────────────────────────────────────────────────────────────────╝
         # State
         self.state = DuckieState.LaneFollowing
 
@@ -152,9 +153,9 @@ class LaneFollowNode(DTROS, FrozenClass):
         # Shutdown hook
         rospy.on_shutdown(self.on_shutdown)
 
-        # ╔─────────────────────────────────────────────────────────────────────╗
-        # │ Pμblishεrs & Sμbscribεrs                                            |
-        # ╚─────────────────────────────────────────────────────────────────────╝
+        # ╔────────────────────────────────────────────────────────────────────╗
+        # │ Pμblishεrs & Sμbscribεrs                                           |
+        # ╚────────────────────────────────────────────────────────────────────╝
         self.pub = rospy.Publisher(
             f"/{self.veh}/output/image/mask/compressed",
             CompressedImage,
@@ -195,8 +196,7 @@ class LaneFollowNode(DTROS, FrozenClass):
             queue_size=1,
         )
 
-        # Now disallow any new attributes
-        self._freeze()
+        self._freeze()  # Now disallow any new attributes
 
     def ajoin_callback(self, msg):
         self.lane_callback(msg)
@@ -262,9 +262,6 @@ class LaneFollowNode(DTROS, FrozenClass):
             ),
         )
         self.robot_transform_queue.append(T)
-        # print("====================")
-        # print(T)
-        # print("====================")
         self.robot_transform_time = msg.header.stamp.to_sec()
 
     def stop_callback(self, msg):
@@ -315,12 +312,12 @@ class LaneFollowNode(DTROS, FrozenClass):
         rospy.loginfo(f"Publishing blind movements for state {self.state.name}")
         self.vel_pub.publish(self.twist)
 
-    def pid_x(self):
+    def pid_x(self, p_coef=1):
         if self.error is None:
             self.twist.omega = 0
         else:
             # P Term
-            P = -self.error * self.Px
+            P = p_coef * -self.error * self.Px
 
             # D Term
             d_error = (self.error - self.last_error) / (
@@ -353,7 +350,7 @@ class LaneFollowNode(DTROS, FrozenClass):
         v = np.sign(v) * np.clip(
             np.abs(v), self.min_velocity, self.max_velocity
         )
-        self.twist.v = np.max(v, 0)
+        self.twist.v = np.max((v, 0))
 
     def follow_lane(self):
         self.pid_x()
@@ -369,6 +366,9 @@ class LaneFollowNode(DTROS, FrozenClass):
     def track_bot(self):
         self.pid_x()
         self.pid_z()
+        rospy.loginfo(
+            f"(v, omega) for tracking: {self.twist.v}, {self.twist.omega}"
+        )
 
         self.vel_pub.publish(self.twist)
 
@@ -386,7 +386,6 @@ class LaneFollowNode(DTROS, FrozenClass):
             return min(np.linalg.norm(latest_translate), self.tof_dist[-1])
 
         return None
-        # return self.tof_dist[-1]  # This will make it pick up anything as a bot
 
     @lru_cache(maxsize=1)
     def set_leds(self, color: LEDColor, index_set: LEDIndex):
@@ -429,9 +428,9 @@ class LaneFollowNode(DTROS, FrozenClass):
                     lateral_disp = self.robot_transform_queue[-1][0, 3]
 
                     if lateral_disp < -0.3:
-                        self.next_blind_state = DuckieState.BlindTurnLeft
-                    elif lateral_disp > 0.3:
                         self.next_blind_state = DuckieState.BlindTurnRight
+                    elif lateral_disp > 0.3:
+                        self.next_blind_state = DuckieState.BlindTurnLeft
                     else:
                         self.next_blind_state = DuckieState.BlindForward
 
@@ -468,10 +467,14 @@ class LaneFollowNode(DTROS, FrozenClass):
                 self.set_leds(LEDColor.Blue, LEDIndex.Back)
                 self.track_bot()
 
-                if (
-                    self.distance_to_robot_ahead() is None
-                    or self.distance_to_robot_ahead() > self.tracking_distance
-                ):
+                is_timeout = (
+                    rospy.get_time() - self.robot_transform_time
+                    > self.tracking_timeout
+                )
+
+                d = self.distance_to_robot_ahead()
+
+                if is_timeout and d is None or d is not None and d > self.tracking_distance:
                     rospy.loginfo(
                         f"Switching to tracking from dist: {self.distance_to_robot_ahead()}"
                     )
