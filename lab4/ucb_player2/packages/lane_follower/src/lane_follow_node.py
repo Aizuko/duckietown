@@ -37,12 +37,13 @@ class DuckieState(Enum):
 
 @unique
 class LEDColor(Enum):
-    Red = [1., 0., 0.]
-    Green = [0., 1., 0.]
-    Blue = [0., 0., 1.]
-    Yellow = [1., 1., 0.]
-    Teal = [0., 1., 1.]
-    Magenta = [1., 0., 1.]
+    Red = [1.0, 0.0, 0.0]
+    Green = [0.0, 1.0, 0.0]
+    Blue = [0.0, 0.0, 1.0]
+    Yellow = [1.0, 1.0, 0.0]
+    Teal = [0.0, 1.0, 1.0]
+    Magenta = [1.0, 0.0, 1.0]
+    Off = [0.0, 0.0, 0.0]
 
 
 @unique
@@ -74,7 +75,8 @@ class FrozenClass(object):
 class LaneFollowNode(DTROS, FrozenClass):
     def __init__(self, node_name):
         super(LaneFollowNode, self).__init__(
-            node_name=node_name, node_type=NodeType.GENERIC)
+            node_name=node_name, node_type=NodeType.GENERIC
+        )
 
         # ╔─────────────────────────────────────────────────────────────────────╗
         # │  Cδηsταητs (τδ τμηε)                                                |
@@ -87,10 +89,7 @@ class LaneFollowNode(DTROS, FrozenClass):
         with open("/params.json") as f:
             self.params = json.load(f)
 
-        self.params = {
-            **self.params["default"],
-            **(self.params.get(self.veh) or {})
-        }
+        self.params = {**self.params["default"], **(self.params.get(self.veh) or {})}
 
         self.is_american = self.params["is_american"]
         self.is_debug = self.params["is_debug"]
@@ -131,7 +130,7 @@ class LaneFollowNode(DTROS, FrozenClass):
         self.stop_time = None
 
         # TOF
-        self.tof_dist = [0., 0., 0.]
+        self.tof_dist = [0.0, 0.0, 0.0]
 
         # Transform
         self.robot_transform_queue = deque(maxlen=self.params["deque_maxlen"])
@@ -160,6 +159,16 @@ class LaneFollowNode(DTROS, FrozenClass):
             CompressedImage,
             queue_size=1,
         )
+        self.vel_pub = rospy.Publisher(
+            f"/{self.veh}/car_cmd_switch_node/cmd",
+            Twist2DStamped,
+            queue_size=1,
+        )
+        self.led_pub = rospy.Publisher(
+            f"/{self.veh}/led_emitter_node/led_pattern",
+            LEDPattern,
+            queue_size=1,
+        )
         self.sub = rospy.Subscriber(
             f"/{self.veh}/camera_node/image/compressed",
             CompressedImage,
@@ -179,16 +188,6 @@ class LaneFollowNode(DTROS, FrozenClass):
             self.robot_ahead_transform_callback,
             queue_size=1,
         )
-        self.vel_pub = rospy.Publisher(
-            f"/{self.veh}/car_cmd_switch_node/cmd",
-            Twist2DStamped,
-            queue_size=1,
-        )
-        self.led_pub = rospy.Publisher(
-            f'/{self.veh}/led_emitter_node/led_pattern',
-            LEDPattern,
-            queue_size=1,
-        )
 
         # Now disallow any new attributes
         self._freeze()
@@ -206,8 +205,7 @@ class LaneFollowNode(DTROS, FrozenClass):
         hsv = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
         mask = cv2.inRange(hsv, ROAD_MASK[0], ROAD_MASK[1])
         crop = cv2.bitwise_and(crop, crop, mask=mask)
-        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL,
-                                       cv2.CHAIN_APPROX_NONE)
+        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
 
         # Search for lane in front
         areas = np.array([cv2.contourArea(a) for a in contours])
@@ -219,8 +217,8 @@ class LaneFollowNode(DTROS, FrozenClass):
 
             M = cv2.moments(contours[max_idx])
             try:
-                cx = int(M['m10'] / M['m00'])
-                cy = int(M['m01'] / M['m00'])
+                cx = int(M["m10"] / M["m00"])
+                cy = int(M["m01"] / M["m00"])
                 self.error = cx - int(crop_width / 2) + self.offset
                 if self.is_debug:
                     cv2.drawContours(crop, contours, max_idx, (0, 255, 0), 3)
@@ -236,23 +234,28 @@ class LaneFollowNode(DTROS, FrozenClass):
         self.tof_dist.append(msg.range)  # Keep full backlog
 
     def robot_ahead_transform_callback(self, msg: TransformStamped):
+        rospy.loginfo(f"Got transform callback {msg.header.stamp.to_sec()}")
         transform = msg.transform
         T = tr.compose_matrix(
-            translate=([
-                transform.translation.x,
-                transform.translation.y,
-                transform.translation.z
-            ]),
-            angles=tr.euler_from_quaternion([
-                transform.rotation.x,
-                transform.rotation.y,
-                transform.rotation.z,
-                transform.rotation.w
-            ])
+            translate=(
+                [
+                    transform.translation.x,
+                    transform.translation.y,
+                    transform.translation.z,
+                ]
+            ),
+            angles=tr.euler_from_quaternion(
+                [
+                    transform.rotation.x,
+                    transform.rotation.y,
+                    transform.rotation.z,
+                    transform.rotation.w,
+                ]
+            ),
         )
         self.robot_transform_queue.append(T)
         self.robot_transform_time = msg.header.stamp.to_sec()
-        rospy.loginfo_throttle(10, f"T: {msg}")
+        rospy.loginfo_throttle(10, f"Got message at time {self.robot_transform_time}, with T = {msg}")
 
     def stop_callback(self, msg):
         img = self.bridge.compressed_imgmsg_to_cv2(msg, "bgr8")
@@ -260,14 +263,14 @@ class LaneFollowNode(DTROS, FrozenClass):
         hsv = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
         mask = cv2.inRange(hsv, STOP_MASK[0], STOP_MASK[1])
         crop = cv2.bitwise_and(crop, crop, mask=mask)
-        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL,
-                                       cv2.CHAIN_APPROX_NONE)
+        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
 
         areas = np.array([cv2.contourArea(a) for a in contours])
-        is_stopline = np.any(np.logical_and(
-            self.stopline_area_min < areas,
-            areas < self.stopline_area_max
-        ))
+        is_stopline = np.any(
+            np.logical_and(
+                self.stopline_area_min < areas, areas < self.stopline_area_max
+            )
+        )
 
         time = rospy.get_time()
         ltime = self.stop_time
@@ -306,8 +309,9 @@ class LaneFollowNode(DTROS, FrozenClass):
             P = -self.error * self.Px
 
             # D Term
-            d_error = (self.error - self.last_error) \
-                / (rospy.get_time() - self.last_time)
+            d_error = (self.error - self.last_error) / (
+                rospy.get_time() - self.last_time
+            )
             self.last_error = self.error
             self.last_time = rospy.get_time()
             D = d_error * self.Dx
@@ -320,15 +324,13 @@ class LaneFollowNode(DTROS, FrozenClass):
             self.tracking_last_error = self.tracking_error
 
         Pz = -self.tracking_error * self.Pz
-        d_error = (self.tracking_error - self.tracking_last_error)
+        d_error = self.tracking_error - self.tracking_last_error
         d_time = rospy.get_time() - self.last_time
         self.tracking_last_error = self.tracking_error
         self.last_time = rospy.get_time()
         Dz = d_error / d_time * self.Dz
         if self.is_debug:
-            rospy.logdebug(
-                f"Distance to robot ahead: {self.distance_to_robot_ahead()}"
-            )
+            rospy.logdebug(f"Distance to robot ahead: {self.distance_to_robot_ahead()}")
             rospy.logdebug(f"Tracking error: {self.tracking_error}")
             rospy.logdebug(f"Tracking P: {Pz}")
             rospy.logdebug(f"Tracking D: {Dz}")
@@ -342,33 +344,22 @@ class LaneFollowNode(DTROS, FrozenClass):
 
         self.vel_pub.publish(self.twist)
 
-        if self.distance_to_robot_ahead() <= self.tracking_distance:
-            self.state = DuckieState.Tracking
+    def stop_wheels(self):
+        self.twist.v = 0
+        self.twist.omega = 0
+        self.vel_pub.publish(self.twist)
 
-    def check_stop(self):
-        delta_time = rospy.get_time() - self.stop_time
-
-        if delta_time >= self.stop_duration:
-            self.state = DuckieState.LaneFollowing
-            # TODO: "Choose state based on what it's observed"
-        else:
-            self.twist.v = 0
-            self.twist.omega = 0
-            self.vel_pub.publish(self.twist)
-
-    def tracking(self):
+    def track_bot(self):
         self.pid_x()
         self.pid_z()
 
         self.vel_pub.publish(self.twist)
 
-        if self.distance_to_robot_ahead() > self.tracking_distance:
-            self.state = DuckieState.LaneFollowing
-            self.tracking_last_error = None
-
     def distance_to_robot_ahead(self):
-        if (self.robot_transform_time and self.robot_transform_time >
-                rospy.get_time() - 1):
+        if (
+            self.robot_transform_time is not None
+            and self.robot_transform_time + 1 > rospy.get_time()
+        ):
             latest_transform = self.robot_transform_queue[-1]
             latest_translate = latest_transform[:3, 3]
             return min(np.linalg.norm(latest_translate), self.tof_dist[-1])
@@ -392,17 +383,40 @@ class LaneFollowNode(DTROS, FrozenClass):
 
         while not rospy.is_shutdown():
             rospy.loginfo_throttle(1, f"STATE: {self.state}")
+
             if self.state is DuckieState.LaneFollowing:
                 self.set_leds(LEDColor.Green, LEDIndex.Back)
                 self.follow_lane()
+
+                if self.distance_to_robot_ahead() <= self.tracking_distance:
+                    rospy.loginfo(f"Switch to tracking size {self.distance_to_robot_ahead()} <= {self.tracking_distance}")
+                    self.state = DuckieState.Tracking
+
             elif self.state is DuckieState.Stopped:
                 self.set_leds(LEDColor.Red, LEDIndex.Back)
-                self.check_stop()
-            elif self.state in (DuckieState.BlindTurnLeft, DuckieState.BlindTurnRight, DuckieState.BlindForward):
+
+                if rospy.get_time() - self.stop_time >= self.stop_duration:
+                    self.state = DuckieState.LaneFollowing
+                    #self.todo("Choose state based on what it's observed")
+                else:
+                    self.stop_wheels()
+
+            elif self.state in (
+                DuckieState.BlindTurnLeft,
+                DuckieState.BlindTurnRight,
+                DuckieState.BlindForward,
+            ):
                 self.drive_bindly(self.state)
+
             elif self.state is DuckieState.Tracking:
                 self.set_leds(LEDColor.Blue, LEDIndex.Back)
-                self.tracking()
+                self.track_bot()
+
+                if self.distance_to_robot_ahead() > self.tracking_distance:
+                    rospy.loginfo(f"Switching to tracking from dist: {self.distance_to_robot_ahead()}")
+                    self.tracking_last_error = None
+                    self.state = DuckieState.LaneFollowing
+
             else:
                 raise Exception(f"Invalid state {self.state}")
 
