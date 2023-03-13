@@ -255,7 +255,6 @@ class LaneFollowNode(DTROS, FrozenClass):
         )
         self.robot_transform_queue.append(T)
         self.robot_transform_time = msg.header.stamp.to_sec()
-        rospy.loginfo_throttle(10, f"Got message at time {self.robot_transform_time}, with T = {msg}")
 
     def stop_callback(self, msg):
         img = self.bridge.compressed_imgmsg_to_cv2(msg, "bgr8")
@@ -363,6 +362,7 @@ class LaneFollowNode(DTROS, FrozenClass):
             latest_transform = self.robot_transform_queue[-1]
             latest_translate = latest_transform[:3, 3]
             return min(np.linalg.norm(latest_translate), self.tof_dist[-1])
+
         return self.tof_dist[-1]
 
     @lru_cache(maxsize=1)
@@ -389,7 +389,9 @@ class LaneFollowNode(DTROS, FrozenClass):
                 self.follow_lane()
 
                 if self.distance_to_robot_ahead() <= self.tracking_distance:
-                    rospy.loginfo(f"Switch to tracking size {self.distance_to_robot_ahead()} <= {self.tracking_distance}")
+                    rospy.loginfo(
+                        f"Switch to tracking size {self.distance_to_robot_ahead()} <= {self.tracking_distance}"
+                    )
                     self.state = DuckieState.Tracking
 
             elif self.state is DuckieState.Stopped:
@@ -397,7 +399,7 @@ class LaneFollowNode(DTROS, FrozenClass):
 
                 if rospy.get_time() - self.stop_time >= self.stop_duration:
                     self.state = DuckieState.LaneFollowing
-                    #self.todo("Choose state based on what it's observed")
+                    # self.todo("Choose state based on what it's observed")
                 else:
                     self.stop_wheels()
 
@@ -413,7 +415,9 @@ class LaneFollowNode(DTROS, FrozenClass):
                 self.track_bot()
 
                 if self.distance_to_robot_ahead() > self.tracking_distance:
-                    rospy.loginfo(f"Switching to tracking from dist: {self.distance_to_robot_ahead()}")
+                    rospy.loginfo(
+                        f"Switching to tracking from dist: {self.distance_to_robot_ahead()}"
+                    )
                     self.tracking_last_error = None
                     self.state = DuckieState.LaneFollowing
 
