@@ -58,6 +58,10 @@ class LEDIndex(Enum):
     Right = set([2, 3])
     Back = set([3, 4])
     Front = set([0, 2])
+    BackLeft = set([4])
+    BackRight = set([3])
+    FrontLeft = set([0])
+    FrontRight = set([2])
 
 
 class FrozenClass(object):
@@ -153,6 +157,11 @@ class LaneFollowNode(DTROS, FrozenClass):
 
         # Shutdown hook
         rospy.on_shutdown(self.on_shutdown)
+
+        # Timer
+        self.timer = rospy.Timer(rospy.Duration(1), self.timer_callback)
+        self.blink_on_state = False
+        self.blink_type_state = None
 
         # ╔────────────────────────────────────────────────────────────────────╗
         # │ Pμblishεrs & Sμbscribεrs                                           |
@@ -318,13 +327,13 @@ class LaneFollowNode(DTROS, FrozenClass):
         self.twist.v = self.velocity
 
         if self.state is DuckieState.BlindForward:
-            self.set_leds(LEDColor.Yellow, LEDIndex.Back)
+            # self.set_leds(LEDColor.Yellow, LEDIndex.Back)
             self.twist.omega = 0
         elif self.state is DuckieState.BlindTurnLeft:
-            self.set_leds(LEDColor.Teal, LEDIndex.Back)
+            # self.set_leds(LEDColor.Teal, LEDIndex.Back)
             self.twist.omega = self.params["rot_omega_l"] * np.pi
         elif self.state is DuckieState.BlindTurnRight:
-            self.set_leds(LEDColor.Magenta, LEDIndex.Back)
+            # self.set_leds(LEDColor.Magenta, LEDIndex.Back)
             self.twist.omega = -self.params["rot_omega_r"] * np.pi
         else:
             raise Exception(f"Invalid state `{self.state}` for blind driving")
@@ -370,7 +379,7 @@ class LaneFollowNode(DTROS, FrozenClass):
         v = np.sign(v) * np.clip(
             np.abs(v), self.min_velocity, self.max_velocity
         )
-        self.twist.v = np.max((v, -0.3))
+        self.twist.v = np.max((v, self.params["clip_velocity"]))
 
     def follow_lane(self):
         self.pid_x()
@@ -428,6 +437,15 @@ class LaneFollowNode(DTROS, FrozenClass):
         if not self.params["no_led"]:
             self.led_pub.publish(led_msg)
 
+    def timer_callback(self, event):
+        rospy.logdebug_throttle(1, f"Name: {self.blink_type_state}")
+        if self.blink_type_state is None:
+            self.set_leds(LEDColor.Off, LEDIndex.Back)
+        elif self.blink_on_state:
+            self.set_leds(LEDColor.Yellow, self.blink_type_state)
+        else:
+            self.set_leds(LEDColor.Off, self.blink_type_state)
+
     def run(self):
         rate = rospy.Rate(self.params["run_rate"])
 
@@ -435,7 +453,7 @@ class LaneFollowNode(DTROS, FrozenClass):
             rospy.loginfo_throttle(1, f"STATE: {self.state}")
 
             if self.state is DuckieState.LaneFollowing:
-                self.set_leds(LEDColor.Green, LEDIndex.Back)
+                # self.set_leds(LEDColor.Green, LEDIndex.Back)
                 self.follow_lane()
 
                 if (
@@ -445,7 +463,7 @@ class LaneFollowNode(DTROS, FrozenClass):
                     self.state = DuckieState.Tracking
 
             elif self.state is DuckieState.Stopped:
-                self.set_leds(LEDColor.Red, LEDIndex.Back)
+                # self.set_leds(LEDColor.Red, LEDIndex.Back)
 
                 if rospy.get_time() - self.stop_time >= self.stop_duration:
                     if self.robot_transform_time is None:
@@ -465,19 +483,29 @@ class LaneFollowNode(DTROS, FrozenClass):
                 DuckieState.BlindTurnRight,
                 DuckieState.BlindForward,
             ):
+                if self.state is DuckieState.BlindTurnLeft:
+                    self.blink_type_state = LEDIndex.BackLeft
+                    blind_duration = self.params["blind_duration_left"]
+                elif self.state is DuckieState.BlindTurnRight:
+                    self.blink_type_state = LEDIndex.BackRight
+                    blind_duration = self.params["blind_duration_right"]
+                else:
+                    blind_duration = self.params["blind_duration_forward"]
+
                 if self.blind_start_time is None:
                     self.blind_start_time = rospy.get_time()
                 elif (
                     rospy.get_time() - self.blind_start_time
-                    > self.blind_duration
+                    > blind_duration
                 ):
                     self.blind_start_time = None
+                    self.blink_type_state = None
                     self.state = DuckieState.LaneFollowing
                 else:
                     self.drive_bindly()
 
             elif self.state is DuckieState.Tracking:
-                self.set_leds(LEDColor.Blue, LEDIndex.Back)
+                # self.set_leds(LEDColor.Blue, LEDIndex.Back)
                 self.track_bot()
 
                 is_timeout = (
@@ -510,10 +538,10 @@ class LaneFollowNode(DTROS, FrozenClass):
         self.twist.omega = 0
 
         self.vel_pub.publish(self.twist)
-        self.set_leds(LEDColor.Off, LEDIndex.All)
+        # self.set_leds(LEDColor.Off, LEDIndex.All)
         for i in range(8):
             self.vel_pub.publish(self.twist)
-            self.set_leds(LEDColor.Off, LEDIndex.All)
+            # self.set_leds(LEDColor.Off, LEDIndex.All)
 
 
 if __name__ == "__main__":
