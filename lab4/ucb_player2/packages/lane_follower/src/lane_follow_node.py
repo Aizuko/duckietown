@@ -422,6 +422,39 @@ class LaneFollowNode(DTROS, FrozenClass):
 
     def run(self):
         rate = rospy.Rate(self.params["run_rate"])
+        self.state = DuckieState.BlindForward
+
+        while not rospy.is_shutdown():
+            wait = rospy.Rate(1/6)
+            wait2 = rospy.Rate(3)
+
+            print("Starting")
+            while True:
+                blind_duration = self.params["blind_duration_forward"]
+
+                if self.blind_start_time is None:
+                    self.blind_start_time = rospy.get_time()
+                elif (
+                    rospy.get_time() - self.blind_start_time
+                    > blind_duration
+                ):
+                    print("breaking")
+                    break
+                else:
+                    self.drive_bindly()
+                print("sleeping")
+                wait2.sleep()
+
+            self.blind_start_time = None
+
+            for _ in range(3):
+                self.twist.v = 0
+                self.twist.omega = 0
+                self.vel_pub.publish(self.twist)
+
+            wait.sleep()
+
+        return
 
         while not rospy.is_shutdown():
             rospy.loginfo_throttle(1, f"STATE: {self.state}")
@@ -455,10 +488,8 @@ class LaneFollowNode(DTROS, FrozenClass):
                 DuckieState.BlindForward,
             ):
                 if self.state is DuckieState.BlindTurnLeft:
-                    self.blink_type_state = LEDIndex.BackLeft
                     blind_duration = self.params["blind_duration_left"]
                 elif self.state is DuckieState.BlindTurnRight:
-                    self.blink_type_state = LEDIndex.BackRight
                     blind_duration = self.params["blind_duration_right"]
                 else:
                     blind_duration = self.params["blind_duration_forward"]
