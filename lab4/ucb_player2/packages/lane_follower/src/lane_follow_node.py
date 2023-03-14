@@ -135,6 +135,7 @@ class LaneFollowNode(DTROS, FrozenClass):
         self.stop_time = None
         self.next_blind_state = None
         self.blind_start_time = None
+        self.is_stop_line = False
 
         # TOF
         self.tof_dist = [0.0, 0.0, 0.0]
@@ -262,6 +263,17 @@ class LaneFollowNode(DTROS, FrozenClass):
             ),
         )
         self.robot_transform_queue.append(T)
+
+        y_rote = tr.euler_from_matrix(T)[1]
+
+        if y_rote > self.params["left_rot"]:
+            self.next_blind_state = DuckieState.BlindTurnLeft
+        elif y_rote < self.params["right_rot"]:
+            self.next_blind_state = DuckieState.BlindTurnRight
+        else:
+            self.next_blind_state = DuckieState.BlindForward
+
+        rospy.loginfo_throttle(1, f"{y_rote}")
         self.robot_transform_time = msg.header.stamp.to_sec()
 
     def stop_callback(self, msg):
@@ -284,10 +296,18 @@ class LaneFollowNode(DTROS, FrozenClass):
         time = rospy.get_time()
         ltime = self.stop_time
 
-        if is_stopline and (ltime is None or time - ltime > self.stop_immunity):
-            self.next_blind_state = None
+        if is_stopline and self.state is DuckieState.Tracking:
+            self.is_stop_line = True
+        elif (
+            is_stopline
+            and self.state is DuckieState.LaneFollowing
+            and (ltime is None or time - ltime < self.params["stop_immunity"])
+        ):
+            self.is_stop_line = True
+        elif not is_stopline and self.is_stop_line:
             self.state = DuckieState.Stopped
             self.stop_time = time
+            self.is_stop_line = False
 
         if self.is_debug:
             rect_img_msg = self.bridge.cv2_to_compressed_imgmsg(crop)
@@ -302,14 +322,14 @@ class LaneFollowNode(DTROS, FrozenClass):
             self.twist.omega = 0
         elif self.state is DuckieState.BlindTurnLeft:
             self.set_leds(LEDColor.Teal, LEDIndex.Back)
-            self.twist.omega = np.pi / 2
+            self.twist.omega = self.params["rot_omega_l"] * np.pi
         elif self.state is DuckieState.BlindTurnRight:
             self.set_leds(LEDColor.Magenta, LEDIndex.Back)
-            self.twist.omega = -np.pi / 2
+            self.twist.omega = -self.params["rot_omega_r"] * np.pi
         else:
-            raise Exception(f"Invalid state {self.state} for blind driving")
+            raise Exception(f"Invalid state `{self.state}` for blind driving")
 
-        rospy.loginfo(f"Publishing blind movements for state {self.state.name}")
+        # rospy.loginfo(f"Publishing blind movements for state {self.state.name}")
         self.vel_pub.publish(self.twist)
 
     def pid_x(self, p_coef=1):
@@ -317,7 +337,7 @@ class LaneFollowNode(DTROS, FrozenClass):
             self.twist.omega = 0
         else:
             # P Term
-            P = p_coef * -self.error * self.Px
+            P = -self.error * self.Px
 
             # D Term
             d_error = (self.error - self.last_error) / (
@@ -350,7 +370,7 @@ class LaneFollowNode(DTROS, FrozenClass):
         v = np.sign(v) * np.clip(
             np.abs(v), self.min_velocity, self.max_velocity
         )
-        self.twist.v = np.max((v, 0))
+        self.twist.v = np.max((v, -0.3))
 
     def follow_lane(self):
         self.pid_x()
@@ -364,11 +384,16 @@ class LaneFollowNode(DTROS, FrozenClass):
         self.vel_pub.publish(self.twist)
 
     def track_bot(self):
-        self.pid_x()
         self.pid_z()
-        rospy.loginfo(
-            f"(v, omega) for tracking: {self.twist.v}, {self.twist.omega}"
-        )
+
+        if self.twist.v < self.params["track_omega_thresh"]:
+            self.twist.omega = 0
+        else:
+            self.pid_x()
+
+        # rospy.loginfo(
+        #    f"(v, omega) for tracking: {self.twist.v}, {self.twist.omega}"
+        # )
 
         self.vel_pub.publish(self.twist)
 
@@ -421,29 +446,16 @@ class LaneFollowNode(DTROS, FrozenClass):
             elif self.state is DuckieState.Stopped:
                 self.set_leds(LEDColor.Red, LEDIndex.Back)
 
-                if (
-                    self.robot_transform_time is not None
-                    and self.robot_transform_time > self.stop_time
-                ):
-                    lateral_disp = self.robot_transform_queue[-1][0, 3]
-
-                    if lateral_disp < -0.3:
-                        self.next_blind_state = DuckieState.BlindTurnRight
-                    elif lateral_disp > 0.3:
-                        self.next_blind_state = DuckieState.BlindTurnLeft
+                if rospy.get_time() - self.stop_time >= self.stop_duration:
+                    if self.robot_transform_time is None:
+                        self.state = DuckieState.LaneFollowing
+                    elif (
+                        rospy.get_time() - self.robot_transform_time
+                        < self.params["inter_plan_time"]
+                    ):
+                        self.state = self.next_blind_state
                     else:
-                        self.next_blind_state = DuckieState.BlindForward
-
-                is_go_time = (
-                    rospy.get_time() - self.stop_time >= self.stop_duration
-                )
-
-                if is_go_time and self.next_blind_state is None:
-                    rospy.loginfo("Didn't get a blind state")
-                    self.state = DuckieState.LaneFollowing
-                elif is_go_time:
-                    self.state = self.next_blind_state
-                    self.next_blind_state = None
+                        self.state = DuckieState.LaneFollowing
                 else:
                     self.stop_wheels()
 
@@ -474,7 +486,12 @@ class LaneFollowNode(DTROS, FrozenClass):
 
                 d = self.distance_to_robot_ahead()
 
-                if is_timeout and d is None or d is not None and d > self.tracking_distance:
+                if (
+                    is_timeout
+                    and d is None
+                    or d is not None
+                    and d > self.tracking_distance
+                ):
                     rospy.loginfo(
                         f"Switching to tracking from dist: {self.distance_to_robot_ahead()}"
                     )
