@@ -26,9 +26,10 @@
     "inter_plan_time": 8,
     "no_led": false,
     "clip_velocity": 0,
-    "placeholder": false,
     "blind_duration_forward": 3,
-    "blind_duration_left": 4,
-    "blind_duration_right": 1
+    "blind_duration_left": 3.5,
+    "blind_duration_right": 1.3,
+
+    "placeholder": false
   }
 }
