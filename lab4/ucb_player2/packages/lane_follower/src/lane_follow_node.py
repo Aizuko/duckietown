@@ -159,7 +159,7 @@ class LaneFollowNode(DTROS, FrozenClass):
         rospy.on_shutdown(self.on_shutdown)
 
         # Timer
-        self.timer = rospy.Timer(rospy.Duration(1), self.timer_callback)
+        #self.timer = rospy.Timer(rospy.Duration(1), self.timer_callback)
         self.blink_on_state = False
         self.blink_type_state = None
 
@@ -423,6 +423,7 @@ class LaneFollowNode(DTROS, FrozenClass):
 
     @lru_cache(maxsize=1)
     def set_leds(self, color: LEDColor, index_set: LEDIndex):
+        """DEAD CODE"""
         led_msg = LEDPattern()
 
         on_color = ColorRGBA()
@@ -437,14 +438,14 @@ class LaneFollowNode(DTROS, FrozenClass):
         if not self.params["no_led"]:
             self.led_pub.publish(led_msg)
 
-    def timer_callback(self, event):
-        rospy.logdebug_throttle(1, f"Name: {self.blink_type_state}")
-        if self.blink_type_state is None:
-            self.set_leds(LEDColor.Off, LEDIndex.Back)
-        elif self.blink_on_state:
-            self.set_leds(LEDColor.Yellow, self.blink_type_state)
-        else:
-            self.set_leds(LEDColor.Off, self.blink_type_state)
+    #def timer_callback(self, event):
+    #    rospy.logdebug_throttle(1, f"Name: {self.blink_type_state}")
+    #    #if self.blink_type_state is None:
+    #    #    self.set_leds(LEDColor.Off, LEDIndex.Back)
+    #    #elif self.blink_on_state:
+    #    #    self.set_leds(LEDColor.Yellow, self.blink_type_state)
+    #    #else:
+    #    #    self.set_leds(LEDColor.Off, self.blink_type_state)
 
     def run(self):
         rate = rospy.Rate(self.params["run_rate"])
