@@ -425,7 +425,8 @@ class LaneFollowNode(DTROS, FrozenClass):
                 on_color if i in index_set.value else OFF_COLOR
             )
 
-        self.led_pub.publish(led_msg)
+        if not self.params["no_led"]:
+            self.led_pub.publish(led_msg)
 
     def run(self):
         rate = rospy.Rate(self.params["run_rate"])

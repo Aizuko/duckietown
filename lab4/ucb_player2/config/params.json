@@ -3,7 +3,7 @@
     "Px": 0.049,
     "Dx": -0.004,
     "Pz": 1.2,
-    "Dz": -0.02,
+    "Dz": 0,
     "min_velocity": 0,
     "max_velocity": 0.8,
     "velocity": 0.4,
@@ -25,7 +25,7 @@
     "rot_omega_l": 0.8,
     "rot_omega_r": 0.8,
     "inter_plan_time": 6,
-
+    "no_led": true,
 
     "placeholder": false
   }
