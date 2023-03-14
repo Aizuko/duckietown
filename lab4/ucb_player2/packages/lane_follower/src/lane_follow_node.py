@@ -301,7 +301,7 @@ class LaneFollowNode(DTROS, FrozenClass):
         elif (
             is_stopline
             and self.state is DuckieState.LaneFollowing
-            and (ltime is None or time - ltime < self.params["stop_immunity"])
+            and (ltime is None or time - ltime > self.params["stop_immunity"])
         ):
             self.is_stop_line = True
         elif not is_stopline and self.is_stop_line:
