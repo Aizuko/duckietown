@@ -308,7 +308,11 @@ class LaneFollowNode(DTROS, FrozenClass):
         ltime = self.stop_time
 
         if is_stopline and self.state is DuckieState.Tracking:
-            self.is_stop_line = True
+            if ltime is None or time - ltime > self.params["stop_immunity_tracking"]:
+                self.state = DuckieState.Stopped
+                self.stop_time = time
+            else:
+                self.is_stop_line = True
         elif (
             is_stopline
             and self.state is DuckieState.LaneFollowing
@@ -345,7 +349,10 @@ class LaneFollowNode(DTROS, FrozenClass):
             self.twist.omega = 0
         else:
             # P Term
-            P = -self.error * self.Px
+            if self.state is DuckieState.Tracking:
+                P = -self.error * self.params["Pxt"]
+            else:
+                P = -self.error * self.Px
 
             # D Term
             d_error = (self.error - self.last_error) / (
@@ -353,26 +360,27 @@ class LaneFollowNode(DTROS, FrozenClass):
             )
             self.last_error = self.error
             self.last_time = rospy.get_time()
-            D = d_error * self.Dx
+            if self.state is DuckieState.Tracking:
+                D = d_error * self.params["Dxt"]
+            else:
+                D = d_error * self.Dx
 
             self.twist.omega = P + D
 
     def pid_z(self):
-        if self.distance_to_robot_ahead() is None:
-            self.tracking_error = self.safe_distance - self.tof_dist[-1]
-        else:
-            self.tracking_error = (
-                self.safe_distance - self.distance_to_robot_ahead()
-            )
+        distance_to_robot_ahead = self.distance_to_robot_ahead()
+        if distance_to_robot_ahead is None:
+            return
+        self.tracking_error = self.safe_distance - distance_to_robot_ahead
 
         if self.tracking_last_error is None:
             self.tracking_last_error = self.tracking_error
 
         Pz = -self.tracking_error * self.Pz
         d_error = self.tracking_error - self.tracking_last_error
-        d_time = rospy.get_time() - self.last_time
+        d_time = rospy.get_time() - self.tracking_last_time
         self.tracking_last_error = self.tracking_error
-        self.last_time = rospy.get_time()
+        self.tracking_last_time = rospy.get_time()
         Dz = d_error / d_time * self.Dz
         v = Pz + Dz
         v = np.sign(v) * np.clip(
@@ -393,11 +401,7 @@ class LaneFollowNode(DTROS, FrozenClass):
 
     def track_bot(self):
         self.pid_z()
-
-        if self.twist.v < self.params["track_omega_thresh"]:
-            self.twist.omega = 0
-        else:
-            self.pid_x()
+        self.pid_x()
 
         # rospy.loginfo(
         #    f"(v, omega) for tracking: {self.twist.v}, {self.twist.omega}"
@@ -412,11 +416,17 @@ class LaneFollowNode(DTROS, FrozenClass):
         """
         if (
             self.robot_transform_time is not None
-            and self.robot_transform_time + 1 > rospy.get_time()
+            and rospy.get_time() - self.robot_transform_time < self.params["tofdist_fusion"]
         ):
             latest_transform = self.robot_transform_queue[-1]
             latest_translate = latest_transform[:3, 3]
-            return min(np.linalg.norm(latest_translate), self.tof_dist[-1])
+            tof_dist_transformed = self.params["tof_a"] * self.tof_dist[-1] + self.params["tof_b"]
+            if self.params["print_distance"]:
+                rospy.loginfo(f"{np.linalg.norm(latest_translate)}, {self.tof_dist[-1]}, {tof_dist_transformed}")
+            return min(
+                np.linalg.norm(latest_translate),
+                tof_dist_transformed
+            )
 
         return None
 
@@ -428,12 +438,14 @@ class LaneFollowNode(DTROS, FrozenClass):
 
             if self.state is DuckieState.LaneFollowing:
                 self.follow_lane()
-
-                if (
-                    self.distance_to_robot_ahead() is not None
-                    and self.distance_to_robot_ahead() <= self.tracking_distance
-                ):
-                    self.state = DuckieState.Tracking
+                try:
+                    if (
+                        self.distance_to_robot_ahead() is not None
+                        and self.distance_to_robot_ahead() <= self.tracking_distance
+                    ):
+                        self.state = DuckieState.Tracking
+                except TypeError:
+                    pass
 
             elif self.state is DuckieState.Stopped:
                 if rospy.get_time() - self.stop_time >= self.stop_duration:
