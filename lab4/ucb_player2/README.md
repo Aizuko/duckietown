@@ -1,47 +1,38 @@
-# Template: template-ros
+# ucb_player2
 
-This template provides a boilerplate repository
-for developing ROS-based software in Duckietown.
+This workspace implements the exercise 4 requirements. Namely,
+it implements a PID controller, computer vision for lane following, computer
+vision for grid detection on the back of a duckiebot, and a finite state machine
+for safely tracking a duckiebot across duckietown.
 
-**NOTE:** If you want to develop software that does not use
-ROS, check out [this template](https://github.com/duckietown/template-basic).
+This ROS program is based on
+[Xiao's](https://github.com/XZPshaw/CMPUT412503_exercise4) grid-detection
+template, with contributions from the lane following package Justin Francis
+posted on eclass.
 
+## Installation and Usage
 
-## How to use it
+```bash
+docker -H csc22902.local build -t duckietown/duckietown:latest-arm64v8 .
+dts devel run -H csc22902.local -v /data:/data
+```
 
-### 1. Fork this repository
+Replace `csc22902` with the hostname of your Duckiebot.
 
-Use the fork button in the top-right corner of the github page to fork this template repository.
+## Packages
 
+### duckiebot_detection
 
-### 2. Create a new repository
+This one came from the starter code Xiao provided for detecting the grids on the
+back on the bot. The original only gave the distance to the bot ahead, though we
+modified it to send over the complete transformation matrix to give us angle in
+its pose as well.
 
-Create a new repository on github.com while
-specifying the newly forked template repository as
-a template for your new repository.
+### lane_follower
 
+This package implements the lane follower node, which uses a PID controller
+to follow the lane lines. We heavily modified the PID controller, though the
+original thing came from Justin Francis's code on eclass.
 
-### 3. Define dependencies
-
-List the dependencies in the files `dependencies-apt.txt` and
-`dependencies-py3.txt` (apt packages and pip packages respectively).
-
-
-### 4. Place your code
-
-Place your code in the directory `/packages/` of
-your new repository.
-
-
-### 5. Setup launchers
-
-The directory `/launchers` can contain as many launchers (launching scripts)
-as you want. A default launcher called `default.sh` must always be present.
-
-If you create an executable script (i.e., a file with a valid shebang statement)
-a launcher will be created for it. For example, the script file 
-`/launchers/my-launcher.sh` will be available inside the Docker image as the binary
-`dt-launcher-my-launcher`.
-
-When launching a new container, you can simply provide `dt-launcher-my-launcher` as
-command.
+This node also contains our custom state machines and sensor fusion. We pretty
+much wrote the entire lab in this one file.
