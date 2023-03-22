@@ -11,4 +11,5 @@
   ],
   "terminal.integrated.cwd": "lab4/ucb_player2",
   "python.formatting.provider": "autopep8",
+  "ros.distro": "noetic",
 }
