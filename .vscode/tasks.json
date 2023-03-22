@@ -6,9 +6,9 @@
     {
       "label": "Local Build",
       "type": "shell",
-      "command": "docker build -t duckietown/ucb_player2:latest-arm64v8 .",
+      "command": "docker build -t duckietown/mallardvision:latest-arm64v8 .",
       "options": {
-        "cwd": "${workspaceFolder}/lab4/ucb_player2",
+        "cwd": "${workspaceFolder}/lab5/mallardvision",
       },
       "group": {
         "kind": "build",
@@ -24,7 +24,7 @@
       "type": "shell",
       "command": "dts devel run",
       "options": {
-        "cwd": "${workspaceFolder}/lab4/ucb_player2"
+        "cwd": "${workspaceFolder}/lab5/mallardvision"
       },
       "group": {
         "kind": "test",
@@ -41,9 +41,9 @@
     {
       "label": "Remote Build",
       "type": "shell",
-      "command": "docker -H ${input:bot}.local build -t duckietown/ucb_player2:latest-arm64v8 .",
+      "command": "docker -H ${input:bot}.local build -t duckietown/mallardvision:latest-arm64v8 .",
       "options": {
-        "cwd": "${workspaceFolder}/lab4/ucb_player2"
+        "cwd": "${workspaceFolder}/lab5/mallardvision"
       },
       "group": {
         "kind": "build",
@@ -59,7 +59,7 @@
       "type": "shell",
       "command": "dts devel run -H ${input:bot}.local",
       "options": {
-        "cwd": "${workspaceFolder}/lab4/ucb_player2"
+        "cwd": "${workspaceFolder}/lab5/mallardvision"
       },
       "group": {
         "kind": "test",

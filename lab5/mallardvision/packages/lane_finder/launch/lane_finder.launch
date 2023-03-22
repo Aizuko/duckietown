@@ -1,0 +1,23 @@
+
+<!--
+AR vision node for segmenting out the lines
+-->
+<launch>
+    <arg name="veh" doc="Name of vehicle. ex: megaman"/>
+
+    <group ns="$(arg veh)">
+        <node pkg="lane_finder"
+                type="lane_finder_node.py"
+                name="lane_finder_node"
+                output="screen" >
+            <param name="veh" value="$(arg veh)" />
+        </node>
+
+        <!-- <node pkg="lane_finder"
+                type="homography_publisher_node.py"
+                name="homography_publisher"
+                output="screen" >
+            <param name="veh" value="$(arg veh)" />
+        </node> -->
+    </group>
+</launch>
