@@ -6,7 +6,6 @@ import numpy as np
 import rospy
 from cv_bridge import CvBridge
 from duckietown.dtros import DTROS, NodeType
-from duckietown_msgs.msg import LEDPattern
 from geometry_msgs.msg import Quaternion, Transform, TransformStamped, Vector3
 from image_geometry import PinholeCameraModel
 from sensor_msgs.msg import CameraInfo, CompressedImage
@@ -23,6 +22,7 @@ class MallardEyeNode(DTROS):
 
         self.hostname = rospy.get_param("~veh")
         self.bridge = CvBridge()
+        self.weights = np.load("/weights.npy", allow_pickle=True)
 
         self.serv = rospy.Service(
             "mallard_eyedentification", MallardEyedentify, self.identify

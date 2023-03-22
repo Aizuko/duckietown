@@ -76,8 +76,8 @@ RUN dt-install-launchers "${LAUNCH_PATH}"
 # define default command
 CMD ["bash", "-c", "dt-launcher-${DT_LAUNCHER}"]
 
-# copy the maps
-# COPY ./maps /tmp/maps
+# copy the weights
+COPY ./weights/weights.npy /weights.npy
 
 # store module metadata
 LABEL org.duckietown.label.module.type="${REPO_NAME}" \
