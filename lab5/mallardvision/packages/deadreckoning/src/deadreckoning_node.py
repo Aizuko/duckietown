@@ -7,12 +7,21 @@ import message_filters
 import numpy as np
 import rospy
 from duckietown.dtros import DTROS, NodeType
-from duckietown_msgs.msg import WheelEncoderStamped
-from geometry_msgs.msg import Point, Pose, Quaternion, Transform, TransformStamped, Twist, Vector3
+from duckietown_msgs.msg import Twist2DStamped, WheelEncoderStamped
+from geometry_msgs.msg import (
+    Point,
+    Pose,
+    Quaternion,
+    Transform,
+    TransformStamped,
+    Twist,
+    Vector3,
+)
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Header
 from tf import transformations as tr
 from tf2_ros import StaticTransformBroadcaster, TransformBroadcaster
+from mallard_eye.srv import MallardEyedentify, MallardEyedentifyResponse
 
 
 class DeadReckoningNode(DTROS):
@@ -47,11 +56,9 @@ class DeadReckoningNode(DTROS):
     """
 
     def __init__(self, node_name):
-        super(
-            DeadReckoningNode,
-            self).__init__(
-            node_name=node_name,
-            node_type=NodeType.LOCALIZATION)
+        super(DeadReckoningNode, self).__init__(
+            node_name=node_name, node_type=NodeType.LOCALIZATION
+        )
         self.node_name = node_name
 
         self.veh = rospy.get_param("~veh")
@@ -90,16 +97,15 @@ class DeadReckoningNode(DTROS):
 
         # Setup subscribers
         self.sub_encoder_left = message_filters.Subscriber(
-            "~left_wheel", WheelEncoderStamped)
+            "~left_wheel", WheelEncoderStamped
+        )
 
         self.sub_encoder_right = message_filters.Subscriber(
-            "~right_wheel", WheelEncoderStamped)
+            "~right_wheel", WheelEncoderStamped
+        )
 
         self.sub_teleport = rospy.Subscriber(
-            "~teleport",
-            Transform,
-            self.cb_teleport,
-            queue_size=1
+            "~teleport", Transform, self.cb_teleport, queue_size=1
         )
 
         # Setup the time synchronizer
@@ -109,10 +115,16 @@ class DeadReckoningNode(DTROS):
         self.ts_encoders.registerCallback(self.cb_ts_encoders)
 
         # Setup publishers
+        self.is_stopped = False
         self.pub = rospy.Publisher("~odom", Odometry, queue_size=10)
 
+        self.classify = rospy.ServiceProxy(
+            f"/{self.hostname}/mallard_eye/mallard_eyedentification",
+            MallardEyedentify,
+        )
+
         # Setup timer
-        self.timer = rospy.Timer(rospy.Duration(1/4), self.cb_timer)
+        self.timer = rospy.Timer(rospy.Duration(1 / 4), self.cb_timer)
         self._print_time = 0
         self._print_every_sec = 30
         # tf broadcaster for odometry TF
@@ -238,28 +250,42 @@ class DeadReckoningNode(DTROS):
         rospy.loginfo(
             f"Teleporting to {self.x:.2f}, {self.y:.2f}, {self.z:.2f}"
         )
-        self.q = np.array([
-            transform.rotation.x,
-            transform.rotation.y,
-            transform.rotation.z,
-            transform.rotation.w
-        ])
+        self.q = np.array(
+            [
+                transform.rotation.x,
+                transform.rotation.y,
+                transform.rotation.z,
+                transform.rotation.w,
+            ]
+        )
+
+        if transform.rotation.z < 0.10:
+            self.is_stopped = True
+            nb_class = self.classify(1)
+            print(f"Found {nb_class}!")
+            self.is_stopped = False
+
         self.yaw = tr.euler_from_quaternion(self.q)[2]
         self.timestamp = rospy.Time.now()
 
     def publish_odometry(self):
         odom = Odometry()
+
         odom.header.stamp = rospy.Time.now()  # Ideally, should be encoder time
         odom.header.frame_id = self.origin_frame
         odom.pose.pose = Pose(
-            Point(
-                self.x, self.y, self.z), Quaternion(
-                *self.q))
+            Point(self.x, self.y, self.z), Quaternion(*self.q)
+        )
         odom.child_frame_id = self.target_frame
-        odom.twist.twist = Twist(
-            Vector3(
-                self.tv, 0.0, 0.0), Vector3(
-                0.0, 0.0, self.rv))
+
+        if not self.is_stopped:
+            odom.twist.twist = Twist(
+                Vector3(self.tv, 0.0, 0.0), Vector3(0.0, 0.0, self.rv)
+            )
+        else:
+            odom.twist.twist = Twist(
+                Vector3(0.0, 0.0, 0.0), Vector3(0.0, 0.0, 0.0)
+            )
 
         self.pub.publish(odom)
 
@@ -269,7 +295,7 @@ class DeadReckoningNode(DTROS):
                 child_frame_id=self.target_frame,
                 transform=Transform(
                     translation=Vector3(self.x, self.y, self.z),
-                    rotation=Quaternion(*self.q)
+                    rotation=Quaternion(*self.q),
                 ),
             )
         )
@@ -280,17 +306,18 @@ class DeadReckoningNode(DTROS):
             q = tr.quaternion_from_euler(
                 apriltag["yaw"] * np.pi,
                 apriltag["pitch"] * np.pi,
-                apriltag["roll"] * np.pi
+                apriltag["roll"] * np.pi,
             )
             transform = TransformStamped(
                 header=Header(
-                    stamp=rospy.Time.now(),
-                    frame_id=self.origin_frame
+                    stamp=rospy.Time.now(), frame_id=self.origin_frame
                 ),
                 child_frame_id=f"at_{apriltag['id']}_static",
                 transform=Transform(
-                    translation=Vector3(apriltag["x"], apriltag["y"], apriltag["z"]),
-                    rotation=Quaternion(*q)
+                    translation=Vector3(
+                        apriltag["x"], apriltag["y"], apriltag["z"]
+                    ),
+                    rotation=Quaternion(*q),
                 ),
             )
             transforms.append(transform)
@@ -299,14 +326,12 @@ class DeadReckoningNode(DTROS):
         transforms.append(
             TransformStamped(
                 header=Header(
-                    stamp=rospy.Time.now(),
-                    frame_id=self.target_frame
+                    stamp=rospy.Time.now(), frame_id=self.target_frame
                 ),
                 child_frame_id=f"{self.veh}/footprint",
                 transform=Transform(
-                    translation=Vector3(0, 0, 0),
-                    rotation=Quaternion(*q)
-                )
+                    translation=Vector3(0, 0, 0), rotation=Quaternion(*q)
+                ),
             )
         )
         self._tf_static_broadcaster.sendTransform(transforms)
