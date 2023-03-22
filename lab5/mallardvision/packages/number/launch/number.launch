@@ -1,0 +1,13 @@
+<launch>
+  <arg name="veh"/>
+  <arg name="map_file" default="hub"/>
+  <group ns="$(arg veh)">
+    <node pkg="number"
+        type="number_node.py"
+        name="number"
+        output="screen">
+      <param name="veh" value="$(arg veh)"/>
+    </node>
+  </group>
+
+</launch>
