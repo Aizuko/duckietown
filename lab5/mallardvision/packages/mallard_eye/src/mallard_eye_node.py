@@ -24,53 +24,13 @@ To help you with that, we have provided you with the Renderer class that render 
 """
 
 
-class NumberNode(DTROS):
+class MallardEyeNode(DTROS):
     def __init__(self, node_name):
-        super(NumberNode, self).__init__(node_name=node_name,
+        super(MallardEyeNode, self).__init__(node_name=node_name,
                                            node_type=NodeType.GENERIC)
 
         self.hostname = rospy.get_param("~veh")
         self.bridge = CvBridge()
-
-        self.camera_model = PinholeCameraModel()
-        self.raw_image = None
-
-        # Standard subscribers and publishers
-        self.img_pub = rospy.Publisher(
-            '~compressed',
-            CompressedImage,
-            queue_size=1
-        )
-
-        self.led_pattern_pub = rospy.Publisher(
-            f'/{self.hostname}/led_emitter_node/led_pattern',
-            LEDPattern,
-            queue_size=1,
-        )
-
-        self.pub_teleport = rospy.Publisher(
-            f"/{self.hostname}/deadreckoning_node/teleport",
-            Transform,
-            queue_size=1
-        )
-
-        self.compressed_sub = rospy.Subscriber(
-            f'/{self.hostname}/camera_node/image/compressed',
-            CompressedImage,
-            self.cb_compressed,
-            queue_size=1,
-        )
-
-        self.camera_info_sub = rospy.Subscriber(
-            f"/{self.hostname}/camera_node/camera_info",
-            CameraInfo,
-            self.cb_camera_info,
-            queue_size=1,
-        )
-
-        self.tf_broadcaster = TransformBroadcaster()
-        self.tf_buffer = Buffer()
-        self.tf_listener = TransformListener(self.tf_buffer)
 
     def process_image(self, raw):
         """Undistorts raw images.
@@ -85,14 +45,6 @@ class NumberNode(DTROS):
 
     def cb_compressed(self, compressed):
         self.raw_image = self.bridge.compressed_imgmsg_to_cv2(compressed)
-
-
-    def rectify(self, image):
-        """Undistorts raw images.
-        """
-        rectified = np.zeros_like(image)
-        self.camera_model.rectifyImage(image, rectified)
-        return rectified
 
     def run(self, rate=3):
         rate = rospy.Rate(rate)
@@ -118,9 +70,9 @@ class NumberNode(DTROS):
             rate.sleep()
 
     def onShutdown(self):
-        super(NumberNode, self).onShutdown()
+        super(MallardEyeNode, self).onShutdown()
 
 
 if __name__ == '__main__':
-    camera_node = NumberNode(node_name='number_node')
+    camera_node = MallardEyeNode(node_name='mallard_eye_node')
     camera_node.run(1)

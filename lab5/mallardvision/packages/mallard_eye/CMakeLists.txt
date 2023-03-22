@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(number)
+project(mallard_eye)
 
 find_package(catkin REQUIRED COMPONENTS
   rospy
