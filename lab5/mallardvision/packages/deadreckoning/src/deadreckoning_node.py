@@ -61,7 +61,7 @@ class DeadReckoningNode(DTROS):
         )
         self.node_name = node_name
 
-        self.veh = rospy.get_param("~veh")
+        self.hostname = self.veh = rospy.get_param("~veh")
         self.publish_hz = rospy.get_param("~publish_hz")
         self.encoder_stale_dt = rospy.get_param("~encoder_stale_dt")
         self.ticks_per_meter = rospy.get_param("~ticks_per_meter")
@@ -119,7 +119,7 @@ class DeadReckoningNode(DTROS):
         self.pub = rospy.Publisher("~odom", Odometry, queue_size=10)
 
         self.classify = rospy.ServiceProxy(
-            f"/{self.hostname}/mallard_eye/mallard_eyedentification",
+            f"/{self.hostname}/mallard_eyedentification",
             MallardEyedentify,
         )
 
@@ -152,7 +152,7 @@ class DeadReckoningNode(DTROS):
         dtl = left_encoder.header.stamp - self.left_encoder_last.header.stamp
         dtr = right_encoder.header.stamp - self.right_encoder_last.header.stamp
         if dtl.to_sec() < 0 or dtr.to_sec() < 0:
-            self.loginfo("Ignoring stale encoder message")
+            #self.loginfo("Ignoring stale encoder message")
             if self.reading_bag:
                 self.left_encoder_last = None
             return
@@ -259,11 +259,16 @@ class DeadReckoningNode(DTROS):
             ]
         )
 
-        if transform.rotation.z < 0.10:
+        if transform.rotation.z < 0.40:
             self.is_stopped = True
+            rospy.loginfo("Starting mallard eye")
             nb_class = self.classify(1)
+            print("==================")
             print(f"Found {nb_class}!")
+            print("==================")
             self.is_stopped = False
+        else:
+            rospy.loginfo(f"Not using mallard eye for depth {transform.rotation.z}")
 
         self.yaw = tr.euler_from_quaternion(self.q)[2]
         self.timestamp = rospy.Time.now()

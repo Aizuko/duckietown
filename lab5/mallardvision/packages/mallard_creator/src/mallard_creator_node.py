@@ -26,20 +26,20 @@ class MallardCreateNode(DTROS):
         self.last_time = time.time()
 
         self.sub_comp = rospy.Subscriber(
-            f'/{self.hostname}/camera_node/image/camera_compressed',
+            f'/{self.hostname}/camera_node/image/compressed',
             CompressedImage,
             self.callback_image,
+            queue_size=1,
         )
 
         rospy.loginfo("Started recording")
 
     def callback_image(self, compressed):
-        rospy.loginfo("Recieved a message")
-        if time.time() - self.last_time > 4:
+        if time.time() - self.last_time > 1:
             self.raw_image = self.bridge.compressed_imgmsg_to_cv2(compressed)
-            cv.imwrite(f'/data/custom_data/{int(time.time())}.jpeg', self.raw_image)
+            p = cv.imwrite(f'/data/custom_data/{int(time.time())}.jpeg', self.raw_image)
             self.last_time = time.time()
-            rospy.loginfo("wrote an image")
+            rospy.loginfo(f"wrote an image, with return val {p}")
 
 
 if __name__ == "__main__":

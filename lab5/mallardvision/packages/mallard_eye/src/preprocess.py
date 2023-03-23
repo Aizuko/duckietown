@@ -51,6 +51,7 @@ def warp_image(image: np.ndarray):
     Returns:
         image_mask: warped image of the digit
     """
+    print("Staring warpd")
     params = {
         "low_hsv_blue": (100, 80, 80),
         "high_hsv_blue": (110, 255, 255),
