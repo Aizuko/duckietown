@@ -59,7 +59,7 @@ def warp_image(image: np.ndarray, visualization_path: Path = None):
         "low_hsv_blue": (100, 80, 80),
         "high_hsv_blue": (110, 255, 255),
         "low_hsv_black": (0, 0, 0),
-        "high_hsv_black": (180, 255, 80),
+        "high_hsv_black": (180, 255, 90),
         "min_note_corner_area_blue": 100
     }
 
