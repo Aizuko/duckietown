@@ -44,12 +44,13 @@ def get_corners(
     return corners
 
 
-def warp_image(image: np.ndarray):
+def warp_image(image: np.ndarray, visualization_path: Path = None):
     """
     Warp the image to obtain a 28x28 mask of the digit.
 
     Args:
         image: raw image
+        visualization_path: path to save the visualization
 
     Returns:
         image_mask: warped image of the digit
@@ -67,6 +68,9 @@ def warp_image(image: np.ndarray):
         image_hsv,
         params["low_hsv_blue"],
         params["high_hsv_blue"])
+    if visualization_path is not None:
+        cv.imwrite(str(visualization_path / "mask1.png"), image_mask)
+
     contours, _ = cv.findContours(
         image_mask, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
     contours = [contour for contour in contours if cv.contourArea(
@@ -79,9 +83,26 @@ def warp_image(image: np.ndarray):
         contours,
         key=lambda x: cv.contourArea(x),
         reverse=True)[0]
+    if visualization_path is not None:
+        image_copy = image.copy()
+        cv.drawContours(
+            image_copy, [largest_contour], -1, (0, 255, 255), 2)
+        cv.imwrite(str(visualization_path / "contour.png"), image_copy)
+
     convex_hull = cv.convexHull(largest_contour)
+    if visualization_path is not None:
+        image_copy = image.copy()
+        cv.drawContours(
+            image_copy, [convex_hull], -1, (0, 255, 255), 2)
+        cv.imwrite(str(visualization_path / "convex_hull.png"), image_copy)
 
     corners = get_corners(convex_hull)
+    if visualization_path is not None:
+        image_copy = image.copy()
+        cv.drawContours(
+            image_copy, [corners], -1, (0, 255, 255), 2)
+        cv.imwrite(str(visualization_path / "corners.png"), image_copy)
+
     if corners is None:
         print("warning: not 4 corners found")
         return
@@ -94,6 +115,9 @@ def warp_image(image: np.ndarray):
     H = cv.getPerspectiveTransform(corners, warped_corners)
 
     image_warped = cv.warpPerspective(image, H, (28, 28))
+
+    if visualization_path is not None:
+        cv.imwrite(str(visualization_path / "warp.png"), image_warped)
 
     image_hsv = cv.cvtColor(image_warped, cv.COLOR_BGR2HSV)
     image_mask = cv.inRange(
