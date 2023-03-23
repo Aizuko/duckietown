@@ -7,7 +7,6 @@ import rospy
 from cv_bridge import CvBridge
 from dt_apriltags import Detection, Detector
 from duckietown.dtros import DTROS, NodeType
-from duckietown_msgs.msg import LEDPattern
 from geometry_msgs.msg import Quaternion, Transform, TransformStamped, Vector3
 from image_geometry import PinholeCameraModel
 from sensor_msgs.msg import CameraInfo, CompressedImage
@@ -52,12 +51,6 @@ class AprilTagNode(DTROS):
             '~compressed',
             CompressedImage,
             queue_size=1
-        )
-
-        self.led_pattern_pub = rospy.Publisher(
-            f'/{self.hostname}/led_emitter_node/led_pattern',
-            LEDPattern,
-            queue_size=1,
         )
 
         self.pub_teleport = rospy.Publisher(
@@ -144,46 +137,6 @@ class AprilTagNode(DTROS):
                 bgr,
                 font_thickness
             )
-
-    def get_led_color(self, detections: List[Detection]):
-        white = (255, 255, 255)
-        priority_tag = None
-        for detection in detections:
-            tag = TAG_ID_TO_TAG.get(
-                detection.tag_id, Tag(
-                    detection.tag_id, None))
-            if tag is None:
-                rospy.logwarn(f"Unknown tag id: {tag.tag_id}")
-                continue
-            if tag.type is TagType.StopSign:
-                priority_tag = tag
-                break
-            if tag.type is TagType.TIntersection:
-                priority_tag = tag
-            elif tag.type is TagType.UofA and priority_tag is None:
-                priority_tag = tag
-
-        return priority_tag.color if priority_tag else white
-
-    def create_led_message(self, colors: 'List[float]') -> 'LEDPattern':
-        """ Creates an led message with the colors set to values from a tuple
-
-        Args:
-            colors (list[float]): RGB values from 0 to 255
-        """
-        led_message = LEDPattern()
-        for i in range(5):
-            rgba = ColorRGBA()
-            if 3 <= i <= 4:
-                rgba.r = colors[0] / 255
-                rgba.g = colors[1] / 255
-                rgba.b = colors[2] / 255
-                rgba.a = 1.0
-            else:
-                rgba.r = rgba.g = rgba.b = rgba.a = 0.0
-
-            led_message.rgb_vals.append(rgba)
-        return led_message
 
     def rectify(self, image):
         """Undistorts raw images.
@@ -295,13 +248,10 @@ class AprilTagNode(DTROS):
             for detection in detections:
                 self.render_tag(image, detection)
             self.broadcast_transforms(detections)
-            color = self.get_led_color(detections)
             message = self.bridge.cv2_to_compressed_imgmsg(
                 image, dst_format="jpeg"
             )
             self.img_pub.publish(message)
-            led_message = self.create_led_message(color)
-            self.led_pattern_pub.publish(led_message)
             rate.sleep()
 
     def onShutdown(self):
