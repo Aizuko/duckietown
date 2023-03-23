@@ -78,10 +78,16 @@ def main(argv=None):
         help='input batch size for testing (default: 1000)')
     parser.add_argument('--epochs', type=int, default=14, metavar='N',
                         help='number of epochs to train (default: 14)')
+    parser.add_argument('--fine_tune_epochs', type=int, default=28, metavar='N',
+                        help='number of epochs to fine tune (default: 14)')
     parser.add_argument('--lr', type=float, default=1.0, metavar='LR',
                         help='learning rate (default: 1.0)')
+    parser.add_argument('--fine_tune_lr', type=int, default=0.1, metavar='N',
+                        help='fine tune learning rate (default: 1.0)')
     parser.add_argument('--gamma', type=float, default=0.7, metavar='M',
                         help='Learning rate step gamma (default: 0.7)')
+    parser.add_argument('--fine_tune_gamma', type=float, default=0.7, metavar='M',
+                        help='fine tune learning rate step gamma (default: 0.7)')
     parser.add_argument('--no-cuda', action='store_true', default=False,
                         help='disables CUDA training')
     parser.add_argument('--no-mps', action='store_true', default=False,
@@ -141,16 +147,41 @@ def main(argv=None):
         test(model, device, test_loader)
         scheduler.step()
 
+    # fine tune on custom dataset
+    transform = transforms.Compose([
+        transforms.Grayscale(),
+        transforms.ToTensor(),
+        transforms.Normalize((0.1307,), (0.3081,))
+    ])
+    custom_dataset = datasets.folder.ImageFolder(
+        root='data/processed_data', transform=transform
+    )
+    train_size = int(0.8 * len(custom_dataset))
+    test_size = len(custom_dataset) - train_size
+    custom_train_dataset, custom_test_dataset = torch.utils.data.random_split(
+        custom_dataset, [train_size, test_size])
+
+    custom_train_loader = torch.utils.data.DataLoader(
+        custom_train_dataset, batch_size=args.batch_size, shuffle=True)
+    custom_test_loader = torch.utils.data.DataLoader(
+        custom_test_dataset, batch_size=args.test_batch_size, shuffle=True)
+
+    optimizer = optim.Adadelta(model.parameters(), lr=args.fine_tune_lr)
+
+    scheduler = StepLR(optimizer, step_size=1, gamma=args.fine_tune_gamma)
+    for epoch in range(1, args.fine_tune_epochs + 1):
+        train(args, model, device, custom_train_loader, optimizer, epoch)
+        test(model, device, custom_test_loader)
+        scheduler.step()
+
     if args.save_model:
-        torch.save(model.state_dict(), "mnist_cnn.pt")
+        torch.save(model.state_dict(), "model.pt")
 
-
-def save_weights():
-    weights = torch.load("mnist_cnn.pt")
+    # save weights as numpy array
+    weights = model.state_dict()
     weights = {k: v.cpu().numpy() for k, v in weights.items()}
     np.save("weights.npy", weights)
 
 
 if __name__ == '__main__':
-    main(['--save-model'])
-    save_weights()
+    main([])

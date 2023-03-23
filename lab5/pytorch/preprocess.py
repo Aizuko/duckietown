@@ -104,7 +104,7 @@ def warp_image(image: np.ndarray):
     return image_mask
 
 
-def preprocess(image: np.ndarray):
+def preprocess_image(image: np.ndarray):
     """
     Remove 2px from the left and right borders.
 
@@ -119,7 +119,7 @@ def preprocess(image: np.ndarray):
     return image
 
 
-def normalize(image: np.ndarray):
+def normalize_image(image: np.ndarray, mean=(0.1307,), std=(0.3081,)):
     """
     Normalize the image to be a float32 array between 0 and 1.
 
@@ -130,7 +130,9 @@ def normalize(image: np.ndarray):
         image: normalized image
     """
     image = image.astype(np.float32)
-    image /= image.max()
+    image /= 255
+    image -= mean
+    image /= std
     return image
 
 
@@ -150,7 +152,7 @@ def main():
         if image is None:
             print(f"warning: {read_path} not processed")
             continue
-        image = preprocess(image)
+        image = preprocess_image(image)
 
         # embed preprocessed image in debug image
         debug_image[:32, :32] = np.repeat(cv.resize(image, (32, 32))[
@@ -162,10 +164,9 @@ def main():
 
         # save preprocessed image
         write_path = PROCESSED_DATA_DIR / read_path.relative_to(
-            CUSTOM_DATA_DIR).with_suffix(".npy")
+            CUSTOM_DATA_DIR).with_suffix(".png")
         write_path.parent.mkdir(parents=True, exist_ok=True)
-        image = preprocess(image)
-        np.save(write_path, image)
+        cv.imwrite(str(write_path), image)
 
 
 if __name__ == "__main__":
