@@ -98,7 +98,7 @@ def warp_image(image: np.ndarray):
         params["low_hsv_black"],
         params["high_hsv_black"])
 
-    return image_mask
+    return image_mask, corners
 
 
 def preprocess_image(image: np.ndarray):
