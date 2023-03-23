@@ -85,6 +85,8 @@ class MallardEyeNode(DTROS):
         self.annotated_image = self.bridge.cv2_to_compressed_imgmsg(image_copy)
 
     def identify(self, _) -> MallardEyedentifyResponse:
+        if not self.is_camera_init:
+            return -3
         if self.compressed is not None:
             raw_image = self.bridge.compressed_imgmsg_to_cv2(self.compressed)
             rectified_image = np.zeros_like(raw_image)
