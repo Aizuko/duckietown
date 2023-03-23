@@ -166,6 +166,8 @@ def main(argv=None):
     custom_test_loader = torch.utils.data.DataLoader(
         custom_test_dataset, batch_size=args.test_batch_size, shuffle=True)
 
+    test(model, device, custom_test_loader)
+
     optimizer = optim.Adadelta(model.parameters(), lr=args.fine_tune_lr)
 
     scheduler = StepLR(optimizer, step_size=1, gamma=args.fine_tune_gamma)
