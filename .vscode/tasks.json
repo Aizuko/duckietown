@@ -57,7 +57,7 @@
     {
       "label": "Remote Test",
       "type": "shell",
-      "command": "dts devel run -H ${input:bot}.local",
+      "command": "docker run -h ${input:bot}.local -v /data:/data",
       "options": {
         "cwd": "${workspaceFolder}/lab5/mallardvision"
       },
@@ -80,8 +80,8 @@
     "description": "Bot hostname",
     "options": [
       "csc22902",
-      "csc22926",
+      "csc22927",
     ],
-    "default": "csc22926"
+    "default": "csc22927"
   },]
 }
