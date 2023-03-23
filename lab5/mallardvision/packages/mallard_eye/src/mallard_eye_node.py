@@ -1,17 +1,12 @@
 #!/usr/bin/env python3
-from typing import List
-
-import cv2
 import numpy as np
 import rospy
 from cv_bridge import CvBridge
 from duckietown.dtros import DTROS, NodeType
-from geometry_msgs.msg import Quaternion, Transform, TransformStamped, Vector3
-from image_geometry import PinholeCameraModel
-from sensor_msgs.msg import CameraInfo, CompressedImage
-from std_msgs.msg import ColorRGBA, Header
+from preprocess import warp_image, normalize_image, preprocess_image
+from nn import Net
 
-from led_controls.srv import MallardEyedentify, MallardEyedentifyResponse
+from mallard_eye.srv import MallardEyedentify, MallardEyedentifyResponse
 
 
 class MallardEyeNode(DTROS):
@@ -22,16 +17,30 @@ class MallardEyeNode(DTROS):
 
         self.hostname = rospy.get_param("~veh")
         self.bridge = CvBridge()
-        self.weights = np.load("/weights.npy", allow_pickle=True)
+        self.net = Net(weights_path="/weights.npy")
 
         self.serv = rospy.Service(
             "mallard_eyedentification", MallardEyedentify, self.identify
         )
         rospy.loginfo("Started led_control_service")
-        return
 
-    def identify(self, srv: MallardEyedentify) -> MallardEyedentifyResponse:
-        pass
+    def cb_compressed(self, compressed):
+        self.compressed = compressed
+
+    def identify(self, _: MallardEyedentify) -> MallardEyedentifyResponse:
+        raw_image = self.bridge.compressed_imgmsg_to_cv2(self.compressed)
+        rectified_image = np.zeros_like(raw_image)
+        image = self.camera_model.rectifyImage(raw_image, rectified_image)
+
+        image = warp_image(image)
+        if image is None:
+            return -1
+
+        image = preprocess_image(image)
+        x = normalize_image(image)
+
+        digit = self.net.predict(x)
+        return digit
 
     def onShutdown(self):
         super(MallardEyeNode, self).onShutdown()
