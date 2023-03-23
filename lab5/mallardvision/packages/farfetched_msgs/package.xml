@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <package>
-  <name>mallardvision_msgs</name>
+  <name>farfetched_msgs</name>
   <version>1.0.0</version>
   <description>TODO: Add a description of package `duckietown_msgs` in `package.xml`.</description>
 

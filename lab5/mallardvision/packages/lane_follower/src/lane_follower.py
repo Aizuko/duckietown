@@ -9,7 +9,7 @@ import yaml
 import sys
 from numpy import pi
 from duckietown.dtros import DTROS, NodeType
-from mallardvision_msgs.msg import MallardVisionPose
+from farfetched_msgs.msg import FarfetchedPose
 from duckietown_msgs.msg import WheelsCmdStamped, Twist2DStamped, Pose2DStamped
 from duckietown.dtros import DTROS, NodeType, TopicType
 from sensor_msgs.msg import CompressedImage
@@ -32,7 +32,7 @@ class LaneFollowerJasper(DTROS):
 
         self.sub = rospy.Subscriber(
             f"/{self.hostname}/lane_finder_node/pose",
-            MallardVisionPose,
+            FarfetchedPose,
             self.pose_cb,
         )
 
@@ -93,7 +93,7 @@ class LaneFollowerGradient(DTROS):
 
         self.sub = rospy.Subscriber(
             f"/{self.hostname}/lane_finder_node/pose",
-            MallardVisionPose,
+            FarfetchedPose,
             self.pose_cb,
         )
 
@@ -161,7 +161,7 @@ class LaneFollowerBasicsNode(DTROS):
 
         self.sub = rospy.Subscriber(
             f"/{self.hostname}/lane_finder_node/pose",
-            MallardVisionPose,
+            FarfetchedPose,
             self.pose_cb,
         )
 
@@ -288,7 +288,7 @@ class LaneFollowerPIDNode(DTROS):
 
         self.sub = rospy.Subscriber(
             f"/{self.hostname}/lane_finder_node/pose",
-            MallardVisionPose,
+            FarfetchedPose,
             self.pose_cb_test,
             queue_size=1
         )

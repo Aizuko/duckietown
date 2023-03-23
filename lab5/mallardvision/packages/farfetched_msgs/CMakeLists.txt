@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(mallardvision_msgs)
+project(farfetched_msgs)
 
 find_package(catkin REQUIRED COMPONENTS
   roscpp
@@ -16,7 +16,7 @@ find_package(catkin REQUIRED COMPONENTS
 ## Generate messages in the 'msg' folder
 add_message_files(
   FILES
-  MallardVisionPose.msg
+  FarfetchedPose.msg
   #AprilTagDetection.msg
   #AprilTagDetectionArray.msg
   #AprilTagsWithInfos.msg
@@ -116,7 +116,6 @@ generate_messages(
 
 catkin_package(
 #  INCLUDE_DIRS include
-#  LIBRARIES mallardvision_msgs   # Maybe uncomment this?
    CATKIN_DEPENDS
    #geometry_msgs
    roscpp rospy

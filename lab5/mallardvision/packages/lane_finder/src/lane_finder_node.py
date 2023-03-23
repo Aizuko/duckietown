@@ -10,7 +10,7 @@ import rospy
 import yaml
 from lane_finder_tools import Augmenter
 from cv_bridge import CvBridge
-from mallardvision_msgs.msg import MallardVisionPose
+from farfetched_msgs.msg import FarfetchedPose
 from duckietown.dtros import DTROS, NodeType, TopicType
 from duckietown_msgs.msg import LEDPattern
 from duckietown_msgs.srv import (
@@ -73,7 +73,7 @@ class LaneFinderNode(DTROS):
         # Setup publisher path ====
         self.pub_pose = rospy.Publisher(
             f"/{self.hostname}/lane_finder_node/pose",
-            MallardVisionPose,
+            FarfetchedPose,
             queue_size=2,
         )
 
@@ -186,7 +186,7 @@ class LaneFinderNode(DTROS):
                 )
                 self.pub_yellow.publish(msg)
 
-                pmsg = MallardVisionPose()
+                pmsg = FarfetchedPose()
                 pmsg.horizontal_target_err = int(self.horizontal_target_err)
                 pmsg.is_yellow_detected = True
 
