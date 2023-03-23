@@ -33,25 +33,18 @@ class MallardEyeNode(DTROS):
     def cb_compressed(self, compressed):
         self.compressed = compressed
 
-    def identify(self, _: MallardEyedentify) -> MallardEyedentifyResponse:
-        raw_image = self.bridge.compressed_imgmsg_to_cv2(self.compressed)
-        rectified_image = np.zeros_like(raw_image)
-        image = self.camera_model.rectifyImage(raw_image, rectified_image)
-
-        image_warped, corners = warp_image(image)
-        if image_warped is None:
-            return -1
-
+    def publish_compressed(
+        self,
+        image: np.ndarray,
+        image_warped: np.ndarray,
+        corners: np.ndarray,
+        digit: int,
+    ):
         image_copy = image.copy()
-        image_copy[:64, :64] = cv.resize(image_warped, (64, 64))
-        image_copy.drawContours(
-            [corners], -1, (0, 255, 255), 2
+        image_copy[:64, :64] = np.repeat(
+            cv.resize(image_warped, (32, 32))[:, :, np.newaxis], 3, axis=2
         )
-
-        image_warped = preprocess_image(image_warped)
-        x = normalize_image(image_warped)
-
-        digit = self.net.predict(x)
+        image_copy.drawContours([corners], -1, (0, 255, 255), 2)
 
         cv.putText(
             image_copy,
@@ -64,6 +57,21 @@ class MallardEyeNode(DTROS):
         )
         msg = self.bridge.cv2_to_compressed_imgmsg(image_copy)
         self.pub.publish(msg)
+
+    def identify(self, _: MallardEyedentify) -> MallardEyedentifyResponse:
+        raw_image = self.bridge.compressed_imgmsg_to_cv2(self.compressed)
+        rectified_image = np.zeros_like(raw_image)
+        image = self.camera_model.rectifyImage(raw_image, rectified_image)
+
+        image_warped, corners = warp_image(image)
+        if image_warped is None:
+            return -1
+
+        image_warped = preprocess_image(image_warped)
+        x = normalize_image(image_warped)
+
+        digit = self.net.predict(x)
+        self.publish_compressed(image, image_warped, corners, digit)
 
         return digit
 
