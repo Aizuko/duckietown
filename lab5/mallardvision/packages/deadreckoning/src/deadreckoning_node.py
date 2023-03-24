@@ -270,6 +270,15 @@ class DeadReckoningNode(DTROS):
 
         if self.distance_from_ap < 0.40:
             self.is_stopped = True
+
+            # Whoa, a comment!
+            r = rospy.Rate(1/5)  # Sleep for 5s
+            for _ in range(10):
+                self.publish_odometry()
+            print(f"Going to sleep {time.time()}")
+            r.sleep()
+            print(f"Woken up! {time.time()}")
+
             rospy.loginfo("Starting mallard eye")
             nb_class = self.classify(1)
             print("==================")
@@ -292,6 +301,7 @@ class DeadReckoningNode(DTROS):
         )
         odom.child_frame_id = self.target_frame
 
+        print(f"State of stopped: {self.is_stopped}")
         if not self.is_stopped:
             odom.twist.twist = Twist(
                 Vector3(self.tv, 0.0, 0.0), Vector3(0.0, 0.0, self.rv)

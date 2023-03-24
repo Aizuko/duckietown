@@ -27,7 +27,7 @@ def get_corners(
         else:
             left_epsilon = epsilon
     else:
-        return
+        return None
 
     corners = corners.squeeze()
 
@@ -71,7 +71,7 @@ def warp_image(image: np.ndarray):
         contour) > params["min_note_corner_area_blue"]]
     if len(contours) < 1:
         print("warning: no contours found")
-        return
+        return None, None
 
     largest_contour = sorted(
         contours,
@@ -82,7 +82,7 @@ def warp_image(image: np.ndarray):
     corners = get_corners(convex_hull)
     if corners is None:
         print("warning: not 4 corners found")
-        return
+        return None, None
 
     corners = corners.astype(np.float32)
     warped_corners = np.array(
