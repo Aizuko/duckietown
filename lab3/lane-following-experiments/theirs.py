@@ -71,7 +71,7 @@ cv.createTrackbar(high_V_name, window_detection_name , high_V, max_value, on_hig
 if __name__ == "__main__":
     #ret, frame = cap.read()
     while True:
-        frame = cv.imread('1677789529.png')
+        frame = cv.imread('3.png')
 
         frame_HSV = cv.cvtColor(frame, cv.COLOR_BGR2HSV)
         frame_threshold = cv.inRange(frame_HSV, (low_H, low_S, low_V), (high_H, high_S, high_V))

@@ -10,7 +10,7 @@ from duckietown.dtros import DTROS, NodeType
 from geometry_msgs.msg import Quaternion, Transform, TransformStamped, Vector3
 from image_geometry import PinholeCameraModel
 from sensor_msgs.msg import CameraInfo, CompressedImage
-from std_msgs.msg import ColorRGBA, Header
+from std_msgs.msg import ColorRGBA, Header, Float64
 from tag import TAG_ID_TO_TAG, Tag, TagType
 from tf import transformations as tr
 from tf2_ros import Buffer, ConnectivityException, TransformBroadcaster, TransformListener
@@ -56,6 +56,12 @@ class AprilTagNode(DTROS):
         self.pub_teleport = rospy.Publisher(
             f"/{self.hostname}/deadreckoning_node/teleport",
             Transform,
+            queue_size=1
+        )
+
+        self.pub_ap_distance = rospy.Publisher(
+            f"/{self.hostname}/deadreckoning_node/ap_distance",
+            Float64,
             queue_size=1
         )
 
@@ -155,6 +161,7 @@ class AprilTagNode(DTROS):
             T_at_camera[:3, 3] = detection.pose_t.flatten()
             translation = tr.translation_from_matrix(T_at_camera)
             distance = np.linalg.norm(translation, 2)
+
             q = tr.quaternion_from_matrix(T_at_camera)
             transform = Transform(
                 translation=Vector3(*translation),
@@ -176,6 +183,8 @@ class AprilTagNode(DTROS):
         self.tf_broadcaster.sendTransform(transforms)
 
         if closest_tag_id is not None:
+            self.pub_ap_distance.publish(min_distance)
+
             try:
                 transform_odometry_at = self.tf_buffer.lookup_transform(
                     f"at_{closest_tag_id}",

@@ -18,7 +18,7 @@ from geometry_msgs.msg import (
     Vector3,
 )
 from nav_msgs.msg import Odometry
-from std_msgs.msg import Header
+from std_msgs.msg import Header, ColorRGBA, Header, Float64
 from tf import transformations as tr
 from tf2_ros import StaticTransformBroadcaster, TransformBroadcaster
 from mallard_eye.srv import MallardEyedentify, MallardEyedentifyResponse
@@ -76,6 +76,7 @@ class DeadReckoningNode(DTROS):
         self.right_encoder_last = None
         self.encoders_timestamp_last = None
         self.encoders_timestamp_last_local = None
+        self.distance_from_ap = 1000
 
         # Current pose, forward velocity, and angular rate
         self.timestamp = None
@@ -108,6 +109,11 @@ class DeadReckoningNode(DTROS):
             "~teleport", Transform, self.cb_teleport, queue_size=1
         )
 
+        self.sub_teleport = rospy.Subscriber(
+            f"/{self.hostname}/deadreckoning_node/ap_distance",
+            Float64, self.cb_distance, queue_size=1
+        )
+
         # Setup the time synchronizer
         self.ts_encoders = message_filters.ApproximateTimeSynchronizer(
             [self.sub_encoder_left, self.sub_encoder_right], 10, 0.5
@@ -132,6 +138,9 @@ class DeadReckoningNode(DTROS):
         self._tf_static_broadcaster = StaticTransformBroadcaster()
         self.broadcast_static()
         self.loginfo("Initialized")
+
+    def cb_distance(self, distance):
+        self.distance_from_ap = distance.data
 
     def cb_ts_encoders(self, left_encoder, right_encoder):
         timestamp_now = rospy.get_time()
@@ -259,7 +268,7 @@ class DeadReckoningNode(DTROS):
             ]
         )
 
-        if transform.rotation.z < 0.40:
+        if self.distance_from_ap < 0.40:
             self.is_stopped = True
             rospy.loginfo("Starting mallard eye")
             nb_class = self.classify(1)

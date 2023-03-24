@@ -49,7 +49,7 @@ class MallardEyeNode(DTROS):
             queue_size=1,
         )
 
-        rospy.loginfo("Started mallard eye")
+        rospy.loginfo("Started mallard eye!")
 
     def cb_compressed(self, compressed):
         self.compressed = compressed
@@ -71,7 +71,7 @@ class MallardEyeNode(DTROS):
         image_copy[:64, :64] = np.repeat(
             cv.resize(image_warped, (64, 64))[:, :, np.newaxis], 3, axis=2
         )
-        image_copy.drawContours([corners], -1, (0, 255, 255), 2)
+        cv.drawContours(image_copy, [np.int64(corners)], -1, (0, 255, 255), 2)
 
         cv.putText(
             image_copy,

@@ -35,7 +35,7 @@ class MallardCreateNode(DTROS):
         rospy.loginfo("Started recording")
 
     def callback_image(self, compressed):
-        if time.time() - self.last_time > 1:
+        if time.time() - self.last_time > 0.2:
             self.raw_image = self.bridge.compressed_imgmsg_to_cv2(compressed)
             p = cv.imwrite(f'/data/custom_data/{int(time.time())}.jpeg', self.raw_image)
             self.last_time = time.time()

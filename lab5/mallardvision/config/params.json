@@ -1,0 +1,7 @@
+{
+  "default": {
+    "detection_dist": 0.4,
+
+    "placeholder": false
+  }
+}

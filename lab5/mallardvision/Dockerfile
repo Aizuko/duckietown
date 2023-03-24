@@ -79,6 +79,9 @@ CMD ["bash", "-c", "dt-launcher-${DT_LAUNCHER}"]
 # copy the weights
 COPY ./weights/weights.npy /weights.npy
 
+## copy the params
+COPY ./config/params.json /
+
 # store module metadata
 LABEL org.duckietown.label.module.type="${REPO_NAME}" \
     org.duckietown.label.module.description="${DESCRIPTION}" \
