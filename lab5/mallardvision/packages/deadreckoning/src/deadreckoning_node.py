@@ -109,11 +109,6 @@ class DeadReckoningNode(DTROS):
             "~teleport", Transform, self.cb_teleport, queue_size=1
         )
 
-        self.sub_teleport = rospy.Subscriber(
-            f"/{self.hostname}/deadreckoning_node/ap_distance",
-            Float64, self.cb_distance, queue_size=1
-        )
-
         # Setup the time synchronizer
         self.ts_encoders = message_filters.ApproximateTimeSynchronizer(
             [self.sub_encoder_left, self.sub_encoder_right], 10, 0.5
@@ -121,13 +116,7 @@ class DeadReckoningNode(DTROS):
         self.ts_encoders.registerCallback(self.cb_ts_encoders)
 
         # Setup publishers
-        self.is_stopped = False
         self.pub = rospy.Publisher("~odom", Odometry, queue_size=10)
-
-        self.classify = rospy.ServiceProxy(
-            f"/{self.hostname}/mallard_eyedentification",
-            MallardEyedentify,
-        )
 
         # Setup timer
         self.timer = rospy.Timer(rospy.Duration(1 / 4), self.cb_timer)
@@ -268,26 +257,6 @@ class DeadReckoningNode(DTROS):
             ]
         )
 
-        if self.distance_from_ap < 0.40:
-            self.is_stopped = True
-
-            # Whoa, a comment!
-            r = rospy.Rate(1/5)  # Sleep for 5s
-            for _ in range(10):
-                self.publish_odometry()
-            print(f"Going to sleep {time.time()}")
-            r.sleep()
-            print(f"Woken up! {time.time()}")
-
-            rospy.loginfo("Starting mallard eye")
-            nb_class = self.classify(1)
-            print("==================")
-            print(f"Found {nb_class}!")
-            print("==================")
-            self.is_stopped = False
-        else:
-            rospy.loginfo(f"Not using mallard eye for depth {transform.rotation.z}")
-
         self.yaw = tr.euler_from_quaternion(self.q)[2]
         self.timestamp = rospy.Time.now()
 
@@ -301,15 +270,9 @@ class DeadReckoningNode(DTROS):
         )
         odom.child_frame_id = self.target_frame
 
-        print(f"State of stopped: {self.is_stopped}")
-        if not self.is_stopped:
-            odom.twist.twist = Twist(
-                Vector3(self.tv, 0.0, 0.0), Vector3(0.0, 0.0, self.rv)
-            )
-        else:
-            odom.twist.twist = Twist(
-                Vector3(0.0, 0.0, 0.0), Vector3(0.0, 0.0, 0.0)
-            )
+        odom.twist.twist = Twist(
+            Vector3(self.tv, 0.0, 0.0), Vector3(0.0, 0.0, self.rv)
+        )
 
         self.pub.publish(odom)
 

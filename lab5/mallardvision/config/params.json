@@ -1,6 +1,10 @@
 {
   "default": {
-    "detection_dist": 0.4,
+    "detection_dist_min": 0.1,
+    "detection_dist_max": 0.4,
+    "velocity": 0.4,
+    "stop_time_duration": 3,
+
 
     "placeholder": false
   }

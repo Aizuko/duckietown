@@ -1,0 +1,7 @@
+x = Lateral
+y = Vertical (not needed)
+z = Depth (Not 1:1 at all)
+1
+
+x is negative when POV is to the right of the target. Target is to the left
+y is a vertica
