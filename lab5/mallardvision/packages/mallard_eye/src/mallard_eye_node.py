@@ -6,6 +6,7 @@ from cv_bridge import CvBridge
 from duckietown.dtros import DTROS, NodeType
 from mallard_eye.srv import MallardEyedentify, MallardEyedentifyResponse
 from sensor_msgs.msg import CompressedImage, CameraInfo
+from geometry_msgs.msg import Vector3
 from nn import Net
 from preprocess import normalize_image, preprocess_image, warp_image
 from image_geometry import PinholeCameraModel
@@ -24,6 +25,7 @@ class MallardEyeNode(DTROS):
         self.annotated_image = None
         self.compressed = None
         self.is_camera_init = False
+        self.ap_position = None
 
         self.pub = rospy.Publisher(
             f"/{self.hostname}/mallard_eye_node/image/compressed",
@@ -49,10 +51,20 @@ class MallardEyeNode(DTROS):
             queue_size=1,
         )
 
+        self.ap_position_sub = rospy.Subscriber(
+            f"/{self.hostname}/ap_node/ap_position",
+            Vector3,
+            self.cb_ap_position,
+            queue_size=1,
+        )
+
         rospy.loginfo("Started mallard eye!")
 
     def cb_compressed(self, compressed):
         self.compressed = compressed
+
+    def cb_ap_position(self, vec):
+        self.ap_position = [vec.x, vec.y, vec.z]
 
     def cb_camera_info(self, message):
         """Callback for the camera_node/camera_info topic."""
@@ -100,11 +112,9 @@ class MallardEyeNode(DTROS):
             x = normalize_image(image_warped)
 
             digit = self.net.predict(x)
-            rospy.loginfo("Starting a detection 10")
             self.set_compressed(rectified_image, image_warped, corners, digit)
-            rospy.loginfo("Starting a detection 11")
 
-            rospy.loginfo(f"Prediction: {digit}")
+            print(f"Apriltag position in world frame {self.ap_position}")
             return digit
         else:
             rospy.loginfo("Starting a detection -2")

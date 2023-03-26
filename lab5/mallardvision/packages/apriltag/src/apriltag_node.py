@@ -74,6 +74,12 @@ class AprilTagNode(DTROS):
             queue_size=1
         )
 
+        self.pub_ap_position = rospy.Publisher(
+            f"/{self.hostname}/ap_node/ap_position,
+            Vector3,
+            queue_size=1,
+        )
+
         self.compressed_sub = rospy.Subscriber(
             f'/{self.hostname}/camera_node/image/compressed',
             CompressedImage,
@@ -192,8 +198,6 @@ class AprilTagNode(DTROS):
         self.tf_broadcaster.sendTransform(transforms)
 
         if closest_tag_id is not None:
-            self.pub_ap_distance.publish(min_distance)
-
             try:
                 transform_odometry_at = self.tf_buffer.lookup_transform(
                     f"at_{closest_tag_id}",
@@ -250,7 +254,10 @@ class AprilTagNode(DTROS):
                 translation=Vector3(*translation),
                 rotation=Quaternion(*q)
             )
+
+            self.pub_ap_distance.publish(min_distance)
             self.pub_teleport.publish(transform_odometry_world)
+            self.pub_ap_position.publish(Vector3(*translation))
 
     def run(self):
         rate = rospy.Rate(self.params["ap_rate"])

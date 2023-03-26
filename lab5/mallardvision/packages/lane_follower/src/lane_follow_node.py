@@ -146,8 +146,6 @@ class LaneFollowNode(DTROS):
             self.state = DuckieState.ForceLeft
         elif most_recent_digit == 7:
             self.state = DuckieState.ForceForward
-        elif most_recent_digit == 4:
-            self.state = DuckieState.ForceLeft
         elif most_recent_digit == 6 and self.seen_ints[9] != 0:
             self.state = DuckieState.ForceForward
         else:
@@ -172,7 +170,7 @@ class LaneFollowNode(DTROS):
 
             for _ in range(8):
                 self.drive()
-            time.sleep(1)
+            #time.sleep(1)
 
             nb_class = self.classify(1).digit
 
