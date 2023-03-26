@@ -1,10 +1,10 @@
 {
   "default": {
     "detection_dist_min": 0.1,
-    "detection_dist_max": 0.5,
-    "velocity": 0.4,
+    "detection_dist_max": 0.6,
+    "velocity": 0.3,
     "stop_time_duration": 3,
-    "ap_rate": 3,
+    "ap_rate": 1,
 
     "force_left_duration": 2,
     "force_left_velocity": 0.4,
