@@ -187,6 +187,7 @@ class LaneFollowNode(DTROS):
 
             self.state_decision(nb_class)
             self.state_start_time = time.time()
+            self.drive()
 
     def lane_callback(self, msg):
         img = self.bridge.compressed_imgmsg_to_cv2(msg, "bgr8")
