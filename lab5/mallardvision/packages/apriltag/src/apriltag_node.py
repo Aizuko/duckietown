@@ -4,6 +4,7 @@ from typing import List
 import cv2
 import numpy as np
 import rospy
+import json
 from cv_bridge import CvBridge
 from dt_apriltags import Detection, Detector
 from duckietown.dtros import DTROS, NodeType
@@ -31,6 +32,14 @@ class AprilTagNode(DTROS):
 
         self.hostname = rospy.get_param("~veh")
         self.bridge = CvBridge()
+
+        with open("/params.json") as f:
+            self.params = json.load(f)
+
+        self.params = {
+            **self.params["default"],
+            **(self.params.get(self.hostname) or {}),
+        }
 
         self.detector = Detector(
             searchpath=['apriltags'],
@@ -243,8 +252,8 @@ class AprilTagNode(DTROS):
             )
             self.pub_teleport.publish(transform_odometry_world)
 
-    def run(self, rate=3):
-        rate = rospy.Rate(rate)
+    def run(self):
+        rate = rospy.Rate(self.params["ap_rate"])
 
         while not rospy.is_shutdown():
             if self.raw_image is None:
@@ -269,4 +278,4 @@ class AprilTagNode(DTROS):
 
 if __name__ == '__main__':
     camera_node = AprilTagNode(node_name='apriltag_node')
-    camera_node.run(1)
+    camera_node.run()

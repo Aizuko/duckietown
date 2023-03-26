@@ -6,6 +6,8 @@ import time
 import json
 
 from duckietown.dtros import DTROS, NodeType
+from dataclasses import dataclass
+from enum import Enum, auto, unique
 from sensor_msgs.msg import CameraInfo, CompressedImage
 from std_msgs.msg import Float32
 from cv_bridge import CvBridge
@@ -20,6 +22,22 @@ STOP_MASK = [(0, 70, 150), (20, 255, 255)]
 DEBUG = True
 ENGLISH = False
 
+
+# 6: force forward
+# 7: force left +2
+# 4: force left always
+@unique
+class DuckieState(Enum):
+    """States our duckiebot can visit. These modify the LaneFollowNode"""
+
+    LaneFollowing = auto()
+    ForceLeft = auto()
+    ForceForward = auto()
+    Classifying = auto()
+    ShuttingDown = auto()
+
+
+# @dataclass(frozen=True)
 class LaneFollowNode(DTROS):
     def __init__(self, node_name):
         super(LaneFollowNode, self).__init__(
@@ -37,7 +55,9 @@ class LaneFollowNode(DTROS):
             **(self.params.get(self.veh) or {}),
         }
 
+        self.state = DuckieState.LaneFollowing
         self.seen_ints = [0 for _ in range(10)]
+        self.state_start_time = time.time()
 
         self.ap_distance = 1000
         self.started_service_call = False
@@ -97,7 +117,6 @@ class LaneFollowNode(DTROS):
         self.last_time = rospy.get_time()
 
         # Stopline variables
-        self.is_stopped = False
         self.stop_time = None
 
         # Constants
@@ -111,13 +130,44 @@ class LaneFollowNode(DTROS):
     def cb_distance(self, msg):
         self.ap_distance = msg.data
 
-    def cb_teleport(self, msg):
-        is_close = self.params["detection_dist_min"] < self.ap_distance < self.params["detection_dist_max"]
+    def state_decision(self, most_recent_digit):
+        if min(self.seen_ints) > 0:
+            self.state = DuckieState.ShuttingDown
+            rospy.signal_shutdown("All digits have been seen")
+        elif most_recent_digit == 7 and all(
+            [
+                self.seen_ints[0],
+                self.seen_ints[5],
+                self.seen_ints[8],
+                self.seen_ints[2],
+                self.seen_ints[1],
+            ]
+        ):
+            self.state = DuckieState.ForceLeft
+        elif most_recent_digit == 7:
+            self.state = DuckieState.ForceForward
+        elif most_recent_digit == 4:
+            self.state = DuckieState.ForceLeft
+        elif most_recent_digit == 6 and self.seen_ints[9] != 0:
+            self.state = DuckieState.ForceForward
+        else:
+            self.state = DuckieState.LaneFollowing
 
-        is_stop_immune = self.stop_time and time.time() - self.stop_time < self.params["stop_time_duration"]
+    def cb_teleport(self, msg):
+        is_close = (
+            self.params["detection_dist_min"]
+            < self.ap_distance
+            < self.params["detection_dist_max"]
+        )
+
+        is_stop_immune = (
+            self.stop_time
+            and time.time() - self.stop_time < self.params["stop_time_duration"]
+        )
 
         if is_close and not is_stop_immune:
             self.is_stopped = True
+            self.state = DuckieState.Classifying
             self.stop_time = time.time()
 
             for _ in range(8):
@@ -135,7 +185,8 @@ class LaneFollowNode(DTROS):
                 print(self.seen_ints)
             print("==================")
 
-            self.is_stopped = False
+            self.state_decision(nb_class)
+            self.state_start_time = time.time()
 
     def lane_callback(self, msg):
         img = self.bridge.compressed_imgmsg_to_cv2(msg, "bgr8")
@@ -172,11 +223,38 @@ class LaneFollowNode(DTROS):
             self.pub.publish(rect_img_msg)
 
     def drive(self):
-        if self.is_stopped:
+        delta_t = time.time() - self.state_start_time
+        rospy.loginfo_throttle(2, f"State: {self.state.name}")
+
+        if self.state == DuckieState.Classifying:
             self.twist.v = 0
             self.twist.omega = 0
+        elif self.state == DuckieState.ShuttingDown:
+            self.twist.v = 0
+            self.twist.omega = 0
+        elif (
+            self.state == DuckieState.ForceLeft
+            and delta_t < self.params["force_left_duration"]
+        ):
+            self.twist.v = self.params["force_left_velocity"]
+            self.twist.omega = self.params["force_left_omega"]
+        elif self.state == DuckieState.ForceLeft:
+            self.state = DuckieState.LaneFollowing
+            self.state_start_time = time.time()
+            return
+        elif (
+            self.state == DuckieState.ForceForward
+            and delta_t < self.params["force_forward_duration"]
+        ):
+            self.twist.v = self.params["force_forward_velocity"]
+            self.twist.omega = self.params["force_forward_omega"]
+        elif self.state == DuckieState.ForceForward:
+            self.state = DuckieState.LaneFollowing
+            self.state_start_time = time.time()
+            return
         elif self.error is None:
             self.twist.omega = 0
+            self.twist.v = self.velocity
         else:
             # P Term
             P = -self.error * self.P
