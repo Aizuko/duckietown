@@ -29,6 +29,7 @@ TAG_ID_TO_TAG = {
     63: Tag(63, TagType.TIntersection),
     153: Tag(153, TagType.TIntersection),
     133: Tag(133, TagType.TIntersection),
+    143: Tag(143, TagType.TIntersection),
     93: Tag(93, TagType.UofA),
     94: Tag(94, TagType.UofA),
     200: Tag(200, TagType.UofA),

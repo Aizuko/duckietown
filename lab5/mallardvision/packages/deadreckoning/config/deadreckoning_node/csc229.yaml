@@ -41,6 +41,13 @@ apriltags:
     yaw: -0.5
     pitch: 0
     roll: 1
+  - id: 143
+    x: 1.253
+    y: 1.755
+    z: 0.08
+    yaw: -0.5
+    pitch: 0
+    roll: 1
   - id: 58
     x: 0.574
     y: 1.259

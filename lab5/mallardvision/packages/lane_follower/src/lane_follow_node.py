@@ -133,6 +133,10 @@ class LaneFollowNode(DTROS):
     def state_decision(self, most_recent_digit):
         if min(self.seen_ints) > 0:
             self.state = DuckieState.ShuttingDown
+            print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+            print("ALL DIGITS HAVE BEEN SEEN")
+            print("Signaling shutdown")
+            print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
             rospy.signal_shutdown("All digits have been seen")
         elif most_recent_digit == 7 and all(
             [
