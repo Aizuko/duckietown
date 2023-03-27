@@ -1,47 +1,46 @@
-# Template: template-ros
+# mallardvision
 
-This template provides a boilerplate repository
-for developing ROS-based software in Duckietown.
+This workspace implements the exercise 5 requirements. Namely,
+it implements a PID controller, computer vision for lane following, machine
+learning for digit classification, and a finite state machine for safely
+traversing Duckietown in order to identify all correct digits.
 
-**NOTE:** If you want to develop software that does not use
-ROS, check out [this template](https://github.com/duckietown/template-basic).
+This ROS program is based on
+[Xiao's](https://github.com/XZPshaw/CMPUT412503_exercise4) grid-detection
+template, with contributions from the lane following package Justin Francis
+posted on eClass.
 
+## Installation and Usage
 
-## How to use it
+```bash
+docker -H csc22902.local build -t duckietown/mallardvision:latest-arm64v8 .
+dts devel run -H csc22902.local
+```
 
-### 1. Fork this repository
+Replace `csc22902` with the hostname of your Duckiebot.
 
-Use the fork button in the top-right corner of the github page to fork this template repository.
+## Packages
 
+### apriltag
 
-### 2. Create a new repository
+This package implements AprilTag detection and localization, it uses the
+teleport publisher to update the robot's pose.
 
-Create a new repository on github.com while
-specifying the newly forked template repository as
-a template for your new repository.
+### deadreckoning
 
+This package implements dead reckoning with a teleport subscriber that
+is used for sensor fusion. This package also publishes any static transforms.
 
-### 3. Define dependencies
+### lane_follower
 
-List the dependencies in the files `dependencies-apt.txt` and
-`dependencies-py3.txt` (apt packages and pip packages respectively).
+This package implements the lane follower node, which uses a PID controller
+to follow the lane lines. We heavily modified the PID controller, though the
+original thing came from Justin Francis's code on eclass.
 
+This node also contains our custom state machines and sensor fusion.
 
-### 4. Place your code
+### mallard_eye
 
-Place your code in the directory `/packages/` of
-your new repository.
-
-
-### 5. Setup launchers
-
-The directory `/launchers` can contain as many launchers (launching scripts)
-as you want. A default launcher called `default.sh` must always be present.
-
-If you create an executable script (i.e., a file with a valid shebang statement)
-a launcher will be created for it. For example, the script file 
-`/launchers/my-launcher.sh` will be available inside the Docker image as the binary
-`dt-launcher-my-launcher`.
-
-When launching a new container, you can simply provide `dt-launcher-my-launcher` as
-command.
+This package implements the number detection node, which uses a multi-layer
+perceptron implemented with `numpy` to detect the numbers on blue sticky notes
+attached to AprilTags.
