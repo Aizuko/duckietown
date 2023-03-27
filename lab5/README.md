@@ -9,4 +9,5 @@ the requirements for Deliverable 3 in this lab.
 ## pytorch
 
 This directory contains the raw data, scripts for preprocessing, training,
-evaluating a simple multilayer perceptron using PyTorch.
+evaluating a simple multilayer perceptron using PyTorch. The weights of the
+the train are used in the `mallard_eye` node.
