@@ -39,7 +39,7 @@ original thing came from Justin Francis's code on eclass.
 
 This node also contains our custom state machines and sensor fusion.
 
-## mallard_creator
+### mallard_creator
 
 This package was used to get training data for the machine learning model.
 
