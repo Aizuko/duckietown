@@ -39,6 +39,10 @@ original thing came from Justin Francis's code on eclass.
 
 This node also contains our custom state machines and sensor fusion.
 
+## mallard_creator
+
+This package was used to get training data for the machine learning model.
+
 ### mallard_eye
 
 This package implements the number detection node, which uses a multi-layer
