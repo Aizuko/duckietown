@@ -2,9 +2,9 @@
   "default": {
     "detection_dist_min": 0.1,
     "detection_dist_max": 0.6,
-    "velocity": 0.3,
+    "velocity": 0.2,
     "stop_time_duration": 3,
-    "ap_rate": 1,
+    "ap_rate": 0,
 
     "force_left_duration": 2,
     "force_left_velocity": 0.4,
