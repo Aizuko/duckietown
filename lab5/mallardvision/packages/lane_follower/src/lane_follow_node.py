@@ -120,8 +120,8 @@ class LaneFollowNode(DTROS):
         self.stop_time = None
 
         # Constants
-        self.P = 0.049
-        self.D = -0.004
+        self.P = self.params["P"]
+        self.D = self.params["d"]
         self.stop_duration = 1
 
         # Shutdown hook
@@ -272,6 +272,10 @@ class LaneFollowNode(DTROS):
 
             self.twist.v = self.velocity
             self.twist.omega = P + D
+            self.twist.omega = np.clip(
+                self.twist.omega, self.params["O_min"], self.params["O_max"]
+            )
+            rospy.logdebug(f"{P + D}, {self.twist.omega}")
 
         self.vel_pub.publish(self.twist)
 

@@ -2,7 +2,7 @@
   "default": {
     "detection_dist_min": 0.1,
     "detection_dist_max": 0.6,
-    "velocity": 0.2,
+    "velocity": 0.32,
     "stop_time_duration": 3,
     "ap_rate": 0,
 
@@ -13,7 +13,10 @@
     "force_forward_duration": 1,
     "force_forward_velocity": 0.5,
     "force_forward_omega": 0.0,
-
+    "P": 0.035,
+    "d": -0.005,
+    "O_min": -7,
+    "O_max": 7,
     "placeholder": false
   }
 }

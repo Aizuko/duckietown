@@ -57,7 +57,7 @@
     {
       "label": "Remote Test",
       "type": "shell",
-      "command": "docker run -h ${input:bot}.local -v /data:/data",
+      "command": "docker -H=${input:bot}.local run -it --net=host --rm --name dts-run-mallardvision -v /var/run/avahi-daemon/socket:/var/run/avahi-daemon/socket -v /data:/data docker.io/duckietown/mallardvision:latest-arm64v8",
       "options": {
         "cwd": "${workspaceFolder}/lab5/mallardvision"
       },
@@ -82,6 +82,6 @@
       "csc22902",
       "csc22927",
     ],
-    "default": "csc22927"
+    "default": "csc22902"
   },]
 }
