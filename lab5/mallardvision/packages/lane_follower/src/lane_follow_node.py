@@ -131,13 +131,13 @@ class LaneFollowNode(DTROS):
         self.ap_distance = msg.data
 
     def state_decision(self, most_recent_digit):
-        if min(self.seen_ints) > 0:
+        if max(self.seen_ints) > 0:
             self.state = DuckieState.ShuttingDown
             print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-            print("ALL DIGITS HAVE BEEN SEEN")
+            print(f"ONE DIGIT HAS BEEN SEEN ({most_recent_digit})")
             print("Signaling shutdown")
             print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-            rospy.signal_shutdown("All digits have been seen")
+            rospy.signal_shutdown("One digit has been seen")
         elif most_recent_digit == 7 and all(
             [
                 self.seen_ints[0],
