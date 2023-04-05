@@ -7,21 +7,12 @@ import message_filters
 import numpy as np
 import rospy
 from duckietown.dtros import DTROS, NodeType
-from duckietown_msgs.msg import Twist2DStamped, WheelEncoderStamped
-from geometry_msgs.msg import (
-    Point,
-    Pose,
-    Quaternion,
-    Transform,
-    TransformStamped,
-    Twist,
-    Vector3,
-)
+from duckietown_msgs.msg import WheelEncoderStamped
+from geometry_msgs.msg import Point, Pose, Quaternion, Transform, TransformStamped, Twist, Vector3
 from nav_msgs.msg import Odometry
-from std_msgs.msg import Header, ColorRGBA, Header, Float64
+from std_msgs.msg import Header
 from tf import transformations as tr
 from tf2_ros import StaticTransformBroadcaster, TransformBroadcaster
-from mallard_eye.srv import MallardEyedentify, MallardEyedentifyResponse
 
 
 class DeadReckoningNode(DTROS):
@@ -56,12 +47,14 @@ class DeadReckoningNode(DTROS):
     """
 
     def __init__(self, node_name):
-        super(DeadReckoningNode, self).__init__(
-            node_name=node_name, node_type=NodeType.LOCALIZATION
-        )
+        super(
+            DeadReckoningNode,
+            self).__init__(
+            node_name=node_name,
+            node_type=NodeType.LOCALIZATION)
         self.node_name = node_name
 
-        self.hostname = self.veh = rospy.get_param("~veh")
+        self.veh = rospy.get_param("~veh")
         self.publish_hz = rospy.get_param("~publish_hz")
         self.encoder_stale_dt = rospy.get_param("~encoder_stale_dt")
         self.ticks_per_meter = rospy.get_param("~ticks_per_meter")
@@ -76,7 +69,6 @@ class DeadReckoningNode(DTROS):
         self.right_encoder_last = None
         self.encoders_timestamp_last = None
         self.encoders_timestamp_last_local = None
-        self.distance_from_ap = 1000
 
         # Current pose, forward velocity, and angular rate
         self.timestamp = None
@@ -98,15 +90,16 @@ class DeadReckoningNode(DTROS):
 
         # Setup subscribers
         self.sub_encoder_left = message_filters.Subscriber(
-            "~left_wheel", WheelEncoderStamped
-        )
+            "~left_wheel", WheelEncoderStamped)
 
         self.sub_encoder_right = message_filters.Subscriber(
-            "~right_wheel", WheelEncoderStamped
-        )
+            "~right_wheel", WheelEncoderStamped)
 
         self.sub_teleport = rospy.Subscriber(
-            "~teleport", Transform, self.cb_teleport, queue_size=1
+            "~teleport",
+            Transform,
+            self.cb_teleport,
+            queue_size=1
         )
 
         # Setup the time synchronizer
@@ -119,7 +112,7 @@ class DeadReckoningNode(DTROS):
         self.pub = rospy.Publisher("~odom", Odometry, queue_size=10)
 
         # Setup timer
-        self.timer = rospy.Timer(rospy.Duration(1 / 4), self.cb_timer)
+        self.timer = rospy.Timer(rospy.Duration(1/4), self.cb_timer)
         self._print_time = 0
         self._print_every_sec = 30
         # tf broadcaster for odometry TF
@@ -127,9 +120,6 @@ class DeadReckoningNode(DTROS):
         self._tf_static_broadcaster = StaticTransformBroadcaster()
         self.broadcast_static()
         self.loginfo("Initialized")
-
-    def cb_distance(self, distance):
-        self.distance_from_ap = distance.data
 
     def cb_ts_encoders(self, left_encoder, right_encoder):
         timestamp_now = rospy.get_time()
@@ -150,7 +140,7 @@ class DeadReckoningNode(DTROS):
         dtl = left_encoder.header.stamp - self.left_encoder_last.header.stamp
         dtr = right_encoder.header.stamp - self.right_encoder_last.header.stamp
         if dtl.to_sec() < 0 or dtr.to_sec() < 0:
-            #self.loginfo("Ignoring stale encoder message")
+            self.loginfo("Ignoring stale encoder message")
             if self.reading_bag:
                 self.left_encoder_last = None
             return
@@ -248,31 +238,28 @@ class DeadReckoningNode(DTROS):
         rospy.loginfo(
             f"Teleporting to {self.x:.2f}, {self.y:.2f}, {self.z:.2f}"
         )
-        self.q = np.array(
-            [
-                transform.rotation.x,
-                transform.rotation.y,
-                transform.rotation.z,
-                transform.rotation.w,
-            ]
-        )
-
+        self.q = np.array([
+            transform.rotation.x,
+            transform.rotation.y,
+            transform.rotation.z,
+            transform.rotation.w
+        ])
         self.yaw = tr.euler_from_quaternion(self.q)[2]
         self.timestamp = rospy.Time.now()
 
     def publish_odometry(self):
         odom = Odometry()
-
         odom.header.stamp = rospy.Time.now()  # Ideally, should be encoder time
         odom.header.frame_id = self.origin_frame
         odom.pose.pose = Pose(
-            Point(self.x, self.y, self.z), Quaternion(*self.q)
-        )
+            Point(
+                self.x, self.y, self.z), Quaternion(
+                *self.q))
         odom.child_frame_id = self.target_frame
-
         odom.twist.twist = Twist(
-            Vector3(self.tv, 0.0, 0.0), Vector3(0.0, 0.0, self.rv)
-        )
+            Vector3(
+                self.tv, 0.0, 0.0), Vector3(
+                0.0, 0.0, self.rv))
 
         self.pub.publish(odom)
 
@@ -282,7 +269,7 @@ class DeadReckoningNode(DTROS):
                 child_frame_id=self.target_frame,
                 transform=Transform(
                     translation=Vector3(self.x, self.y, self.z),
-                    rotation=Quaternion(*self.q),
+                    rotation=Quaternion(*self.q)
                 ),
             )
         )
@@ -293,18 +280,17 @@ class DeadReckoningNode(DTROS):
             q = tr.quaternion_from_euler(
                 apriltag["yaw"] * np.pi,
                 apriltag["pitch"] * np.pi,
-                apriltag["roll"] * np.pi,
+                apriltag["roll"] * np.pi
             )
             transform = TransformStamped(
                 header=Header(
-                    stamp=rospy.Time.now(), frame_id=self.origin_frame
+                    stamp=rospy.Time.now(),
+                    frame_id=self.origin_frame
                 ),
                 child_frame_id=f"at_{apriltag['id']}_static",
                 transform=Transform(
-                    translation=Vector3(
-                        apriltag["x"], apriltag["y"], apriltag["z"]
-                    ),
-                    rotation=Quaternion(*q),
+                    translation=Vector3(apriltag["x"], apriltag["y"], apriltag["z"]),
+                    rotation=Quaternion(*q)
                 ),
             )
             transforms.append(transform)
@@ -313,12 +299,14 @@ class DeadReckoningNode(DTROS):
         transforms.append(
             TransformStamped(
                 header=Header(
-                    stamp=rospy.Time.now(), frame_id=self.target_frame
+                    stamp=rospy.Time.now(),
+                    frame_id=self.target_frame
                 ),
                 child_frame_id=f"{self.veh}/footprint",
                 transform=Transform(
-                    translation=Vector3(0, 0, 0), rotation=Quaternion(*q)
-                ),
+                    translation=Vector3(0, 0, 0),
+                    rotation=Quaternion(*q)
+                )
             )
         )
         self._tf_static_broadcaster.sendTransform(transforms)

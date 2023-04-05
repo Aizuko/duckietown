@@ -9,7 +9,4 @@
   <include file="$(find lane_follower)/launch/lane_follower.launch">
     <arg name="veh" value="$(arg veh)"/>
   </include>
-  <include file="$(find mallard_eye)/launch/mallard_eye.launch">
-    <arg name="veh" value="$(arg veh)"/>
-  </include>
 </launch>
