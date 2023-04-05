@@ -5,6 +5,10 @@ import cv2
 import time
 import json
 
+import stage1_loops
+import stage2_ducks
+import stage3_parking
+
 from duckietown.dtros import DTROS, NodeType
 from dataclasses import dataclass
 from enum import Enum, auto, unique
