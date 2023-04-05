@@ -325,18 +325,17 @@ class LaneFollowNode(DTROS):
             try:
                 at_transform = self.tf_buffer.lookup_transform(
                     "world",
-                    f"at_{self.params['parking_lot_depth_apriltag_id']}",
+                    "odometry",
                     rospy.Time(0),
                     rospy.Duration(1.0),
                 ).transform
                 translation = at_transform.translation
                 rospy.logdebug((translation.x, translation.y, translation.z))
-            except Exception as e:
-                rospy.logwarn_throttle(1.0, str(e))
+            except Exception:
                 rate.sleep()
                 continue
-            error = self.params["parking_far_depth_distance"] - translation.z
-            if error < self.params["parking_depth_forward_epsilon"]:
+            error = self.params["parking_far_depth_x"] - translation.x
+            if error < self.params["parking_far_depth_epsilon"]:
                 break
             self.parking_pid(error)
             self.vel_pub.publish(self.twist)

@@ -1,78 +1,36 @@
 apriltags:
-  - id: 200
-    x: 0.17
-    y: 0.17
+  - id: 207
+    x: 1.40
+    y: 1.19
     z: 0.08
     yaw: -0.5
     pitch: 0
-    roll: 0.75
-  - id: 201
-    x: 1.65
-    y: 0.17
+    roll: 1
+  - id: 226
+    x: 1.62
+    y: 1.19
     z: 0.08
     yaw: -0.5
     pitch: 0
-    roll: 1.25
-  - id: 94
-    x: 1.65
-    y: 2.84
-    z: 0.08
-    yaw: -0.5
-    pitch: 0
-    roll: 1.75
-  - id: 93
-    x: 0.17
-    y: 2.84
-    z: 0.08
-    yaw: -0.5
-    pitch: 0
-    roll: 0.25
-  - id: 153
-    x: 1.75
-    y: 1.252
+    roll: 1
+  - id: 228
+    x: 1.40
+    y: 2.47
     z: 0.08
     yaw: -0.5
     pitch: 0
     roll: 0
-  - id: 133
-    x: 1.253
-    y: 1.755
-    z: 0.08
-    yaw: -0.5
-    pitch: 0
-    roll: 1
-  - id: 143
-    x: 1.253
-    y: 1.755
-    z: 0.08
-    yaw: -0.5
-    pitch: 0
-    roll: 1
-  - id: 58
-    x: 0.574
-    y: 1.259
+  - id: 75
+    x: 1.62
+    y: 2.47
     z: 0.08
     yaw: -0.5
     pitch: 0
     roll: 0
-  - id: 62
-    x: 0.075
-    y: 1.755
-    z: 0.08
-    yaw: -0.5
-    pitch: 0
-    roll: 1
-  - id: 169
-    x: 0.574
-    y: 1.755
+  - id: 227
+    x: 1.17
+    y: 1.63
     z: 0.08
     yaw: -0.5
     pitch: 0
     roll: 0.5
-  - id: 162
-    x: 1.253
-    y: 1.253
-    z: 0.08
-    yaw: -0.5
-    pitch: 0
-    roll: -0.5
