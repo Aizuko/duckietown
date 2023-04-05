@@ -7,7 +7,6 @@ import json
 
 import stage1_loops
 import stage2_ducks
-import stage3_parking
 
 from duckietown.dtros import DTROS, NodeType
 from dataclasses import dataclass
@@ -19,7 +18,7 @@ import numpy as np
 from duckietown_msgs.msg import WheelsCmdStamped, Twist2DStamped
 from geometry_msgs.msg import Transform
 from std_msgs.msg import Float64
-from mallard_eye.srv import MallardEyedentify, MallardEyedentifyResponse
+from tf2_ros import Buffer, TransformListener
 
 ROAD_MASK = [(20, 60, 0), (50, 255, 255)]
 STOP_MASK = [(0, 70, 150), (20, 255, 255)]
@@ -38,6 +37,7 @@ class DuckieState(Enum):
     ForceLeft = auto()
     ForceForward = auto()
     Classifying = auto()
+    Parking = auto()
     ShuttingDown = auto()
 
 
@@ -65,6 +65,7 @@ class LaneFollowNode(DTROS):
 
         self.ap_distance = 1000
         self.started_service_call = False
+        self.parked = False
 
         # Publishers & Subscribers
         self.pub = rospy.Publisher(
@@ -88,11 +89,6 @@ class LaneFollowNode(DTROS):
             f"/{self.veh}/car_cmd_switch_node/cmd", Twist2DStamped, queue_size=1
         )
 
-        self.classify = rospy.ServiceProxy(
-            f"/{self.veh}/mallard_eyedentification",
-            MallardEyedentify,
-        )
-
         self.sub_dist = rospy.Subscriber(
             f"/{self.veh}/deadreckoning_node/ap_distance",
             Float64,
@@ -105,6 +101,9 @@ class LaneFollowNode(DTROS):
             self.cb_teleport,
             queue_size=1,
         )
+
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer)
 
         self.loginfo("Lane follower is initialized")
 
@@ -119,6 +118,8 @@ class LaneFollowNode(DTROS):
 
         self.last_error = 0
         self.last_time = rospy.get_time()
+        self.parking_last_error = 0
+        self.parking_last_time = rospy.get_time()
 
         # Stopline variables
         self.stop_time = None
@@ -135,7 +136,7 @@ class LaneFollowNode(DTROS):
         self.ap_distance = msg.data
 
     def state_decision(self, most_recent_digit):
-        if min(self.seen_ints) > 0:
+        if self.parked:
             self.state = DuckieState.ShuttingDown
             print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
             print("ALL DIGITS HAVE BEEN SEEN")
@@ -231,7 +232,10 @@ class LaneFollowNode(DTROS):
 
     def drive(self):
         delta_t = time.time() - self.state_start_time
+        if self.params.get("state") is not None:
+            self.state = DuckieState[self.params["state"]]
         rospy.loginfo_throttle(2, f"State: {self.state.name}")
+
 
         if self.state == DuckieState.Classifying:
             self.twist.v = 0
@@ -259,6 +263,8 @@ class LaneFollowNode(DTROS):
             self.state = DuckieState.LaneFollowing
             self.state_start_time = time.time()
             return
+        elif self.state == DuckieState.Parking:
+            self.parking_state()
         elif self.error is None:
             self.twist.omega = 0
             self.twist.v = self.velocity
@@ -287,6 +293,54 @@ class LaneFollowNode(DTROS):
         for i in range(8):
             self.vel_pub.publish(self.twist)
 
+    def parking_state(self):
+        parking_lot = self.params["parking_lot"]
+        parking_stall_number = self.params["parking_stall_number"]
+        parking_stall = parking_lot[parking_stall_number - 1]
+        opposite_stall_number = parking_stall["opposite_stall_number"]
+        opposite_stall = parking_lot[opposite_stall_number - 1]
+
+        if parking_stall["depth"] == "far":
+            self.parking_depth_substate()
+        # if parking_stall["side"] == "left":
+        #     ?
+        # else:
+        #     ?
+        self.parked = True
+
+    def parking_pid(self, error):
+        P = error * self.params["parking_P"]
+        d_error = (error - self.parking_last_error) / (
+            rospy.get_time() - self.parking_last_time
+        )
+        self.parking_last_error = error
+        self.parking_last_time = rospy.get_time()
+        D = d_error * self.params["parking_D"]
+
+        self.twist.v = P + D
+
+    def parking_depth_substate(self):
+        rate = rospy.Rate(self.params["parking_rate"])
+        while True:
+            try:
+                at_transform = self.tf_buffer.lookup_transform(
+                    "world",
+                    f"at_{self.params['parking_lot_depth_apriltag_id']}",
+                    rospy.Time(0),
+                    rospy.Duration(1.0),
+                ).transform
+                translation = at_transform.translation
+                rospy.logdebug((translation.x, translation.y, translation.z))
+            except Exception as e:
+                rospy.logwarn_throttle(1.0, str(e))
+                rate.sleep()
+                continue
+            error = self.params["parking_far_depth_distance"] - translation.z
+            if error < self.params["parking_depth_forward_epsilon"]:
+                break
+            self.parking_pid(error)
+            self.vel_pub.publish(self.twist)
+            rate.sleep()
 
 if __name__ == "__main__":
     node = LaneFollowNode("lanefollow_node")

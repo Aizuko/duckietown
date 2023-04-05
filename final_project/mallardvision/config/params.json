@@ -13,7 +13,46 @@
     "force_forward_duration": 1,
     "force_forward_velocity": 0.5,
     "force_forward_omega": 0.0,
-
-    "placeholder": false
+    "parking_stall_number": 1,
+    "parking_lot_depth_apriltag_id": 227,
+    "parking_lot": [
+      {
+        "distance": 1.28,
+        "id": 207,
+        "number": 1,
+        "opposite_stall_number": 3,
+        "side": "left",
+        "depth": "far"
+      },
+      {
+        "distance": 1.28,
+        "id": 226,
+        "opposite_stall_number": 4,
+        "number": 2,
+        "side": "left",
+        "depth": "near"
+      },
+      {
+        "distance": 1.28,
+        "id": 228,
+        "opposite_stall_number": 1,
+        "number": 3,
+        "side": "right",
+        "depth": "far"
+      },
+      {
+        "distance": 1.28,
+        "id": 75,
+        "opposite_stall_number": 2,
+        "number": 4,
+        "side": "right",
+        "depth": "near"
+      }
+    ],
+    "parking_rate": 8,
+    "parking_depth_forward_epsilon": 0.1,
+    "parking_far_depth_distance": 0.3,
+    "placeholder": false,
+    "state": "Parking"
   }
 }

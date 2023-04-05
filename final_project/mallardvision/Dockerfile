@@ -76,9 +76,6 @@ RUN dt-install-launchers "${LAUNCH_PATH}"
 # define default command
 CMD ["bash", "-c", "dt-launcher-${DT_LAUNCHER}"]
 
-# copy the weights
-COPY ./weights/weights.npy /weights.npy
-
 ## copy the params
 COPY ./config/params.json /
 
