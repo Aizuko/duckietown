@@ -178,7 +178,7 @@ class LaneFollowNode(DTROS):
 
             for _ in range(8):
                 self.drive()
-            #time.sleep(1)
+            # time.sleep(1)
 
             self.state_start_time = time.time()
             self.drive()
@@ -222,7 +222,6 @@ class LaneFollowNode(DTROS):
         if self.params.get("state") is not None:
             self.state = DuckieState[self.params["state"]]
         rospy.loginfo_throttle(2, f"State: {self.state.name}")
-
 
         if self.state == DuckieState.Classifying:
             self.twist.v = 0
@@ -289,22 +288,25 @@ class LaneFollowNode(DTROS):
 
         if parking_stall["depth"] == "far":
             self.parking_depth_substate()
-        # if parking_stall["side"] == "left":
-        #     ?
-        # else:
-        #     ?
+        self.parking_overshoot_substate(parking_stall)
+        self.parking_reverse_substate(parking_stall, opposite_stall)
         self.parked = True
 
     def parking_pid(self, error):
-        P = error * self.params["parking_P"]
-        d_error = (error - self.parking_last_error) / (
+        P = error * np.array(
+            [self.params["parking_P_x"], self.params["parking_P_o"]]
+        )
+        d_error = error - self.parking_last_error / (
             rospy.get_time() - self.parking_last_time
         )
         self.parking_last_error = error
         self.parking_last_time = rospy.get_time()
-        D = d_error * self.params["parking_D"]
+        D = d_error * np.array(
+            [self.params["parking_D_x"], self.params["parking_D_o"]]
+        )
 
-        self.twist.v = P + D
+        self.twist.v = P[0] + D[0]
+        self.twist.omega = P[1] + D[1]
 
     def parking_depth_substate(self):
         rate = rospy.Rate(self.params["parking_rate"])
@@ -321,13 +323,46 @@ class LaneFollowNode(DTROS):
             except Exception:
                 rate.sleep()
                 continue
-            error = translation.x - self.params["parking_far_depth_x"]
+            error = np.array(
+                [translation.x - self.params["parking_far_depth_x"], 0]
+            )
+            rospy.logdebug_throttle(5, (error, translation.x))
+            if np.linalg.norm(error) < self.params["parking_far_depth_epsilon"]:
+                break
+            self.parking_pid(error)
+            self.vel_pub.publish(self.twist)
+            rate.sleep()
+
+    def parking_overshoot_substate(self, opposite_stall):
+        rate = rospy.Rate(self.params["parking_rate"])
+        if opposite_stall["side"] == "left":
+            angle = self.params["parking_overshoot_angle_left"] * np.pi
+        else:
+            angle = -self.params["parking_overshoot_angle_right"] * np.pi
+        while True:
+            try:
+                at_transform = self.tf_buffer.lookup_transform(
+                    "world",
+                    "odometry",
+                    rospy.Time(0),
+                    rospy.Duration(1.0),
+                ).transform
+                translation = at_transform.translation
+                rospy.logdebug_throttle(5, translation.x)
+            except Exception:
+                rate.sleep()
+                continue
+            error = [0, angle]
             rospy.logdebug_throttle(5, (error, translation.x))
             if abs(error) < self.params["parking_far_depth_epsilon"]:
                 break
             self.parking_pid(error)
             self.vel_pub.publish(self.twist)
             rate.sleep()
+
+    def parking_reverse_substate(self, parking_stall, opposite_stall):
+        return
+
 
 if __name__ == "__main__":
     node = LaneFollowNode("lanefollow_node")
