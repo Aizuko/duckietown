@@ -174,25 +174,12 @@ class LaneFollowNode(DTROS):
 
         if is_close and not is_stop_immune:
             self.is_stopped = True
-            self.state = DuckieState.Classifying
             self.stop_time = time.time()
 
             for _ in range(8):
                 self.drive()
             #time.sleep(1)
 
-            nb_class = self.classify(1).digit
-
-            print("==================")
-            if nb_class < 0:
-                print(f"That one wasn't quite clear enough... Ecode {nb_class}")
-            else:
-                print(f"Found {nb_class}!")
-                self.seen_ints[nb_class] += 1
-                print(self.seen_ints)
-            print("==================")
-
-            self.state_decision(nb_class)
             self.state_start_time = time.time()
             self.drive()
 
@@ -330,12 +317,13 @@ class LaneFollowNode(DTROS):
                     rospy.Duration(1.0),
                 ).transform
                 translation = at_transform.translation
-                rospy.logdebug((translation.x, translation.y, translation.z))
+                rospy.logdebug_throttle(5, translation.x)
             except Exception:
                 rate.sleep()
                 continue
-            error = self.params["parking_far_depth_x"] - translation.x
-            if error < self.params["parking_far_depth_epsilon"]:
+            error = translation.x - self.params["parking_far_depth_x"]
+            rospy.logdebug_throttle(5, (error, translation.x))
+            if abs(error) < self.params["parking_far_depth_epsilon"]:
                 break
             self.parking_pid(error)
             self.vel_pub.publish(self.twist)

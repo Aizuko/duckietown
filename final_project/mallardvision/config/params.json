@@ -50,9 +50,9 @@
       }
     ],
     "parking_rate": 8,
-    "parking_far_depth_epsilon": 0.1,
+    "parking_far_depth_epsilon": 0.01,
     "parking_far_depth_x": 1.51,
-    "parking_P": 0.049,
+    "parking_P": 1,
     "parking_D": 0,
     "state": "Parking",
     "placeholder": false
