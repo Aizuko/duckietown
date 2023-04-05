@@ -1,0 +1,19 @@
+{
+  "default": {
+    "detection_dist_min": 0.1,
+    "detection_dist_max": 0.6,
+    "velocity": 0.3,
+    "stop_time_duration": 3,
+    "ap_rate": 1,
+
+    "force_left_duration": 2,
+    "force_left_velocity": 0.4,
+    "force_left_omega": 0.72,
+
+    "force_forward_duration": 1,
+    "force_forward_velocity": 0.5,
+    "force_forward_omega": 0.0,
+
+    "placeholder": false
+  }
+}

@@ -1,0 +1,11 @@
+<package>
+  <name>mallard_creator</name>
+  <version>0.1.0</version>
+  <description>
+  This package is used to identify numbers
+  </description>
+  <maintainer email="stang5@ualberta.ca">Steven Tang</maintainer>
+  <license>None</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+</package>
