@@ -3,6 +3,8 @@
     "detection_dist_min": 0.1,
     "detection_dist_max": 0.6,
 
+    "starting_state": 19,
+
     "comment1":
     "==== tuning params for forced turns and lane follows====",
     "lane_follow_velocity": 0.3,

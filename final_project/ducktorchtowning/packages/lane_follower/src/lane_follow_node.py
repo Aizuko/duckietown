@@ -6,7 +6,7 @@ import json
 
 from duckietown.dtros import DTROS, NodeType
 from dataclasses import dataclass
-from enum import Enum, auto, unique
+from enum import IntEnum, auto, unique
 from sensor_msgs.msg import CameraInfo, CompressedImage
 from std_msgs.msg import Float32
 from cv_bridge import CvBridge
@@ -25,7 +25,7 @@ duckies_only = [(0, 55, 145), (20, 255, 255)]
 
 
 @unique
-class DS(Enum):
+class DS(IntEnum):
     """
     Statemachine, segmented by project stage
     """
@@ -68,7 +68,7 @@ class LaneFollowNode(DTROS):
         # ╔─────────────────────────────────────────────────────────────────────╗
         # │ Sτατε cδητrδls                                                      |
         # ╚─────────────────────────────────────────────────────────────────────╝
-        self.state = DS.Stage1Loops_ThinkDuck
+        self.state = DS(self.params["starting_state"])
         self.state_start_time = time.time()
 
         self.is_parked = False
