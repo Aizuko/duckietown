@@ -20,9 +20,12 @@ ROAD_MASK = [(20, 60, 0), (50, 255, 255)]
 STOP_MASK = [(0, 70, 150), (20, 255, 255)]
 DEBUG = True
 
+duckies_plus_line = [(0, 70, 120), (40, 255, 255)]
+duckies_only = [(0, 55, 145), (20, 255, 255)]
+
 
 @unique
-class DuckieState(Enum):
+class DS(Enum):
     """
     Statemachine, segmented by project stage
     """
@@ -41,6 +44,8 @@ class DuckieState(Enum):
 
     Stage3Drive = 30
     Stage3Drive_ThinkDuck = 39
+
+    ShuttingDown = 90
 
 
 class LaneFollowNode(DTROS):
@@ -63,7 +68,7 @@ class LaneFollowNode(DTROS):
         # ╔─────────────────────────────────────────────────────────────────────╗
         # │ Sτατε cδητrδls                                                      |
         # ╚─────────────────────────────────────────────────────────────────────╝
-        self.state = DuckieState.Stage1Loops_LaneFollowing
+        self.state = DS.Stage1Loops_ThinkDuck
         self.state_start_time = time.time()
 
         self.is_parked = False
@@ -77,7 +82,7 @@ class LaneFollowNode(DTROS):
 
         self.lane_offset = 220
 
-        self.velocity = self.params["velocity"]
+        self.velocity = self.params["lane_follow_velocity"]
         self.twist = Twist2DStamped(v=self.velocity, omega=0)
 
         self.right_last_error = 0
@@ -131,12 +136,12 @@ class LaneFollowNode(DTROS):
 
     def state_decision(self, most_recent_digit):
         if self.is_parked:
-            self.state = DuckieState.ShuttingDown
-            print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-            print("ALL DIGITS HAVE BEEN SEEN")
-            print("Signaling shutdown")
-            print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-            rospy.signal_shutdown("All digits have been seen")
+            self.state = DS.ShuttingDown
+            print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+            print("End of the road")
+            print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+            rospy.signal_shutdown("Rode to the end of the road")
+
         elif most_recent_digit == 7 and all(
             [
                 self.seen_ints[0],
@@ -146,13 +151,13 @@ class LaneFollowNode(DTROS):
                 self.seen_ints[1],
             ]
         ):
-            self.state = DuckieState.ForceLeft
+            self.state = DS.ForceLeft
         elif most_recent_digit == 7:
-            self.state = DuckieState.ForceForward
+            self.state = DS.ForceForward
         elif most_recent_digit == 6 and self.seen_ints[9] != 0:
-            self.state = DuckieState.ForceForward
+            self.state = DS.ForceForward
         else:
-            self.state = DuckieState.LaneFollowing
+            self.state = DS.LaneFollowing
 
     def cb_teleport(self, msg):
         is_close = (
@@ -172,23 +177,23 @@ class LaneFollowNode(DTROS):
 
         hsv = cv2.cvtColor(right_image, cv2.COLOR_BGR2HSV)
         mask = cv2.inRange(hsv, ROAD_MASK[0], ROAD_MASK[1])
-        right_image = cv2.bitwise_and(crop, crop, mask=mask)
+        right_image = cv2.bitwise_and(right_image, right_image, mask=mask)
         right_conts, _ = cv2.findContours(
-            right_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE
+            mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE
         )
 
         hsv = cv2.cvtColor(left_image, cv2.COLOR_BGR2HSV)
         mask = cv2.inRange(hsv, ROAD_MASK[0], ROAD_MASK[1])
-        left_image = cv2.bitwise_and(crop, crop, mask=mask)
+        left_image = cv2.bitwise_and(left_image, left_image, mask=mask)
         left_conts, _ = cv2.findContours(
-            left_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE
+            mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE
         )
 
         hsv = cv2.cvtColor(bottom_image, cv2.COLOR_BGR2HSV)
         mask = cv2.inRange(hsv, ROAD_MASK[0], ROAD_MASK[1])
-        bottom_image = cv2.bitwise_and(crop, crop, mask=mask)
+        bottom_image = cv2.bitwise_and(bottom_image, bottom_image, mask=mask)
         bottom_conts, _ = cv2.findContours(
-            bottom_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE
+            mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE
         )
 
         right_areas = np.array([cv2.contourArea(a) for a in right_conts])
@@ -235,65 +240,62 @@ class LaneFollowNode(DTROS):
                 pass
 
     def drive(self):
-        todo("Switch to using correct errors in drive")
-
         delta_t = time.time() - self.state_start_time
-        if self.params.get("state") is not None:
-            self.state = DuckieState[self.params["state"]]
         rospy.loginfo_throttle(2, f"State: {self.state.name}")
 
-        if self.state == DuckieState.Classifying:
-            self.twist.v = 0
-            self.twist.omega = 0
-        elif self.state == DuckieState.ShuttingDown:
-            self.twist.v = 0
-            self.twist.omega = 0
-        elif (
-            self.state == DuckieState.ForceLeft
-            and delta_t < self.params["force_left_duration"]
-        ):
-            self.twist.v = self.params["force_left_velocity"]
-            self.twist.omega = self.params["force_left_omega"]
-        elif self.state == DuckieState.ForceLeft:
-            self.state = DuckieState.LaneFollowing
-            self.state_start_time = time.time()
-            return
-        elif (
-            self.state == DuckieState.ForceForward
-            and delta_t < self.params["force_forward_duration"]
-        ):
-            self.twist.v = self.params["force_forward_velocity"]
-            self.twist.omega = self.params["force_forward_omega"]
-        elif self.state == DuckieState.ForceForward:
-            self.state = DuckieState.LaneFollowing
-            self.state_start_time = time.time()
-            return
-        elif self.state == DuckieState.Parking:
-            self.parking_state()
-        elif self.error is None:
-            self.twist.omega = 0
-            self.twist.v = self.velocity
+        # ==== Set target ====
+        if self.state == DS.Stage1Loops_LaneFollowing:
+            self.twist.v = self.params["lane_follow_velocity"]
+            self.twist.omega = self.get_lanefollowing_omega()
+        elif self.state == DS.Stage1Loops_ForceForward:
+            self.twist.v = self.params["forward_turn_velocity"]
+            self.twist.omega = self.params["forward_turn_omega"]
+        elif self.state == DS.Stage1Loops_ForceRight:
+            self.twist.v = self.params["right_turn_velocity"]
+            self.twist.omega = self.params["right_turn_omega"]
+        elif self.state == DS.Stage1Loops_ForceLeft:
+            self.twist.v = self.params["left_turn_velocity"]
+            self.twist.omega = self.params["left_turn_omega"]
+        elif self.state == DS.Stage1Loops_ThinkDuck:
+            self.twist.v = self.twist.omega = 0
+        elif self.state == DS.Stage2Ducks_LaneFollowing:
+            self.twist.v = self.params["lane_follow_velocity"]
+            self.twist.omega = self.get_lanefollowing_omega()
+        elif self.state == DS.Stage2Ducks_WaitForCrossing:
+            self.twist.v = self.twist.omega = 0
+        elif self.state == DS.Stage2Ducks_ThinkDuck:
+            self.twist.v = self.twist.omega = 0
+        elif self.state == DS.Stage3Drive_ThinkDuck:
+            self.twist.v = self.twist.omega = 0
+        elif self.state == DS.ShuttingDown:
+            self.twist.v = self.twist.omega = 0
         else:
-            # P Term
-            P = -self.error * self.P
-
-            # D Term
-            d_error = (self.error - self.last_error) / (
-                rospy.get_time() - self.last_time
-            )
-            self.last_error = self.error
-            self.last_time = rospy.get_time()
-            D = d_error * self.D
-
-            self.twist.v = self.velocity
-            self.twist.omega = P + D
+            print(f"Found unknown state: {self.state.name}")
+            rospy.signal_shutdown("Reached unknown state")
 
         self.vel_pub.publish(self.twist)
 
+    def get_lanefollowing_omega(self):
+        """Justin's pid for lane following"""
+        if self.bottom_error is None:
+            return 0
+
+        # P Term
+        P = -self.bottom_error * self.P
+
+        # D Term
+        d_error = (self.bottom_error - self.bottom_last_time) / (
+            rospy.get_time() - self.bottom_last_time
+        )
+        self.bottom_last_error = self.bottom_error
+        self.bottom_last_time = rospy.get_time()
+        D = d_error * self.D
+
+        return P + D
+
     def hook(self):
         print("SHUTTING DOWN")
-        self.twist.v = 0
-        self.twist.omega = 0
+        self.twist.v = self.twist.omega = 0
         self.vel_pub.publish(self.twist)
         for i in range(8):
             self.vel_pub.publish(self.twist)

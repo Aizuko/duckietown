@@ -2,7 +2,24 @@
   "default": {
     "detection_dist_min": 0.1,
     "detection_dist_max": 0.6,
-    "velocity": 0.3,
+
+    "comment1":
+    "==== tuning params for forced turns and lane follows====",
+    "lane_follow_velocity": 0.3,
+
+    "right_turn_velocity": 0.3,
+    "left_turn_velocity": 0.3,
+    "forward_turn_velocity": 0.3,
+
+    "right_turn_omega": 0.3,
+    "left_turn_omega": 0.3,
+    "forward_turn_omega": 0.0,
+
+    "right_turn_duration": 2,
+    "left_turn_duration": 2,
+    "forward_turn_duration": 2,
+
+
     "stop_time_duration": 3,
     "ap_rate": 1,
 
@@ -58,7 +75,6 @@
     "parking_D_o": 0,
     "parking_overshoot_angle_left": -0.5,
     "parking_overshoot_angle_right": 0.5,
-    "state": null,
     "placeholder": false
   }
 }
