@@ -76,20 +76,22 @@ class LaneFollowNode(DTROS):
         # ╔─────────────────────────────────────────────────────────────────────╗
         # │ Lαηε fδllδωiηg PID sεττiηgs                                         |
         # ╚─────────────────────────────────────────────────────────────────────╝
-        self.bottom_error = None
-        self.right_error = None
-        self.left_error = None
-
-        self.lane_offset = 220
+        self.lane_offset = self.params["lane_offset"]
 
         self.velocity = self.params["lane_follow_velocity"]
         self.twist = Twist2DStamped(v=self.velocity, omega=0)
+
+        self.bottom_error = None
+        self.right_error = None
+        self.left_error = None
 
         self.right_last_error = 0
         self.left_last_error = 0
         self.bottom_last_error = 0
 
-        self.last_time = rospy.get_time()
+        self.right_last_time = rospy.get_time()
+        self.left_last_time = rospy.get_time()
+        self.bottom_last_time = rospy.get_time()
 
         self.parking_last_error = 0
         self.parking_last_time = rospy.get_time()
@@ -110,6 +112,9 @@ class LaneFollowNode(DTROS):
             CompressedImage,
             queue_size=1,
         )
+        self.vel_pub = rospy.Publisher(
+            f"/{self.veh}/car_cmd_switch_node/cmd", Twist2DStamped, queue_size=1
+        )
         self.sub = rospy.Subscriber(
             f"/{self.veh}/camera_node/image/compressed",
             CompressedImage,
@@ -117,10 +122,6 @@ class LaneFollowNode(DTROS):
             queue_size=1,
             buff_size="20MB",
         )
-        self.vel_pub = rospy.Publisher(
-            f"/{self.veh}/car_cmd_switch_node/cmd", Twist2DStamped, queue_size=1
-        )
-
         self.sub_teleport = rospy.Subscriber(
             f"/{self.veh}/deadreckoning_node/teleport",
             Transform,
@@ -201,7 +202,7 @@ class LaneFollowNode(DTROS):
         bottom_areas = np.array([cv2.contourArea(a) for a in bottom_conts])
 
         if len(right_areas) == 0 or np.max(right_areas) < 20:
-            self.error = None
+            self.right_error = None
         else:
             max_idx = np.argmax(right_areas)
 
@@ -209,12 +210,12 @@ class LaneFollowNode(DTROS):
             try:
                 cx = int(M["m10"] / M["m00"])
                 cy = int(M["m01"] / M["m00"])
-                self.right_error = cx - int(crop_width / 2) + self.offset
+                self.right_error = cx - int(crop_width / 2) + self.lane_offset
             except:
                 pass
 
         if len(left_areas) == 0 or np.max(left_areas) < 20:
-            self.error = None
+            self.left_error = None
         else:
             max_idx = np.argmax(left_areas)
 
@@ -222,26 +223,31 @@ class LaneFollowNode(DTROS):
             try:
                 cx = int(M["m10"] / M["m00"])
                 cy = int(M["m01"] / M["m00"])
-                self.left_error = cx - int(crop_width / 2) + self.offset
+                self.left_error = cx - int(crop_width / 2) + self.lane_offset
             except:
                 pass
 
         if len(bottom_areas) == 0 or np.max(bottom_areas) < 20:
-            self.error = None
+            self.bottom_error = None
         else:
             max_idx = np.argmax(bottom_areas)
 
             M = cv2.moments(bottom_conts[max_idx])
-            try:
-                cx = int(M["m10"] / M["m00"])
-                cy = int(M["m01"] / M["m00"])
-                self.bottom_error = cx - int(crop_width / 2) + self.offset
-            except:
-                pass
+
+            cx = int(M["m10"] / M["m00"])
+            cy = int(M["m01"] / M["m00"])
+            self.bottom_error = cx - int(crop_width / 2) + self.lane_offset
+            # except:
+            #    rospy.loginfo_throttle(2, f"bottom exception composed up")
+            #    pass
 
     def drive(self):
         delta_t = time.time() - self.state_start_time
         rospy.loginfo_throttle(2, f"State: {self.state.name}")
+        rospy.loginfo_throttle(
+            2,
+            f"Errors: {self.left_error}, {self.right_error}, {self.bottom_error}",
+        )
 
         # ==== Set target ====
         if self.state == DS.Stage1Loops_LaneFollowing:
@@ -284,7 +290,7 @@ class LaneFollowNode(DTROS):
         P = -self.bottom_error * self.P
 
         # D Term
-        d_error = (self.bottom_error - self.bottom_last_time) / (
+        d_error = (self.bottom_error - self.bottom_last_error) / (
             rospy.get_time() - self.bottom_last_time
         )
         self.bottom_last_error = self.bottom_error
