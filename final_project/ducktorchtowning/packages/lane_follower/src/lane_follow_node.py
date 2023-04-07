@@ -23,25 +23,30 @@ from tf2_ros import Buffer, TransformListener
 ROAD_MASK = [(20, 60, 0), (50, 255, 255)]
 STOP_MASK = [(0, 70, 150), (20, 255, 255)]
 DEBUG = True
-ENGLISH = False
 
 
-# 6: force forward
-# 7: force left +2
-# 4: force left always
 @unique
 class DuckieState(Enum):
-    """States our duckiebot can visit. These modify the LaneFollowNode"""
+    """
+    Statemachine, segmented by project stage
+    """
 
-    LaneFollowing = auto()
-    ForceLeft = auto()
-    ForceForward = auto()
-    Classifying = auto()
-    Parking = auto()
-    ShuttingDown = auto()
+    Stage1Loops = 10
+    Stage1Loops_LaneFollowing = 11
+    Stage1Loops_ForceForward = 12
+    Stage1Loops_ForceRight = 13
+    Stage1Loops_ForceLeft = 14
+    Stage1Loops_ThinkDuck = 19
+
+    Stage2Ducks = 20
+    Stage2Ducks_LaneFollowing = 21
+    Stage2Ducks_WaitForCrossing = 22
+    Stage2Ducks_ThinkDuck = 29
+
+    Stage3Drive = 30
+    Stage3Drive_ThinkDuck = 39
 
 
-# @dataclass(frozen=True)
 class LaneFollowNode(DTROS):
     def __init__(self, node_name):
         super(LaneFollowNode, self).__init__(
@@ -67,7 +72,9 @@ class LaneFollowNode(DTROS):
         self.started_service_call = False
         self.parked = False
 
-        # Publishers & Subscribers
+        # ╔─────────────────────────────────────────────────────────────────────╗
+        # │ Pμblishεrs & Sμbscribεrs                                            |
+        # ╚─────────────────────────────────────────────────────────────────────╝
         self.pub = rospy.Publisher(
             f"/{self.veh}/output/image/mask/compressed",
             CompressedImage,
@@ -89,12 +96,6 @@ class LaneFollowNode(DTROS):
             f"/{self.veh}/car_cmd_switch_node/cmd", Twist2DStamped, queue_size=1
         )
 
-        self.sub_dist = rospy.Subscriber(
-            f"/{self.veh}/deadreckoning_node/ap_distance",
-            Float64,
-            self.cb_distance,
-            queue_size=1,
-        )
         self.sub_teleport = rospy.Subscriber(
             f"/{self.veh}/deadreckoning_node/teleport",
             Transform,
@@ -105,14 +106,15 @@ class LaneFollowNode(DTROS):
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer)
 
-        self.loginfo("Lane follower is initialized")
+        # ╔─────────────────────────────────────────────────────────────────────╗
+        # │ Lαηε fδllδωiηg PID sεττiηgs                                         |
+        # ╚─────────────────────────────────────────────────────────────────────╝
+        self.bottom_error = None
+        self.right_error = None
+        self.left_error = None
 
-        # PID Variables
-        self.error = None
-        if ENGLISH:
-            self.offset = -220
-        else:
-            self.offset = 220
+        self.lane_offset = 220
+
         self.velocity = self.params["velocity"]
         self.twist = Twist2DStamped(v=self.velocity, omega=0)
 
@@ -121,9 +123,6 @@ class LaneFollowNode(DTROS):
         self.parking_last_error = 0
         self.parking_last_time = rospy.get_time()
 
-        # Stopline variables
-        self.stop_time = None
-
         # Constants
         self.P = 0.049
         self.D = -0.004
@@ -131,9 +130,6 @@ class LaneFollowNode(DTROS):
 
         # Shutdown hook
         rospy.on_shutdown(self.hook)
-
-    def cb_distance(self, msg):
-        self.ap_distance = msg.data
 
     def state_decision(self, most_recent_digit):
         if self.parked:
@@ -167,55 +163,78 @@ class LaneFollowNode(DTROS):
             < self.params["detection_dist_max"]
         )
 
-        is_stop_immune = (
-            self.stop_time
-            and time.time() - self.stop_time < self.params["stop_time_duration"]
-        )
-
-        if is_close and not is_stop_immune:
-            self.is_stopped = True
-            self.stop_time = time.time()
-
-            for _ in range(8):
-                self.drive()
-            # time.sleep(1)
-
-            self.state_start_time = time.time()
-            self.drive()
-
     def lane_callback(self, msg):
-        img = self.bridge.compressed_imgmsg_to_cv2(msg, "bgr8")
-        crop = img[300:-1, :, :]
-        crop_width = crop.shape[1]
-        hsv = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
+        image = self.bridge.compressed_imgmsg_to_cv2(msg, "bgr8")
+
+        right_image  = image[:, 400:, :]
+        left_image   = image[:, :-400,:]
+        bottom_image = image[300:, :, :]
+
+        crop_width = bottom_image.shape[1]
+
+        hsv = cv2.cvtColor(right_image, cv2.COLOR_BGR2HSV)
         mask = cv2.inRange(hsv, ROAD_MASK[0], ROAD_MASK[1])
-        crop = cv2.bitwise_and(crop, crop, mask=mask)
-        contours, _ = cv2.findContours(
-            mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE
+        right_image = cv2.bitwise_and(crop, crop, mask=mask)
+        right_conts, _ = cv2.findContours(
+            right_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE
         )
 
-        # Search for lane in front
-        areas = np.array([cv2.contourArea(a) for a in contours])
+        hsv = cv2.cvtColor(left_image, cv2.COLOR_BGR2HSV)
+        mask = cv2.inRange(hsv, ROAD_MASK[0], ROAD_MASK[1])
+        left_image = cv2.bitwise_and(crop, crop, mask=mask)
+        left_conts, _ = cv2.findContours(
+            left_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE
+        )
 
-        if len(areas) == 0 or np.max(areas) < 20:
+        hsv = cv2.cvtColor(bottom_image, cv2.COLOR_BGR2HSV)
+        mask = cv2.inRange(hsv, ROAD_MASK[0], ROAD_MASK[1])
+        bottom_image = cv2.bitwise_and(crop, crop, mask=mask)
+        bottom_conts, _ = cv2.findContours(
+            bottom_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE
+        )
+
+        right_areas  = np.array([cv2.contourArea(a) for a in right_conts])
+        left_areas   = np.array([cv2.contourArea(a) for a in left_conts])
+        bottom_areas = np.array([cv2.contourArea(a) for a in bottom_conts])
+
+        if len(right_areas) == 0 or np.max(right_areas) < 20:
             self.error = None
         else:
-            max_idx = np.argmax(areas)
+            max_idx = np.argmax(right_areas)
 
-            M = cv2.moments(contours[max_idx])
+            M = cv2.moments(right_conts[max_idx])
             try:
                 cx = int(M["m10"] / M["m00"])
                 cy = int(M["m01"] / M["m00"])
-                self.error = cx - int(crop_width / 2) + self.offset
-                if DEBUG:
-                    cv2.drawContours(crop, contours, max_idx, (0, 255, 0), 3)
-                    cv2.circle(crop, (cx, cy), 7, (0, 0, 255), -1)
+                self.right_error = cx - int(crop_width / 2) + self.offset
             except:
                 pass
 
-        if DEBUG:
-            rect_img_msg = self.bridge.cv2_to_compressed_imgmsg(crop)
-            self.pub.publish(rect_img_msg)
+        if len(left_areas) == 0 or np.max(left_areas) < 20:
+            self.error = None
+        else:
+            max_idx = np.argmax(left_areas)
+
+            M = cv2.moments(left_conts[max_idx])
+            try:
+                cx = int(M["m10"] / M["m00"])
+                cy = int(M["m01"] / M["m00"])
+                self.left_error = cx - int(crop_width / 2) + self.offset
+            except:
+                pass
+
+        if len(bottom_areas) == 0 or np.max(bottom_areas) < 20:
+            self.error = None
+        else:
+            max_idx = np.argmax(bottom_areas)
+
+            M = cv2.moments(bottom_conts[max_idx])
+            try:
+                cx = int(M["m10"] / M["m00"])
+                cy = int(M["m01"] / M["m00"])
+                self.bottom_error = cx - int(crop_width / 2) + self.offset
+            except:
+                pass
 
     def drive(self):
         delta_t = time.time() - self.state_start_time
