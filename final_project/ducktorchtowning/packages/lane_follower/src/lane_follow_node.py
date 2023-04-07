@@ -1,12 +1,8 @@
 #!/usr/bin/env python3
-
 import rospy
 import cv2
 import time
 import json
-
-import stage1_loops
-import stage2_ducks
 
 from duckietown.dtros import DTROS, NodeType
 from dataclasses import dataclass
@@ -64,13 +60,37 @@ class LaneFollowNode(DTROS):
             **(self.params.get(self.veh) or {}),
         }
 
-        self.state = DuckieState.LaneFollowing
-        self.seen_ints = [0 for _ in range(10)]
+        # ╔─────────────────────────────────────────────────────────────────────╗
+        # │ Sτατε cδητrδls                                                      |
+        # ╚─────────────────────────────────────────────────────────────────────╝
+        self.state = DuckieState.Stage1Loops_LaneFollowing
         self.state_start_time = time.time()
 
-        self.ap_distance = 1000
-        self.started_service_call = False
-        self.parked = False
+        self.is_parked = False
+
+        # ╔─────────────────────────────────────────────────────────────────────╗
+        # │ Lαηε fδllδωiηg PID sεττiηgs                                         |
+        # ╚─────────────────────────────────────────────────────────────────────╝
+        self.bottom_error = None
+        self.right_error = None
+        self.left_error = None
+
+        self.lane_offset = 220
+
+        self.velocity = self.params["velocity"]
+        self.twist = Twist2DStamped(v=self.velocity, omega=0)
+
+        self.right_last_error = 0
+        self.left_last_error = 0
+        self.bottom_last_error = 0
+
+        self.last_time = rospy.get_time()
+
+        self.parking_last_error = 0
+        self.parking_last_time = rospy.get_time()
+
+        self.P = 0.049
+        self.D = -0.004
 
         # ╔─────────────────────────────────────────────────────────────────────╗
         # │ Pμblishεrs & Sμbscribεrs                                            |
@@ -106,33 +126,11 @@ class LaneFollowNode(DTROS):
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer)
 
-        # ╔─────────────────────────────────────────────────────────────────────╗
-        # │ Lαηε fδllδωiηg PID sεττiηgs                                         |
-        # ╚─────────────────────────────────────────────────────────────────────╝
-        self.bottom_error = None
-        self.right_error = None
-        self.left_error = None
-
-        self.lane_offset = 220
-
-        self.velocity = self.params["velocity"]
-        self.twist = Twist2DStamped(v=self.velocity, omega=0)
-
-        self.last_error = 0
-        self.last_time = rospy.get_time()
-        self.parking_last_error = 0
-        self.parking_last_time = rospy.get_time()
-
-        # Constants
-        self.P = 0.049
-        self.D = -0.004
-        self.stop_duration = 1
-
         # Shutdown hook
         rospy.on_shutdown(self.hook)
 
     def state_decision(self, most_recent_digit):
-        if self.parked:
+        if self.is_parked:
             self.state = DuckieState.ShuttingDown
             print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
             print("ALL DIGITS HAVE BEEN SEEN")
@@ -166,8 +164,8 @@ class LaneFollowNode(DTROS):
     def lane_callback(self, msg):
         image = self.bridge.compressed_imgmsg_to_cv2(msg, "bgr8")
 
-        right_image  = image[:, 400:, :]
-        left_image   = image[:, :-400,:]
+        right_image = image[:, 400:, :]
+        left_image = image[:, :-400, :]
         bottom_image = image[300:, :, :]
 
         crop_width = bottom_image.shape[1]
@@ -193,8 +191,8 @@ class LaneFollowNode(DTROS):
             bottom_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE
         )
 
-        right_areas  = np.array([cv2.contourArea(a) for a in right_conts])
-        left_areas   = np.array([cv2.contourArea(a) for a in left_conts])
+        right_areas = np.array([cv2.contourArea(a) for a in right_conts])
+        left_areas = np.array([cv2.contourArea(a) for a in left_conts])
         bottom_areas = np.array([cv2.contourArea(a) for a in bottom_conts])
 
         if len(right_areas) == 0 or np.max(right_areas) < 20:
@@ -237,6 +235,8 @@ class LaneFollowNode(DTROS):
                 pass
 
     def drive(self):
+        todo("Switch to using correct errors in drive")
+
         delta_t = time.time() - self.state_start_time
         if self.params.get("state") is not None:
             self.state = DuckieState[self.params["state"]]
@@ -309,7 +309,7 @@ class LaneFollowNode(DTROS):
             self.parking_depth_substate()
         self.parking_overshoot_substate(parking_stall)
         self.parking_reverse_substate(parking_stall, opposite_stall)
-        self.parked = True
+        self.is_parked = True
 
     def parking_pid(self, error):
         P = error * np.array(
