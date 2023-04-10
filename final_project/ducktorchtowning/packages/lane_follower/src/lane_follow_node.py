@@ -42,8 +42,11 @@ class DS(IntEnum):
     Stage2Ducks_WaitForCrossing = 22
     Stage2Ducks_ThinkDuck = 29
 
-    Stage3Drive = 30
-    Stage3Drive_ThinkDuck = 39
+    Stage3Parking = 30
+    Stage3Parking_Depth = 31
+    Stage3Parking_Overshoot = 32
+    Stage3Parking_Reverse = 33
+    Stage3Parking_ThinkDuck = 39
 
     ShuttingDown = 90
 
@@ -122,12 +125,12 @@ class LaneFollowNode(DTROS):
             queue_size=1,
             buff_size="20MB",
         )
-        self.sub_teleport = rospy.Subscriber(
-            f"/{self.veh}/deadreckoning_node/teleport",
-            Transform,
-            self.cb_teleport,
-            queue_size=1,
-        )
+        # self.sub_teleport = rospy.Subscriber(
+        #     f"/{self.veh}/deadreckoning_node/teleport",
+        #     Transform,
+        #     self.cb_teleport,
+        #     queue_size=1,
+        # )
 
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer)
@@ -135,37 +138,8 @@ class LaneFollowNode(DTROS):
         # Shutdown hook
         rospy.on_shutdown(self.hook)
 
-    def state_decision(self, most_recent_digit):
-        if self.is_parked:
-            self.state = DS.ShuttingDown
-            print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-            print("End of the road")
-            print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-            rospy.signal_shutdown("Rode to the end of the road")
-
-        elif most_recent_digit == 7 and all(
-            [
-                self.seen_ints[0],
-                self.seen_ints[5],
-                self.seen_ints[8],
-                self.seen_ints[2],
-                self.seen_ints[1],
-            ]
-        ):
-            self.state = DS.ForceLeft
-        elif most_recent_digit == 7:
-            self.state = DS.ForceForward
-        elif most_recent_digit == 6 and self.seen_ints[9] != 0:
-            self.state = DS.ForceForward
-        else:
-            self.state = DS.LaneFollowing
-
     def cb_teleport(self, msg):
-        is_close = (
-            self.params["detection_dist_min"]
-            < self.ap_distance
-            < self.params["detection_dist_max"]
-        )
+        return
 
     def lane_callback(self, msg):
         image = self.bridge.compressed_imgmsg_to_cv2(msg, "bgr8")
@@ -271,7 +245,13 @@ class LaneFollowNode(DTROS):
             self.twist.v = self.twist.omega = 0
         elif self.state == DS.Stage2Ducks_ThinkDuck:
             self.twist.v = self.twist.omega = 0
-        elif self.state == DS.Stage3Drive_ThinkDuck:
+        elif self.state == DS.Stage3Parking_Depth:
+            self.parking_depth_state()
+        elif self.state == DS.Stage3Parking_Overshoot:
+            self.parking_overshoot_state()
+        elif self.state == DS.Stage3Parking_Reverse:
+            self.parking_reverse_state()
+        elif self.state == DS.Stage3Parking_ThinkDuck:
             self.twist.v = self.twist.omega = 0
         elif self.state == DS.ShuttingDown:
             self.twist.v = self.twist.omega = 0
@@ -314,9 +294,9 @@ class LaneFollowNode(DTROS):
         opposite_stall = parking_lot[opposite_stall_number - 1]
 
         if parking_stall["depth"] == "far":
-            self.parking_depth_substate()
-        self.parking_overshoot_substate(parking_stall)
-        self.parking_reverse_substate(parking_stall, opposite_stall)
+            self.parking_depth_state()
+        self.parking_overshoot_state(parking_stall)
+        self.parking_reverse_state(parking_stall, opposite_stall)
         self.is_parked = True
 
     def parking_pid(self, error):
@@ -335,7 +315,7 @@ class LaneFollowNode(DTROS):
         self.twist.v = P[0] + D[0]
         self.twist.omega = P[1] + D[1]
 
-    def parking_depth_substate(self):
+    def parking_depth_state(self):
         rate = rospy.Rate(self.params["parking_rate"])
         while True:
             try:
@@ -346,21 +326,20 @@ class LaneFollowNode(DTROS):
                     rospy.Duration(1.0),
                 ).transform
                 translation = at_transform.translation
-                rospy.logdebug_throttle(5, translation.x)
             except Exception:
                 rate.sleep()
                 continue
             error = np.array(
                 [translation.x - self.params["parking_far_depth_x"], 0]
             )
-            rospy.logdebug_throttle(5, (error, translation.x))
+            rospy.logdebug_throttle(5, (error, translation.x, translation.y))
             if np.linalg.norm(error) < self.params["parking_far_depth_epsilon"]:
                 break
             self.parking_pid(error)
             self.vel_pub.publish(self.twist)
             rate.sleep()
 
-    def parking_overshoot_substate(self, opposite_stall):
+    def parking_overshoot_state(self, opposite_stall):
         rate = rospy.Rate(self.params["parking_rate"])
         if opposite_stall["side"] == "left":
             angle = self.params["parking_overshoot_angle_left"] * np.pi
@@ -379,15 +358,15 @@ class LaneFollowNode(DTROS):
             except Exception:
                 rate.sleep()
                 continue
-            error = [0, angle]
-            rospy.logdebug_throttle(5, (error, translation.x))
-            if abs(error) < self.params["parking_far_depth_epsilon"]:
+            error = np.array([translation.y - opposite_stall["y_overshoot_target"], angle])
+            rospy.logdebug_throttle(5, (error, translation.x, translation.y))
+            if np.linalg.norm(error) < self.params["parking_overshoot_side_epsilon"]:
                 break
             self.parking_pid(error)
             self.vel_pub.publish(self.twist)
             rate.sleep()
 
-    def parking_reverse_substate(self, parking_stall, opposite_stall):
+    def parking_reverse_state(self, parking_stall, opposite_stall):
         return
 
 

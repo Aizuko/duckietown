@@ -3,7 +3,7 @@
     "detection_dist_min": 0.1,
     "detection_dist_max": 0.6,
 
-    "starting_state": 11,
+    "starting_state": 31,
 
     "comment1":
     "==== tuning params for forced turns and lane follows====",
@@ -42,7 +42,10 @@
         "number": 1,
         "opposite_stall_number": 3,
         "side": "left",
-        "depth": "far"
+        "depth": "far",
+        "x": 1.62,
+        "y": 1.19,
+        "y_overshoot_target": 1.41
       },
       {
         "distance": 1.28,
@@ -50,7 +53,10 @@
         "opposite_stall_number": 4,
         "number": 2,
         "side": "left",
-        "depth": "near"
+        "depth": "near",
+        "x": 1.40,
+        "y": 1.19,
+        "y_overshoot_target": 1.41
       },
       {
         "distance": 1.28,
@@ -58,7 +64,10 @@
         "opposite_stall_number": 1,
         "number": 3,
         "side": "right",
-        "depth": "far"
+        "depth": "far",
+        "x": 1.62,
+        "y": 2.47,
+        "y_overshoot_target": 2.05
       },
       {
         "distance": 1.28,
@@ -66,12 +75,16 @@
         "opposite_stall_number": 2,
         "number": 4,
         "side": "right",
-        "depth": "near"
+        "depth": "near",
+        "x": 1.40,
+        "y": 2.47,
+        "y_overshoot_target": 2.05
       }
     ],
     "parking_rate": 8,
     "parking_far_depth_epsilon": 0.01,
     "parking_far_depth_x": 1.51,
+    "parking_overshoot_side_epsilon": 0.01,
     "parking_P_x": 1,
     "parking_D_x": 0,
     "parking_P_o": 0.003,
