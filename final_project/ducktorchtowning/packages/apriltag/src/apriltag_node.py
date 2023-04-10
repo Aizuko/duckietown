@@ -131,7 +131,7 @@ class AprilTagNode(DTROS):
     def render_tag(self, image: np.ndarray, detection: Detection):
         for i in range(4):
             tag = TAG_ID_TO_TAG.get(
-                detection.tag_id, Tag(detection.tag_id, None)
+                detection.tag_id, Tag(detection.tag_id, None, 0)
             )
             corner_a = detection.corners[i]
             corner_b = detection.corners[(i + 1) % 4]
