@@ -10,6 +10,7 @@ class TagType(Enum):
     LeftStop = "Stop sign indicating left-turning traffic"
     CrossingStop = "Duckie crossing stop sign"
     ParkingLotEnteringStop = "Stop sign that leads into the parking lot"
+    ParkingLot = "Parking lot tag"
 
 
 class Tag:
@@ -28,7 +29,8 @@ TAG_TYPE_TO_COLOR = {
     TagType.LeftStop: (0, 255, 0),
     TagType.ForwardStop: (0, 255, 0),
     TagType.CrossingStop: (0, 255, 0),
-    TagType.ParkingLotEnteringStop: (0, 255, 0),
+    TagType.ParkingLotEnteringStop: (0, 255, 255),
+    TagType.ParkingLot: (0, 255, 255),
     None: (255, 0, 255),
 }
 
@@ -51,4 +53,9 @@ TAG_ID_TO_TAG = {
     56: Tag(56, TagType.ForwardStop, 3),
     163: Tag(163, TagType.CrossingStop, 4),
     38: Tag(38, TagType.ParkingLotEnteringStop, 5),
+    75: Tag(75, TagType.ParkingLot, 0),
+    207: Tag(207, TagType.ParkingLot, 0),
+    226: Tag(226, TagType.ParkingLot, 0),
+    227: Tag(227, TagType.ParkingLot, 0),
+    228: Tag(228, TagType.ParkingLot, 0),
 }

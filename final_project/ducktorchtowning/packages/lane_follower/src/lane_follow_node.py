@@ -189,11 +189,14 @@ class LaneFollowNode(DTROS):
             self.state = DS.LaneFollowing
 
     def ap_callback(self, msg):
+        if 30 <= self.state < 40:
+            return
+
         self.ap_distance = msg.x
         self.ap_label = TagType(int(msg.y))
 
         if self.ap_label == TagType.ParkingLotEnteringStop:
-            self.state = DS.Stage3Drive_ThinkDuck
+            self.state = DS.Stage3Parking_ThinkDuck
             self.state_start_time = time.time()
         elif self.ap_label == TagType.CrossingStop:
             self.state = DS.Stage2Ducks_WaitForCrossing
@@ -207,8 +210,6 @@ class LaneFollowNode(DTROS):
         elif self.ap_label == TagType.ForwardStop:
             self.state = DS.Stage1Loops_ForceForward
             self.state_start_time = time.time()
-
-        todo("Finish this")
 
     def lane_callback(self, msg):
         if 30 <= self.state < 40:
@@ -384,14 +385,15 @@ class LaneFollowNode(DTROS):
             self.twist.v = self.twist.omega = 0
         elif self.state == DS.Stage2Ducks_ThinkDuck:
             self.twist.v = self.twist.omega = 0
+        elif self.state == DS.Stage3Parking_ThinkDuck:
+            self.twist.v = self.twist.omega = 0
+            self.parking_state()
         elif self.state == DS.Stage3Parking_Depth:
             self.parking_depth_state()
         elif self.state == DS.Stage3Parking_Overshoot:
             self.parking_overshoot_state()
         elif self.state == DS.Stage3Parking_Reverse:
             self.parking_reverse_state()
-        elif self.state == DS.Stage3Parking_ThinkDuck:
-            self.twist.v = self.twist.omega = 0
         elif self.state == DS.ShuttingDown:
             self.twist.v = self.twist.omega = 0
         else:
