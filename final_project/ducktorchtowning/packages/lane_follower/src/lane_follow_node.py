@@ -405,21 +405,23 @@ class LaneFollowNode(DTROS):
         D = d_error * np.array(
             [self.params["parking_D_x"], self.params["parking_D_o"]]
         )
-
-        self.twist.v = P[0] + D[0]
-        self.twist.omega = P[1] + D[1]
+        v = P[0] + D[0]
+        v = np.clip(v, -self.params["parking_max_v"], self.params["parking_max_v"])
+        omega = P[1] + D[1]
+        self.twist.v = v
+        self.twist.omega = omega
 
     def parking_depth_state(self):
         rate = rospy.Rate(self.params["parking_rate"])
         while True:
             try:
-                at_transform = self.tf_buffer.lookup_transform(
+                odometry_transform = self.tf_buffer.lookup_transform(
                     "world",
                     "odometry",
                     rospy.Time(0),
                     rospy.Duration(1.0),
                 ).transform
-                translation = at_transform.translation
+                translation = odometry_transform.translation
             except Exception:
                 rate.sleep()
                 continue
@@ -432,36 +434,73 @@ class LaneFollowNode(DTROS):
             self.parking_pid(error)
             self.vel_pub.publish(self.twist)
             rate.sleep()
+        self.state = DS.Stage3Parking_Overshoot
 
-    def parking_overshoot_state(self, opposite_stall):
+    def parking_overshoot_state(self):
         rate = rospy.Rate(self.params["parking_rate"])
-        if opposite_stall["side"] == "left":
-            angle = self.params["parking_overshoot_angle_left"] * np.pi
+        if self.opposite_stall["side"] == "left":
+            target_angle = self.params["parking_overshoot_angle_left"] * np.pi
         else:
-            angle = -self.params["parking_overshoot_angle_right"] * np.pi
+            target_angle = self.params["parking_overshoot_angle_right"] * np.pi
         while True:
             try:
-                at_transform = self.tf_buffer.lookup_transform(
+                odometry_transform = self.tf_buffer.lookup_transform(
                     "world",
                     "odometry",
                     rospy.Time(0),
                     rospy.Duration(1.0),
                 ).transform
-                translation = at_transform.translation
-                rospy.logdebug_throttle(5, translation.x)
+                translation = odometry_transform.translation
+                rotation = odometry_transform.rotation
+                angle = tr.euler_from_quaternion(
+                    [rotation.x, rotation.y, rotation.z, rotation.w]
+                )[2]
             except Exception:
                 rate.sleep()
                 continue
-            error = np.array([translation.y - opposite_stall["y_overshoot_target"], angle])
+            angle_error = angle - target_angle
+            error = np.array([self.params["parking_rotating_x_error"], angle_error])
+            rospy.logdebug(f"angle: {angle}")
+            rospy.logdebug(f"target angle: {target_angle}")
+            if np.linalg.norm(error) < self.params["parking_overshoot_angle_epsilon"] * np.pi:
+                break
+            self.twist.v = self.params["parking_overshoot_v"]
+            self.twist.omega = np.sign(target_angle) * self.params["parking_overshoot_omega"] * np.pi
+            self.vel_pub.publish(self.twist)
+            rate.sleep()
+        self.state = DS.Stage3Parking_Reverse
+
+    def parking_reverse_state(self):
+        if self.opposite_stall["side"] == "left":
+            target_angle = self.params["parking_overshoot_angle_left"] * np.pi
+        else:
+            target_angle = self.params["parking_overshoot_angle_right"] * np.pi
+        while True:
+            try:
+                odometry_transform = self.tf_buffer.lookup_transform(
+                    "world",
+                    "odometry",
+                    rospy.Time(0),
+                    rospy.Duration(1.0),
+                ).transform
+                translation = odometry_transform.translation
+                rotation = odometry_transform.rotation
+                angle = tr.euler_from_quaternion(
+                    [rotation.x, rotation.y, rotation.z, rotation.w]
+                )[2]
+            except Exception:
+                rate.sleep()
+                continue
+            error = np.array(
+                [translation.y - self.parking_stall["y_parking_target"], angle - target_angle]
+            )
             rospy.logdebug_throttle(5, (error, translation.x, translation.y))
-            if np.linalg.norm(error) < self.params["parking_overshoot_side_epsilon"]:
+            if np.linalg.norm(error) < self.params["parking_far_depth_epsilon"]:
                 break
             self.parking_pid(error)
             self.vel_pub.publish(self.twist)
             rate.sleep()
-
-    def parking_reverse_state(self, parking_stall, opposite_stall):
-        return
+        self.state = DS.ShuttingDown
 
 
 if __name__ == "__main__":
