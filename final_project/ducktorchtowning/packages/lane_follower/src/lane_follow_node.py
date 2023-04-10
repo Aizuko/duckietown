@@ -64,11 +64,14 @@ class TagType(IntEnum):
     CrossingStop = 4
     ParkingLotEnteringStop = 5
 
+
 class SeenAP:
-    """ Tuple for an apriltag detection """
+    """Tuple for an apriltag detection"""
+
     def __init__(self, tag: TagType, tag_pos):
         self.tag = tag
         self.time = time.time()
+
 
 class LaneFollowNode(DTROS):
     def __init__(self, node_name):
@@ -255,7 +258,9 @@ class LaneFollowNode(DTROS):
         # Line far red
         hsv = cv2.cvtColor(lines_far_image, cv2.COLOR_BGR2HSV)
         mask = cv2.inRange(hsv, REDLINE_MASK[0], REDLINE_MASK[1])
-        redline_far_image = cv2.bitwise_and(lines_far_image, lines_far_image, mask=mask)
+        redline_far_image = cv2.bitwise_and(
+            lines_far_image, lines_far_image, mask=mask
+        )
         red_far_conts, _ = cv2.findContours(
             mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE
         )
@@ -263,7 +268,9 @@ class LaneFollowNode(DTROS):
         # Line close red
         hsv = cv2.cvtColor(lines_close_image, cv2.COLOR_BGR2HSV)
         mask = cv2.inRange(hsv, REDLINE_MASK[0], REDLINE_MASK[1])
-        redline_close_image = cv2.bitwise_and(lines_close_image, lines_close_image, mask=mask)
+        redline_close_image = cv2.bitwise_and(
+            lines_close_image, lines_close_image, mask=mask
+        )
         red_close_conts, _ = cv2.findContours(
             mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE
         )
@@ -272,7 +279,9 @@ class LaneFollowNode(DTROS):
         left_areas = np.array([cv2.contourArea(a) for a in left_conts])
         bottom_areas = np.array([cv2.contourArea(a) for a in bottom_conts])
         red_far_areas = np.array([cv2.contourArea(a) for a in red_far_conts])
-        red_close_areas = np.array([cv2.contourArea(a) for a in red_close_conts])
+        red_close_areas = np.array(
+            [cv2.contourArea(a) for a in red_close_conts]
+        )
 
         # Right error
         if len(right_areas) == 0 or np.max(right_areas) < 20:
@@ -315,11 +324,17 @@ class LaneFollowNode(DTROS):
             self.bottom_error = cx - int(crop_width / 2) + self.lane_offset
 
         # Red far
-        if len(red_far_areas) > 0 and np.max(red_far_areas) > self.params["red_far_thresh"]:
+        if (
+            len(red_far_areas) > 0
+            and np.max(red_far_areas) > self.params["red_far_thresh"]
+        ):
             self.red_far_sightings.append(time.time())
 
         # Red close
-        if len(red_close_areas) > 0 and np.max(red_close_areas) > self.params["red_close_thresh"]:
+        if (
+            len(red_close_areas) > 0
+            and np.max(red_close_areas) > self.params["red_close_thresh"]
+        ):
             self.red_close_sightings.append(time.time())
 
     def is_good2go(self, image):
@@ -360,6 +375,9 @@ class LaneFollowNode(DTROS):
             2,
             f"Errors: {self.left_error}, {self.right_error}, {self.bottom_error}",
         )
+
+        rospy.loginfo_throttle(1, f"Red far: {len(self.red_far_sightings)}")
+        rospy.loginfo_throttle(1, f"Red close: {len(self.red_close_sightings)}")
 
         # ==== Set target ====
         if self.state == DS.Stage1Loops_LaneFollowing:
@@ -450,7 +468,9 @@ class LaneFollowNode(DTROS):
             [self.params["parking_D_x"], self.params["parking_D_o"]]
         )
         v = P[0] + D[0]
-        v = np.clip(v, -self.params["parking_max_v"], self.params["parking_max_v"])
+        v = np.clip(
+            v, -self.params["parking_max_v"], self.params["parking_max_v"]
+        )
         omega = P[1] + D[1]
         self.twist.v = v
         self.twist.omega = omega
@@ -503,13 +523,22 @@ class LaneFollowNode(DTROS):
                 rate.sleep()
                 continue
             angle_error = angle - target_angle
-            error = np.array([self.params["parking_rotating_x_error"], angle_error])
+            error = np.array(
+                [self.params["parking_rotating_x_error"], angle_error]
+            )
             rospy.logdebug(f"angle: {angle}")
             rospy.logdebug(f"target angle: {target_angle}")
-            if np.linalg.norm(error) < self.params["parking_overshoot_angle_epsilon"] * np.pi:
+            if (
+                np.linalg.norm(error)
+                < self.params["parking_overshoot_angle_epsilon"] * np.pi
+            ):
                 break
             self.twist.v = self.params["parking_overshoot_v"]
-            self.twist.omega = np.sign(target_angle) * self.params["parking_overshoot_omega"] * np.pi
+            self.twist.omega = (
+                np.sign(target_angle)
+                * self.params["parking_overshoot_omega"]
+                * np.pi
+            )
             self.vel_pub.publish(self.twist)
             rate.sleep()
         self.state = DS.Stage3Parking_Reverse
@@ -536,7 +565,10 @@ class LaneFollowNode(DTROS):
                 rate.sleep()
                 continue
             error = np.array(
-                [translation.y - self.parking_stall["y_parking_target"], angle - target_angle]
+                [
+                    translation.y - self.parking_stall["y_parking_target"],
+                    angle - target_angle,
+                ]
             )
             rospy.logdebug_throttle(5, (error, translation.x, translation.y))
             if np.linalg.norm(error) < self.params["parking_far_depth_epsilon"]:
