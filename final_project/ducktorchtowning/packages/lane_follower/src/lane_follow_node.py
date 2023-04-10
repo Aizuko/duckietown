@@ -49,8 +49,7 @@ class DS(IntEnum):
     Stage2Ducks_ThinkDuck = 29
 
     Stage3Parking = 30
-    Stage3Parking_Depth = 31
-    Stage3Parking_Overshoot = 32
+    Stage3Parking_Turn = 32
     Stage3Parking_Reverse = 33
     Stage3Parking_ThinkDuck = 39
 
@@ -422,10 +421,8 @@ class LaneFollowNode(DTROS):
         elif self.state == DS.Stage3Parking_ThinkDuck:
             self.twist.v = self.twist.omega = 0
             self.parking_state()
-        elif self.state == DS.Stage3Parking_Depth:
-            self.parking_depth_state()
-        elif self.state == DS.Stage3Parking_Overshoot:
-            self.parking_overshoot_state()
+        elif self.state == DS.Stage3Parking_Turn:
+            self.parking_turn_state()
         elif self.state == DS.Stage3Parking_Reverse:
             self.parking_reverse_state()
         elif self.state == DS.ShuttingDown:
@@ -470,7 +467,7 @@ class LaneFollowNode(DTROS):
 
         if parking_stall["depth"] == "far":
             self.parking_depth_state()
-        self.parking_overshoot_state(parking_stall)
+        self.parking_turn_state(parking_stall)
         self.parking_reverse_state(parking_stall, opposite_stall)
         self.is_parked = True
 
@@ -494,37 +491,12 @@ class LaneFollowNode(DTROS):
         self.twist.v = v
         self.twist.omega = omega
 
-    def parking_depth_state(self):
-        rate = rospy.Rate(self.params["parking_rate"])
-        while True:
-            try:
-                odometry_transform = self.tf_buffer.lookup_transform(
-                    "world",
-                    "odometry",
-                    rospy.Time(0),
-                    rospy.Duration(1.0),
-                ).transform
-                translation = odometry_transform.translation
-            except Exception:
-                rate.sleep()
-                continue
-            error = np.array(
-                [translation.x - self.params["parking_far_depth_x"], 0]
-            )
-            rospy.logdebug_throttle(5, (error, translation.x, translation.y))
-            if np.linalg.norm(error) < self.params["parking_far_depth_epsilon"]:
-                break
-            self.parking_pid(error)
-            self.vel_pub.publish(self.twist)
-            rate.sleep()
-        self.state = DS.Stage3Parking_Overshoot
-
-    def parking_overshoot_state(self):
+    def parking_turn_state(self):
         rate = rospy.Rate(self.params["parking_rate"])
         if self.opposite_stall["side"] == "left":
-            target_angle = self.params["parking_overshoot_angle_left"] * np.pi
+            target_angle = self.params["parking_turn_angle_left"] * np.pi
         else:
-            target_angle = self.params["parking_overshoot_angle_right"] * np.pi
+            target_angle = self.params["parking_turn_angle_right"] * np.pi
         while True:
             try:
                 odometry_transform = self.tf_buffer.lookup_transform(
@@ -549,13 +521,13 @@ class LaneFollowNode(DTROS):
             rospy.logdebug(f"target angle: {target_angle}")
             if (
                 np.linalg.norm(error)
-                < self.params["parking_overshoot_angle_epsilon"] * np.pi
+                < self.params["parking_turn_angle_epsilon"] * np.pi
             ):
                 break
-            self.twist.v = self.params["parking_overshoot_v"]
+            self.twist.v = self.params["parking_turn_v"]
             self.twist.omega = (
                 np.sign(target_angle)
-                * self.params["parking_overshoot_omega"]
+                * self.params["parking_turn_omega"]
                 * np.pi
             )
             self.vel_pub.publish(self.twist)
@@ -564,9 +536,9 @@ class LaneFollowNode(DTROS):
 
     def parking_reverse_state(self):
         if self.opposite_stall["side"] == "left":
-            target_angle = self.params["parking_overshoot_angle_left"] * np.pi
+            target_angle = self.params["parking_turn_angle_left"] * np.pi
         else:
-            target_angle = self.params["parking_overshoot_angle_right"] * np.pi
+            target_angle = self.params["parking_turn_angle_right"] * np.pi
         while True:
             try:
                 odometry_transform = self.tf_buffer.lookup_transform(
@@ -590,7 +562,7 @@ class LaneFollowNode(DTROS):
                 ]
             )
             rospy.logdebug_throttle(5, (error, translation.x, translation.y))
-            if np.linalg.norm(error) < self.params["parking_far_depth_epsilon"]:
+            if np.linalg.norm(error) < self.params["parking_reverse_epsilon"]:
                 break
             self.parking_pid(error)
             self.vel_pub.publish(self.twist)
