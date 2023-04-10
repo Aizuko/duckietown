@@ -24,6 +24,11 @@ TAG_TYPE_TO_COLOR = {
     TagType.StopSign: (255, 0, 0),
     TagType.TIntersection: (0, 0, 255),
     TagType.UofA: (0, 255, 0),
+    TagType.RightStop: (0, 255, 0),
+    TagType.LeftStop: (0, 255, 0),
+    TagType.ForwardStop: (0, 255, 0),
+    TagType.CrossingStop: (0, 255, 0),
+    TagType.ParkingLotEnteringStop: (0, 255, 0),
     None: (255, 0, 255),
 }
 
