@@ -22,6 +22,8 @@ DEBUG = True
 
 DUCKIES_PLUS_LINE = [(0, 70, 120), (40, 255, 255)]
 DUCKIES_ONLY = [(0, 55, 145), (20, 255, 255)]
+REDLINE_MASK = [(0, 100, 120), (10, 255, 255)]
+BLUELINE_MASK = [(40, 100, 80), (130, 255, 255)]
 
 
 @unique
