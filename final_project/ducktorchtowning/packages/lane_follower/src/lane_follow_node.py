@@ -25,6 +25,8 @@ DUCKIES_PLUS_LINE = [(0, 70, 120), (40, 255, 255)]
 DUCKIES_ONLY = [(0, 55, 145), (20, 255, 255)]
 REDLINE_MASK = [(0, 100, 120), (10, 255, 255)]
 BLUELINE_MASK = [(40, 100, 80), (130, 255, 255)]
+# Crop off top 270 for lines
+# Crop off top 340 for real closeness
 
 
 @unique
@@ -63,6 +65,11 @@ class TagType(IntEnum):
     CrossingStop = 4
     ParkingLotEnteringStop = 5
 
+class SeenAP:
+    """ Tuple for an apriltag detection """
+    def __init__(self, tag: TagType, tag_pos):
+        self.tag = tag
+        self.time = time.time()
 
 class LaneFollowNode(DTROS):
     def __init__(self, node_name):
@@ -90,6 +97,7 @@ class LaneFollowNode(DTROS):
         self.is_parked = False
         self.duck_free_time = 0.0
         self.last_seen_duck = None
+        self.seen_ap = [None, None]
 
         # ╔─────────────────────────────────────────────────────────────────────╗
         # │ Lαηε fδllδωiηg PID sεττiηgs                                         |
@@ -106,6 +114,8 @@ class LaneFollowNode(DTROS):
         self.right_last_error = 0
         self.left_last_error = 0
         self.bottom_last_error = 0
+        self.red_far_sightings = [None, None]
+        self.red_close_sightings = [None, None]
 
         self.right_last_time = rospy.get_time()
         self.left_last_time = rospy.get_time()
@@ -201,6 +211,9 @@ class LaneFollowNode(DTROS):
         todo("Finish this")
 
     def lane_callback(self, msg):
+        if 30 <= self.state < 40:
+            return
+
         image = self.bridge.compressed_imgmsg_to_cv2(msg, "bgr8")
 
         if self.state == DS.Stage2Ducks_WaitForCrossing:
@@ -211,9 +224,12 @@ class LaneFollowNode(DTROS):
         right_image = image[:, 400:, :]
         left_image = image[:, :-400, :]
         bottom_image = image[300:, :, :]
+        lines_far_image = image[340:, :, :]
+        lines_close_image = image[270:, :, :]
 
         crop_width = bottom_image.shape[1]
 
+        # Right
         hsv = cv2.cvtColor(right_image, cv2.COLOR_BGR2HSV)
         mask = cv2.inRange(hsv, ROAD_MASK[0], ROAD_MASK[1])
         right_image = cv2.bitwise_and(right_image, right_image, mask=mask)
@@ -221,6 +237,7 @@ class LaneFollowNode(DTROS):
             mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE
         )
 
+        # Left
         hsv = cv2.cvtColor(left_image, cv2.COLOR_BGR2HSV)
         mask = cv2.inRange(hsv, ROAD_MASK[0], ROAD_MASK[1])
         left_image = cv2.bitwise_and(left_image, left_image, mask=mask)
@@ -228,6 +245,7 @@ class LaneFollowNode(DTROS):
             mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE
         )
 
+        # Bottom
         hsv = cv2.cvtColor(bottom_image, cv2.COLOR_BGR2HSV)
         mask = cv2.inRange(hsv, ROAD_MASK[0], ROAD_MASK[1])
         bottom_image = cv2.bitwise_and(bottom_image, bottom_image, mask=mask)
@@ -235,10 +253,29 @@ class LaneFollowNode(DTROS):
             mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE
         )
 
+        # Line far red
+        hsv = cv2.cvtColor(lines_far_image, cv2.COLOR_BGR2HSV)
+        mask = cv2.inRange(hsv, REDLINE_MASK[0], REDLINE_MASK[1])
+        redline_far_image = cv2.bitwise_and(lines_far_image, lines_far_image, mask=mask)
+        red_far_conts, _ = cv2.findContours(
+            mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE
+        )
+
+        # Line close red
+        hsv = cv2.cvtColor(lines_close_image, cv2.COLOR_BGR2HSV)
+        mask = cv2.inRange(hsv, REDLINE_MASK[0], REDLINE_MASK[1])
+        redline_close_image = cv2.bitwise_and(lines_close_image, lines_close_image, mask=mask)
+        red_close_conts, _ = cv2.findContours(
+            mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE
+        )
+
         right_areas = np.array([cv2.contourArea(a) for a in right_conts])
         left_areas = np.array([cv2.contourArea(a) for a in left_conts])
         bottom_areas = np.array([cv2.contourArea(a) for a in bottom_conts])
+        red_far_areas = np.array([cv2.contourArea(a) for a in red_far_conts])
+        red_close_areas = np.array([cv2.contourArea(a) for a in red_close_conts])
 
+        # Right error
         if len(right_areas) == 0 or np.max(right_areas) < 20:
             self.right_error = None
         else:
@@ -252,6 +289,7 @@ class LaneFollowNode(DTROS):
             except:
                 pass
 
+        # Left error
         if len(left_areas) == 0 or np.max(left_areas) < 20:
             self.left_error = None
         else:
@@ -265,6 +303,7 @@ class LaneFollowNode(DTROS):
             except:
                 pass
 
+        # Bottom error
         if len(bottom_areas) == 0 or np.max(bottom_areas) < 20:
             self.bottom_error = None
         else:
@@ -275,9 +314,14 @@ class LaneFollowNode(DTROS):
             cx = int(M["m10"] / M["m00"])
             cy = int(M["m01"] / M["m00"])
             self.bottom_error = cx - int(crop_width / 2) + self.lane_offset
-            # except:
-            #    rospy.loginfo_throttle(2, f"bottom exception composed up")
-            #    pass
+
+        # Red far
+        if len(red_far_areas) > 0 and np.max(red_far_areas) > self.params["red_far_thresh"]:
+            self.red_far_sightings.append(time.time())
+
+        # Red close
+        if len(red_close_areas) > 0 and np.max(red_close_areas) > self.params["red_close_thresh"]:
+            self.red_close_sightings.append(time.time())
 
     def is_good2go(self, image):
         if (
