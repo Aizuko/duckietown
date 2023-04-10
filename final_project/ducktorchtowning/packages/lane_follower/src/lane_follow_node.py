@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import rospy
 import cv2
+import cv2 as cv
 import time
 import json
 
@@ -210,8 +211,6 @@ class LaneFollowNode(DTROS):
         elif self.ap_label == TagType.ForwardStop:
             self.state = DS.Stage1Loops_ForceForward
             self.state_start_time = time.time()
-
-        todo("Finish this")
 
     def lane_callback(self, msg):
         if 30 <= self.state < 40:
