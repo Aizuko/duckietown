@@ -12,7 +12,7 @@ from std_msgs.msg import Float32
 from cv_bridge import CvBridge
 import numpy as np
 from duckietown_msgs.msg import WheelsCmdStamped, Twist2DStamped
-from geometry_msgs.msg import Transform
+from geometry_msgs.msg import Transform, Vector3
 from std_msgs.msg import Float64
 from tf2_ros import Buffer, TransformListener
 
@@ -20,8 +20,8 @@ ROAD_MASK = [(20, 60, 0), (50, 255, 255)]
 STOP_MASK = [(0, 70, 150), (20, 255, 255)]
 DEBUG = True
 
-duckies_plus_line = [(0, 70, 120), (40, 255, 255)]
-duckies_only = [(0, 55, 145), (20, 255, 255)]
+DUCKIES_PLUS_LINE = [(0, 70, 120), (40, 255, 255)]
+DUCKIES_ONLY = [(0, 55, 145), (20, 255, 255)]
 
 
 @unique
@@ -51,6 +51,16 @@ class DS(IntEnum):
     ShuttingDown = 90
 
 
+class TagType(IntEnum):
+    """IntEnum mirror of the classification @ apriltag tag.py"""
+
+    RightStop = 1
+    LeftStop = 2
+    ForwardStop = 3
+    CrossingStop = 4
+    ParkingLotEnteringStop = 5
+
+
 class LaneFollowNode(DTROS):
     def __init__(self, node_name):
         super(LaneFollowNode, self).__init__(
@@ -75,6 +85,8 @@ class LaneFollowNode(DTROS):
         self.state_start_time = time.time()
 
         self.is_parked = False
+        self.duck_free_time = 0.0
+        self.last_seen_duck = None
 
         # ╔─────────────────────────────────────────────────────────────────────╗
         # │ Lαηε fδllδωiηg PID sεττiηgs                                         |
@@ -118,6 +130,12 @@ class LaneFollowNode(DTROS):
         self.vel_pub = rospy.Publisher(
             f"/{self.veh}/car_cmd_switch_node/cmd", Twist2DStamped, queue_size=1
         )
+        self.ap_sub = rospy.Subscriber(
+            f"/{self.veh}/ap_node/ap_detection",
+            Vector3,
+            self.ap_callback,
+            queue_size=1,
+        )
         self.sub = rospy.Subscriber(
             f"/{self.veh}/camera_node/image/compressed",
             CompressedImage,
@@ -125,12 +143,6 @@ class LaneFollowNode(DTROS):
             queue_size=1,
             buff_size="20MB",
         )
-        # self.sub_teleport = rospy.Subscriber(
-        #     f"/{self.veh}/deadreckoning_node/teleport",
-        #     Transform,
-        #     self.cb_teleport,
-        #     queue_size=1,
-        # )
 
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer)
@@ -138,11 +150,60 @@ class LaneFollowNode(DTROS):
         # Shutdown hook
         rospy.on_shutdown(self.hook)
 
-    def cb_teleport(self, msg):
-        return
+    def state_decision(self, most_recent_digit):
+        if self.is_parked:
+            self.state = DS.ShuttingDown
+            print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+            print("End of the road")
+            print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+            rospy.signal_shutdown("Rode to the end of the road")
+
+        elif most_recent_digit == 7 and all(
+            [
+                self.seen_ints[0],
+                self.seen_ints[5],
+                self.seen_ints[8],
+                self.seen_ints[2],
+                self.seen_ints[1],
+            ]
+        ):
+            self.state = DS.ForceLeft
+        elif most_recent_digit == 7:
+            self.state = DS.ForceForward
+        elif most_recent_digit == 6 and self.seen_ints[9] != 0:
+            self.state = DS.ForceForward
+        else:
+            self.state = DS.LaneFollowing
+
+    def ap_callback(self, msg):
+        self.ap_distance = msg.x
+        self.ap_label = TagType(int(msg.y))
+
+        if self.ap_label == TagType.ParkingLotEnteringStop:
+            self.state = DS.Stage3Drive_ThinkDuck
+            self.state_start_time = time.time()
+        elif self.ap_label == TagType.CrossingStop:
+            self.state = DS.Stage2Ducks_WaitForCrossing
+            self.state_start_time = time.time()
+        elif self.ap_label == TagType.RightStop:
+            self.state = DS.Stage1Loops_ForceRight
+            self.state_start_time = time.time()
+        elif self.ap_label == TagType.LeftStop:
+            self.state = DS.Stage1Loops_ForceLeft
+            self.state_start_time = time.time()
+        elif self.ap_label == TagType.ForwardStop:
+            self.state = DS.Stage1Loops_ForceForward
+            self.state_start_time = time.time()
+
+        todo("Finish this")
 
     def lane_callback(self, msg):
         image = self.bridge.compressed_imgmsg_to_cv2(msg, "bgr8")
+
+        if self.state == DS.Stage2Ducks_WaitForCrossing:
+            if not self.is_good2go(image):
+                return
+            self.state = DS.Stage2Ducks_LaneFollowing
 
         right_image = image[:, 400:, :]
         left_image = image[:, :-400, :]
@@ -214,6 +275,37 @@ class LaneFollowNode(DTROS):
             # except:
             #    rospy.loginfo_throttle(2, f"bottom exception composed up")
             #    pass
+
+    def is_good2go(self, image):
+        if (
+            self.last_seen_duck is not None
+            and (time.time() - self.last_seen_duck)
+            > self.params["crossing_timeout"]
+        ):
+            self.last_seen_duck = None
+
+        image = image[200:, :, :]  # Tends to be better to grab only half
+
+        hsv = cv.cvtColor(image, cv.COLOR_BGR2HSV)
+        mask = cv.inRange(hsv, DUCKIES_ONLY[0], DUCKIES_ONLY[1])
+
+        image = cv.bitwise_and(image, image, mask=mask)
+        image = cv.cvtColor(image[200:, :, :], cv.COLOR_BGR2GRAY)
+        image[image != 0] = 1
+
+        is_occupied = np.sum(image) > self.params["duckie_crossing_thresh"]
+
+        if is_occupied:
+            self.last_seen_duck = time.time()
+            return False
+        elif self.last_seen_duck is None:
+            return True
+        elif (time.time() - self.last_seen_duck) > self.params[
+            "crossing_wait_time"
+        ]:
+            return True
+        else:
+            return False
 
     def drive(self):
         delta_t = time.time() - self.state_start_time

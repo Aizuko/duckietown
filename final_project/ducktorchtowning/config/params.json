@@ -4,11 +4,14 @@
     "detection_dist_max": 0.6,
 
     "starting_state": 31,
+    "crossing_wait_time": 3,
+    "crossing_timeout": 10,
+    "duckie_crossing_thresh": 300,
 
     "comment1":
     "==== tuning params for forced turns and lane follows====",
     "lane_offset": 220,
-    "lane_follow_velocity": 0.3,
+    "lane_follow_velocity": 0.2,
 
     "right_turn_velocity": 0.3,
     "left_turn_velocity": 0.3,

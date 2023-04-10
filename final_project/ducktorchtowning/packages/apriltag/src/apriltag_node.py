@@ -11,7 +11,7 @@ from duckietown.dtros import DTROS, NodeType
 from geometry_msgs.msg import Quaternion, Transform, TransformStamped, Vector3
 from image_geometry import PinholeCameraModel
 from sensor_msgs.msg import CameraInfo, CompressedImage
-from std_msgs.msg import ColorRGBA, Header, Float64
+from std_msgs.msg import ColorRGBA, Header, Float64, Int64
 from tag import TAG_ID_TO_TAG, Tag, TagType
 from tf import transformations as tr
 from tf2_ros import (
@@ -72,9 +72,9 @@ class AprilTagNode(DTROS):
             queue_size=1,
         )
 
-        self.pub_ap_distance = rospy.Publisher(
-            f"/{self.hostname}/deadreckoning_node/ap_distance",
-            Float64,
+        self.pub_ap_detection = rospy.Publisher(
+            f"/{self.hostname}/ap_node/ap_detection",
+            Vector3,
             queue_size=1,
         )
 
@@ -125,7 +125,7 @@ class AprilTagNode(DTROS):
                 self.camera_model.cx(),
                 self.camera_model.cy(),
             ],
-            tag_size=0.05,
+            tag_size=0.15,
         )
 
     def render_tag(self, image: np.ndarray, detection: Detection):
@@ -258,9 +258,17 @@ class AprilTagNode(DTROS):
                 translation=Vector3(*translation), rotation=Quaternion(*q)
             )
 
-            self.pub_ap_distance.publish(min_distance)
+            self.pub_ap_detection.publish(
+                Vector3(
+                    min_distance,
+                    float(TAG_ID_TO_TAG[closest_tag_id].label),
+                    0.0,
+                )
+            )
             self.pub_teleport.publish(transform_odometry_world)
             self.pub_ap_position.publish(Vector3(*translation))
+
+        return closest_tag_id
 
     def run(self):
         rate = rospy.Rate(self.params["ap_rate"])
