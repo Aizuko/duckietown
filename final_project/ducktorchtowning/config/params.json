@@ -3,7 +3,7 @@
     "detection_dist_min": 0.1,
     "detection_dist_max": 0.6,
 
-    "starting_state": 31,
+    "starting_state": 11,
 
     "comment2":
     "==== Thresholds and timeouts ====",
@@ -33,8 +33,15 @@
     "left_turn_duration": 2,
     "forward_turn_duration": 2,
 
-    "stop_time_duration": 3,
+    "comment3":
+    "==== Apriltag settings ====",
+    "ap_stale_timeout": 3,
+    "ap_considered_distance": 0.3,
     "ap_rate": 1,
+
+
+    "comment4":
+    "==== Forced movements ====",
 
     "force_left_duration": 2,
     "force_left_velocity": 0.4,
@@ -43,6 +50,9 @@
     "force_forward_duration": 1,
     "force_forward_velocity": 0.5,
     "force_forward_omega": 0.0,
+
+    "comment4":
+    "==== Parking settings ====",
     "parking_stall_number": 1,
     "parking_lot_depth_apriltag_id": 227,
     "parking_lot": [

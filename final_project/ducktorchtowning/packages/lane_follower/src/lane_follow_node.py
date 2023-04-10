@@ -18,16 +18,16 @@ from std_msgs.msg import Float64
 from tf2_ros import Buffer, TransformListener
 from tf import transformations as tr
 
-ROAD_MASK = [(20, 60, 0), (50, 255, 255)]
-STOP_MASK = [(0, 70, 150), (20, 255, 255)]
-DEBUG = True
-
+ROAD_MASK = [(10, 60, 165), (40, 255, 255)]
 DUCKIES_PLUS_LINE = [(0, 70, 120), (40, 255, 255)]
 DUCKIES_ONLY = [(0, 55, 145), (20, 255, 255)]
 REDLINE_MASK = [(0, 100, 120), (10, 255, 255)]
 BLUELINE_MASK = [(40, 100, 80), (130, 255, 255)]
 # Crop off top 270 for lines
 # Crop off top 340 for real closeness
+
+with open("/params.json") as f:
+    params = json.load(f)["default"]
 
 
 @unique
@@ -70,9 +70,19 @@ class TagType(IntEnum):
 class SeenAP:
     """Tuple for an apriltag detection"""
 
-    def __init__(self, tag: TagType, tag_pos):
+    def __init__(self, tag: TagType, distance: float):
         self.tag = tag
+        self.distance = distance
         self.time = time.time()
+
+    def is_within_time(self) -> bool:
+        return time.time() - self.time < params["ap_stale_timeout"]
+
+    def is_within_distance(self) -> bool:
+        self.distance < params["ap_considered_distance"]
+
+    def is_within_criteria(self) -> bool:
+        return self.is_within_time() and self.is_within_distance()
 
 
 class LaneFollowNode(DTROS):
@@ -84,13 +94,7 @@ class LaneFollowNode(DTROS):
         self.bridge = CvBridge()
         self.veh = rospy.get_param("~veh")
 
-        with open("/params.json") as f:
-            self.params = json.load(f)
-
-        self.params = {
-            **self.params["default"],
-            **(self.params.get(self.veh) or {}),
-        }
+        self.params = params
 
         # ╔─────────────────────────────────────────────────────────────────────╗
         # │ Sτατε cδητrδls                                                      |
@@ -125,18 +129,24 @@ class LaneFollowNode(DTROS):
         self.left_last_time = rospy.get_time()
         self.bottom_last_time = rospy.get_time()
 
-        self.parking_last_error = 0
-        self.parking_last_time = rospy.get_time()
-
         self.P = 0.049
         self.D = -0.004
 
+        # ╔─────────────────────────────────────────────────────────────────────╗
+        # │ Pαrkiηg αττribμτεs                                                  |
+        # ╚─────────────────────────────────────────────────────────────────────╝
+        self.parking_last_error = 0
+        self.parking_last_time = rospy.get_time()
+
         parking_lot = self.params["parking_lot"]
         parking_stall_number = self.params["parking_stall_number"]
+
         self.parking_stall = parking_lot[parking_stall_number - 1]
         opposite_stall_number = self.parking_stall["opposite_stall_number"]
         self.opposite_stall = parking_lot[opposite_stall_number - 1]
 
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer)
 
         # ╔─────────────────────────────────────────────────────────────────────╗
         # │ Pμblishεrs & Sμbscribεrs                                            |
@@ -168,11 +178,15 @@ class LaneFollowNode(DTROS):
             buff_size="20MB",
         )
 
-        self.tf_buffer = Buffer()
-        self.tf_listener = TransformListener(self.tf_buffer)
+        self.timer = rospy.Timer(rospy.Duration(1), self.debug_callback)
 
         # Shutdown hook
         rospy.on_shutdown(self.hook)
+
+    def debug_callback(self, _):
+        rospy.loginfo(f"April tags: {len(self.seen_ap)}")
+        rospy.loginfo(f"Red far: {len(self.red_far_sightings)}")
+        rospy.loginfo(f"Red close: {len(self.red_close_sightings)}")
 
     def state_decision(self, most_recent_digit):
         if self.is_parked:
@@ -182,29 +196,26 @@ class LaneFollowNode(DTROS):
             print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
             rospy.signal_shutdown("Rode to the end of the road")
 
-        elif most_recent_digit == 7 and all(
-            [
-                self.seen_ints[0],
-                self.seen_ints[5],
-                self.seen_ints[8],
-                self.seen_ints[2],
-                self.seen_ints[1],
-            ]
-        ):
-            self.state = DS.ForceLeft
-        elif most_recent_digit == 7:
-            self.state = DS.ForceForward
-        elif most_recent_digit == 6 and self.seen_ints[9] != 0:
-            self.state = DS.ForceForward
-        else:
-            self.state = DS.LaneFollowing
+        for i in range(-1, -(10**6)):
+            try:
+                ap = self.seen_ap[i]
+
+                if ap is None or not ap.is_within_time():
+                    break
+                elif ap.is_within_distance():
+                    rospy.loginfo(f"Would transition to state {ap.tag.name}")
+                    break
+                else:
+                    continue
+            except IndexError:
+                break
 
     def ap_callback(self, msg):
-        if 30 <= self.state < 40:
+        # Don't do any ap callbacks in the parking state
+        if DS.Stage3Parking <= self.state < DS.Stage3Parking + 10:
             return
 
-        self.ap_distance = msg.x
-        self.ap_label = TagType(int(msg.y))
+        self.seen_ap.append(SeenAP(TagType(int(msg.y)), msg.x))
 
         if self.ap_label == TagType.ParkingLotEnteringStop:
             self.state = DS.Stage3Parking_ThinkDuck
@@ -385,9 +396,6 @@ class LaneFollowNode(DTROS):
             2,
             f"Errors: {self.left_error}, {self.right_error}, {self.bottom_error}",
         )
-
-        rospy.loginfo_throttle(1, f"Red far: {len(self.red_far_sightings)}")
-        rospy.loginfo_throttle(1, f"Red close: {len(self.red_close_sightings)}")
 
         # ==== Set target ====
         if self.state == DS.Stage1Loops_LaneFollowing:
