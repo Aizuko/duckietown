@@ -48,7 +48,8 @@
         "depth": "far",
         "x": 1.62,
         "y": 1.19,
-        "y_overshoot_target": 1.41
+        "y_overshoot_target": 1.41,
+        "y_parking_target": 1.41
       },
       {
         "distance": 1.28,
@@ -59,7 +60,8 @@
         "depth": "near",
         "x": 1.40,
         "y": 1.19,
-        "y_overshoot_target": 1.41
+        "y_overshoot_target": 1.41,
+        "y_parking_target": 1.41
       },
       {
         "distance": 1.28,
@@ -70,7 +72,8 @@
         "depth": "far",
         "x": 1.62,
         "y": 2.47,
-        "y_overshoot_target": 2.05
+        "y_overshoot_target": 2.05,
+        "y_parking_target": 2.05
       },
       {
         "distance": 1.28,
@@ -81,19 +84,25 @@
         "depth": "near",
         "x": 1.40,
         "y": 2.47,
-        "y_overshoot_target": 2.05
+        "y_overshoot_target": 2.05,
+        "y_parking_target": 2.05
       }
     ],
     "parking_rate": 8,
     "parking_far_depth_epsilon": 0.01,
     "parking_far_depth_x": 1.51,
-    "parking_overshoot_side_epsilon": 0.01,
+    "parking_overshoot_angle_epsilon": 0.01,
     "parking_P_x": 1,
     "parking_D_x": 0,
-    "parking_P_o": 0.003,
+    "parking_P_o": 0.1,
     "parking_D_o": 0,
-    "parking_overshoot_angle_left": -0.5,
-    "parking_overshoot_angle_right": 0.5,
+    "parking_overshoot_angle_left": 0.5,
+    "parking_overshoot_angle_right": -0.5,
+    "parking_reverse_angle_left": -0.5,
+    "parking_reverse_angle_right": 0.5,
+    "parking_rotating_x_error": 0,
+    "parking_overshoot_v": 0.2,
+    "parking_overshoot_omega": 0.75,
+    "parking_max_v": 0.3,
     "placeholder": false
-  }
 }
