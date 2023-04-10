@@ -112,4 +112,5 @@
     "parking_overshoot_omega": 0.75,
     "parking_max_v": 0.3,
     "placeholder": false
+  }
 }
