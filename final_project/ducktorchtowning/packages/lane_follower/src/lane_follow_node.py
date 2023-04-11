@@ -265,10 +265,13 @@ class LaneFollowNode(DTROS):
             self.state_start_time = time.time()
 
     def lane_callback(self, msg):
+        self.image = self.bridge.compressed_imgmsg_to_cv2(msg, "bgr8")
+
+    def evaluate_errors(self)
         if 30 <= self.state < 40:
             return
 
-        image = self.bridge.compressed_imgmsg_to_cv2(msg, "bgr8")
+        image = self.image
 
         if self.state == DS.Stage2Ducks_WaitForCrossing:
             if not self.is_good2go(image):
@@ -606,6 +609,7 @@ if __name__ == "__main__":
     rate = rospy.Rate(8)  # 8hz
 
     while not rospy.is_shutdown():
+        node.evaluate_errors()
         node.state_decision()
         node.drive()
         rate.sleep()
