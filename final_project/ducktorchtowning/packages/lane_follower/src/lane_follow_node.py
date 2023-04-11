@@ -101,6 +101,7 @@ class LaneFollowNode(DTROS):
         # ╚─────────────────────────────────────────────────────────────────────╝
         self.state = DS(self.params["starting_state"])
         self.state_start_time = time.time()
+        self.image = None
 
         self.is_parked = False
         self.duck_free_time = 0.0
@@ -191,7 +192,8 @@ class LaneFollowNode(DTROS):
         rospy.on_shutdown(self.hook)
 
     def debug_callback(self, _):
-        return
+        if not self.params["is_debug"]:
+            return
         rospy.loginfo(f"April tags: {len(self.seen_ap)}")
 
         if self.seen_ap[-1] is not None:
@@ -219,7 +221,6 @@ class LaneFollowNode(DTROS):
                 ap = self.seen_ap[i]
 
                 if ap is None:
-                    rospy.logwarn("Broken on None")
                     break
 
                 rospy.logwarn(f"==== Ap type: {ap.tag.name}")
@@ -279,7 +280,7 @@ class LaneFollowNode(DTROS):
         self.image = self.bridge.compressed_imgmsg_to_cv2(msg, "bgr8")
 
     def evaluate_errors(self):
-        if 30 <= self.state < 40:
+        if self.image is None or 30 <= self.state < 40:
             return
 
         image = self.image
@@ -509,9 +510,6 @@ class LaneFollowNode(DTROS):
         parking_stall = parking_lot[parking_stall_number - 1]
         opposite_stall_number = parking_stall["opposite_stall_number"]
         opposite_stall = parking_lot[opposite_stall_number - 1]
-
-        if parking_stall["depth"] == "far":
-            self.parking_depth_state()
         self.parking_turn_state(parking_stall)
         self.parking_reverse_state(parking_stall, opposite_stall)
         self.is_parked = True

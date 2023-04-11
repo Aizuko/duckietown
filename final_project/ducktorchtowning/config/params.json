@@ -3,7 +3,8 @@
     "detection_dist_min": 0.1,
     "detection_dist_max": 0.6,
 
-    "starting_state": 32,
+    "starting_state": 11,
+    "is_debug": false,
 
     "comment2":
     "==== Thresholds and timeouts ====",
