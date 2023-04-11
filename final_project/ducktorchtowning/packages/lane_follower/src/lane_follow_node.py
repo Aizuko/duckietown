@@ -23,6 +23,7 @@ DUCKIES_PLUS_LINE = [(0, 70, 120), (40, 255, 255)]
 DUCKIES_ONLY = [(0, 55, 145), (20, 255, 255)]
 REDLINE_MASK = [(0, 100, 120), (10, 255, 255)]
 BLUELINE_MASK = [(40, 100, 80), (130, 255, 255)]
+PARKING_LANE_MASK = [(22, 70, 120), (40, 255, 255)]
 # Crop off top 270 for lines
 # Crop off top 340 for real closeness
 
@@ -162,6 +163,11 @@ class LaneFollowNode(DTROS):
             CompressedImage,
             queue_size=1,
         )
+        self.pub_parking_lane = rospy.Publisher(
+            f"/{self.veh}/output/image/parking_lane/compressed",
+            CompressedImage,
+            queue_size=1,
+        )
         self.vel_pub = rospy.Publisher(
             f"/{self.veh}/car_cmd_switch_node/cmd", Twist2DStamped, queue_size=1
         )
@@ -187,10 +193,13 @@ class LaneFollowNode(DTROS):
 
         self.timer = rospy.Timer(rospy.Duration(1), self.debug_callback)
 
+        self.image = None
+
         # Shutdown hook
         rospy.on_shutdown(self.hook)
 
     def debug_callback(self, _):
+        self.parking_yellow_lane_error()
         return
         rospy.loginfo(f"April tags: {len(self.seen_ap)}")
 
@@ -436,10 +445,11 @@ class LaneFollowNode(DTROS):
 
     def drive(self):
         delta_t = time.time() - self.state_start_time
-        rospy.loginfo_throttle(
-            2,
-            f"Errors: {self.left_error}, {self.right_error}, {self.bottom_error}",
-        )
+        # rospy.loginfo_throttle(
+        #     2,
+        #     f"Errors: {self.left_error}, {self.right_error}, {self.bottom_error}",
+        # )
+        rospy.loginfo_throttle(1, f"State: {self.state.name}")
 
         # ==== Set target ====
         if self.state == DS.Stage1Loops_LaneFollowing:
@@ -465,7 +475,7 @@ class LaneFollowNode(DTROS):
             self.twist.v = self.twist.omega = 0
         elif self.state == DS.Stage3Parking_ThinkDuck:
             self.twist.v = self.twist.omega = 0
-            self.parking_state()
+            self.parking_stop_state()
         elif self.state == DS.Stage3Parking_Turn:
             self.parking_turn_state()
         elif self.state == DS.Stage3Parking_Reverse:
@@ -503,96 +513,164 @@ class LaneFollowNode(DTROS):
         for i in range(8):
             self.vel_pub.publish(self.twist)
 
-    def parking_state(self):
-        parking_lot = self.params["parking_lot"]
-        parking_stall_number = self.params["parking_stall_number"]
-        parking_stall = parking_lot[parking_stall_number - 1]
-        opposite_stall_number = parking_stall["opposite_stall_number"]
-        opposite_stall = parking_lot[opposite_stall_number - 1]
+    def parking_stop_state(self):
+        self.state_start_time = time.time()
+        rate = rospy.Rate(self.params["parking_rate"])
+        while time.time() - self.state_start_time < self.params["parking_stop_time"]:
+            self.twist.v = 0
+            self.twist.omega = 0
+            self.vel_pub.publish(self.twist)
+            rate.sleep()
+        self.state = DS.Stage3Parking_Turn
 
-        if parking_stall["depth"] == "far":
-            self.parking_depth_state()
-        self.parking_turn_state(parking_stall)
-        self.parking_reverse_state(parking_stall, opposite_stall)
-        self.is_parked = True
-
-    def parking_pid(self, error):
-        P = error * np.array(
-            [self.params["parking_P_x"], self.params["parking_P_o"]]
-        )
+    def parking_pid(self, error, P_, D_):
+        P = error * P_
         d_error = error - self.parking_last_error / (
             rospy.get_time() - self.parking_last_time
         )
         self.parking_last_error = error
         self.parking_last_time = rospy.get_time()
-        D = d_error * np.array(
-            [self.params["parking_D_x"], self.params["parking_D_o"]]
-        )
+        D = d_error * D_
         v = P[0] + D[0]
         v = np.clip(
             v, -self.params["parking_max_v"], self.params["parking_max_v"]
         )
         omega = P[1] + D[1]
+        omega = np.clip(
+            omega,
+            -self.params["parking_max_omega"],
+            self.params["parking_max_omega"]
+        )
         self.twist.v = v
         self.twist.omega = omega
 
+    def filter_parking_contours(self, contour):
+        if contour.shape[0] < 5:
+            return False
+        (x, y), (MA, ma), angle = cv2.fitEllipse(contour)
+        if MA == 0:
+            return False
+        return (ma / MA) > self.params["parking_lane_aspect_ratio"]
+
+    def parking_yellow_lane_error(self):
+        if self.image is None:
+            return None
+        image = self.image[self.params["parking_lane_crop_top"]:, :]
+        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+        mask = cv2.inRange(hsv, DUCKIES_PLUS_LINE[0], DUCKIES_PLUS_LINE[1])
+        contours, _ = cv2.findContours(
+            mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE
+        )
+        contours = list(filter(lambda x: cv2.contourArea(x) > self.params["parking_lane_min_area"], contours))
+        if len(contours) < 3:
+            return None
+        contours = sorted(contours, key=cv2.contourArea, reverse=True)
+        contours = contours[:3]
+        contours = sorted(contours, key=lambda x: x[0][0][0])
+        if self.parking_stall["depth"] == "near":
+            contours = contours[-2:]
+        elif self.parking_stall["depth"] == "far":
+            contours = contours[:2]
+
+        # get parallel lines
+        lines = []
+
+        colors = [(255, 0, 0), (0, 0, 255)]
+        black = (0, 0, 0)
+        if self.params["parking_lane_debug"]:
+            image_copy = image.copy()
+
+        for contour, color in zip(contours, colors):
+            # https://stackoverflow.com/questions/64396183/opencv-find-a-middle-line-of-a-contour-python
+            M = cv2.moments(contour)
+            if M["m00"] == 0:
+                return None
+            center = (int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]))
+            theta = 0.5 * np.arctan2(2 * M["mu11"], M["mu20"] - M["mu02"])
+            endx = np.cos(theta) + center[0]
+            endy = np.sin(theta) + center[1]
+            line = np.cross([center[0], center[1], 1], [endx, endy, 1])
+            lines.append(line)
+            if self.params["parking_lane_debug"]:
+                cv2.drawContours(image_copy, [contour], -1, color, 3)
+                cv2.putText(
+                    image_copy,
+                    str(cv2.contourArea(contour)), (center),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    1,
+                    color,
+                    2,
+                    cv2.LINE_AA
+                )
+                cv2.line(image_copy,
+                         center,
+                         (int(endx), int(endy)), black, 3)
+        lines = np.array(lines)
+
+        # get point at infinity at intersection
+        intersection = np.cross(lines[0], lines[1])
+        intersection = intersection / intersection[2]
+        intersection = intersection.astype(int)
+
+        # error is distance from self.center of image
+        error = intersection[0] - self.image.shape[1] / 2
+
+        if self.params["parking_lane_debug"]:
+            cv2.circle(image_copy, (intersection[0], intersection[1]), 10, (255, 0, 255), -1)
+            cv2.line(image_copy, (intersection[0], 0), (intersection[0], image.shape[0]), (0, 255, 0), 3)
+            cv2.line(image_copy, (image.shape[1] // 2, 0), (image.shape[1] // 2, image.shape[0]), (255, 255, 0), 3)
+            cv2.putText(image_copy, str(error), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, black, 2, cv2.LINE_AA)
+            message = self.bridge.cv2_to_compressed_imgmsg(image_copy, dst_format="jpeg")
+            self.pub_parking_lane.publish(message)
+
+        return error
+
     def parking_turn_state(self):
+        # parameterized blind turn
         rate = rospy.Rate(self.params["parking_rate"])
-        side = self.opposite_stall["side"]
-        depth = self.opposite_stall["depth"]
-        target_angle = self.params["parking_turn_angle"][side] * np.pi
-        while True:
-            try:
-                odometry_transform = self.tf_buffer.lookup_transform(
-                    "world",
-                    "odometry",
-                    rospy.Time(0),
-                    rospy.Duration(1.0),
-                ).transform
-                translation = odometry_transform.translation
-                rotation = odometry_transform.rotation
-                angle = tr.euler_from_quaternion(
-                    [rotation.x, rotation.y, rotation.z, rotation.w]
-                )[2]
-            except Exception:
-                rate.sleep()
-                continue
-            angle_error = angle - target_angle
-            error = np.array([0, angle_error])
-            rospy.logdebug(f"angle: {angle}")
-            rospy.logdebug(f"target angle: {target_angle}")
-            if (
-                np.linalg.norm(error)
-                < self.params["parking_turn_angle_epsilon"] * np.pi
-            ):
-                break
+        start = time.time()
+        time_elapsed = 0
+        while time_elapsed < self.parking_stall["turn"]["time"]:
             self.twist.v = self.params["parking_turn_v"]
-            self.twist.omega = (
-                np.sign(target_angle)
-                * self.params["parking_turn_omega"][side][depth]
-                * np.pi
-            )
+            self.twist.omega = self.parking_stall["turn"]["omega"] * np.pi
             self.vel_pub.publish(self.twist)
+            time_elapsed = time.time() - start
             rate.sleep()
+
         self.state = DS.Stage3Parking_Reverse
 
     def parking_reverse_state(self):
         rate = rospy.Rate(self.params["parking_rate"])
+        prev_yellow_lane_error = None
         while True:
-            error = np.array(
-                [
-                    self.tof_distance - self.params["parking_tof_distance"],
-                    0,
-                ]
+            yellow_lane_error = self.parking_yellow_lane_error()
+            if self.tof_distance > self.params["parking_reverse_max_tof_distance_alignment"]:
+                omega_error = 0
+            elif yellow_lane_error is not None:
+                omega_error = yellow_lane_error
+                prev_yellow_lane_error = yellow_lane_error
+            elif prev_yellow_lane_error is None:
+                omega_error = 0
+            else:
+                prev_yellow_lane_error *= self.params["parking_reverse_beta"]
+                omega_error = prev_yellow_lane_error
+            distance_error = (
+                self.tof_distance - self.params["parking_reverse_target_tof_distance"]
             )
-            rospy.logdebug_throttle(1, (f"error: {error}"))
-            rospy.logdebug_throttle(1, (f"tof_distance: {self.tof_distance}, target: {self.params['parking_tof_distance']}"))
-            if np.linalg.norm(error, 2) < self.params["parking_reverse_epsilon"]:
+            error = np.array([distance_error, omega_error])
+            rospy.logdebug(f"error: {error}")
+            if abs(distance_error) < self.params["parking_reverse_epsilon"]:
                 break
-            self.parking_pid(error)
+            self.parking_pid(error, np.array(
+                [self.params["parking_P_x"], self.params["parking_reverse_P_o"]]
+            ), np.array(
+                [self.params["parking_D_x"], self.params["parking_reverse_D_o"]]
+            ))
+            rospy.logdebug(f"omega: {self.twist.omega}")
             self.vel_pub.publish(self.twist)
             rate.sleep()
         rate = rospy.Rate(1 / self.params["parking_reverse_constant_time"])
+
         # reverse backwards for a parameterized amount time
         self.twist.v = self.params["parking_reverse_v"]
         self.vel_pub.publish(self.twist)

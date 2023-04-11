@@ -3,7 +3,7 @@
     "detection_dist_min": 0.1,
     "detection_dist_max": 0.6,
 
-    "starting_state": 32,
+    "starting_state": 39,
 
     "comment2":
     "==== Thresholds and timeouts ====",
@@ -65,7 +65,11 @@
         "depth": "far",
         "x": 1.62,
         "y": 1.19,
-        "y_parking_target": 1.41
+        "turn": {
+          "v": 0.2,
+          "omega": -0.55,
+          "time": 6.5
+        }
       },
       {
         "distance": 1.28,
@@ -76,7 +80,11 @@
         "depth": "near",
         "x": 1.40,
         "y": 1.19,
-        "y_parking_target": 1.41
+        "turn": {
+          "v": 0.2,
+          "omega": -0.75,
+          "time": 8
+        }
       },
       {
         "distance": 1.28,
@@ -87,7 +95,11 @@
         "depth": "far",
         "x": 1.62,
         "y": 2.47,
-        "y_parking_target": 2.05
+        "turn": {
+          "v": 0.2,
+          "omega": 0.6,
+          "time": 10
+        }
       },
       {
         "distance": 1.28,
@@ -98,36 +110,42 @@
         "depth": "near",
         "x": 1.40,
         "y": 2.47,
-        "y_parking_target": 2.05
+        "turn": {
+          "v": 0.2,
+          "omega": 0.75,
+          "time": 8
+        }
       }
     ],
+
+    "parking_stop_time": 5,
+
     "parking_rate": 8,
     "parking_P_x": 1.5,
     "parking_D_x": 0,
-    "parking_P_o": 0.1,
+    "parking_P_o": 0.01,
     "parking_D_o": 0,
-    "parking_max_v": 0.3,
-    "parking_turn_angle": {
-      "left": 0.5,
-      "right": -0.5
-    },
+    "parking_max_v": 0.2,
+    "parking_max_omega": 0.15,
     "parking_turn_angle_epsilon": 0.05,
-    "parking_turn_x_error": 0,
+    "parking_turn_constant_time": 1.5,
     "parking_turn_v": 0.2,
-    "parking_turn_omega": {
-      "left": {
-        "far": -0.75,
-        "near": -1
-      },
-      "right": {
-        "far": 0.6,
-        "near": 0.75
-      }
-    },
-    "parking_reverse_epsilon": 0.05,
-    "parking_tof_distance": 1.15,
+
+    "parking_reverse_epsilon": 0.08,
+    "parking_reverse_P_o": 0.01,
+    "parking_reverse_D_o": 0,
     "parking_reverse_constant_time": 1.5,
-    "parking_reverse_v": -0.3,
+    "parking_reverse_v": -0.15,
+    "parking_reverse_max_tof_distance_alignment": 0.5,
+    "parking_reverse_target_tof_distance": 1.15,
+    "parking_reverse_beta": 0.8,
+
+    "parking_lane_aspect_ratio": 2,
+    "parking_lane_min_area": 300,
+    "parking_lane_crop_top": 175,
+    "parking_lane_debug": true,
+    "parking_lane_hsv_mask": [[17, 30, 120], [45, 255, 255]],
+
     "max_tof_distance": 1.25,
     "placeholder": false
   }
