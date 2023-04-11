@@ -36,7 +36,7 @@
     "comment3":
     "==== Apriltag settings ====",
     "ap_stale_timeout": 3,
-    "ap_considered_distance": 0.3,
+    "ap_considered_distance": 3,
     "ap_rate": 1,
 
 

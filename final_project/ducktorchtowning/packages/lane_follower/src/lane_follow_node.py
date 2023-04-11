@@ -59,6 +59,7 @@ class DS(IntEnum):
 class TagType(IntEnum):
     """IntEnum mirror of the classification @ apriltag tag.py"""
 
+    NotImportant = 0
     RightStop = 1
     LeftStop = 2
     ForwardStop = 3
@@ -78,7 +79,7 @@ class SeenAP:
         return time.time() - self.time < params["ap_stale_timeout"]
 
     def is_within_distance(self) -> bool:
-        self.distance < params["ap_considered_distance"]
+        return self.distance < params["ap_considered_distance"]
 
     def is_within_criteria(self) -> bool:
         return self.is_within_time() and self.is_within_distance()
@@ -192,10 +193,17 @@ class LaneFollowNode(DTROS):
     def debug_callback(self, _):
         return
         rospy.loginfo(f"April tags: {len(self.seen_ap)}")
+
+        if self.seen_ap[-1] is not None:
+            rospy.loginfo(f"latest tag tag        {self.seen_ap[-1].tag.name}")
+            rospy.loginfo(f"Delta from latest tag {time.time() - self.seen_ap[-1].time}")
+            rospy.loginfo(f"Dist from latest tag {self.seen_ap[-1].distance}")
+
+        rospy.loginfo(f"==== State: {self.state.name} ====")
         rospy.loginfo(f"Red far: {len(self.red_far_sightings)}")
         rospy.loginfo(f"Red close: {len(self.red_close_sightings)}")
 
-    def state_decision(self, most_recent_digit):
+    def state_decision(self):
         if self.is_parked:
             self.state = DS.ShuttingDown
             print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
@@ -203,17 +211,40 @@ class LaneFollowNode(DTROS):
             print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
             rospy.signal_shutdown("Rode to the end of the road")
 
-        for i in range(-1, -(10**6)):
+        if 30 <= self.state < 40:
+            return  # Let parking figure out its own state
+
+        for i in range(-1, -(10**6), -1):
             try:
                 ap = self.seen_ap[i]
 
-                if ap is None or not ap.is_within_time():
+                if ap is None:
+                    rospy.logwarn("Broken on None")
                     break
-                elif ap.is_within_distance():
-                    rospy.loginfo(f"Would transition to state {ap.tag.name}")
+
+                rospy.logwarn(f"==== Ap type: {ap.tag.name}")
+
+                if not ap.is_within_time():
+                    rospy.logwarn(f"Broken on time delta: {time.time() - ap.time}")
                     break
+                elif not ap.is_within_distance():
+                    rospy.logwarn(f"Broken on distance delta: {ap.distance}")
+                    break
+                elif ap.tag == TagType.ParkingLotEnteringStop:
+                    self.state = DS.Stage3Parking_ThinkDuck
+                elif self.state == DS.Stage1Loops_LaneFollowing:
+                    if ap.tag == TagType.RightStop:
+                        self.state = DS.Stage1Loops_ForceRight
+                    elif ap.tag == TagType.LeftStop:
+                        self.state = DS.Stage1Loops_ForceLeft
+                    elif ap.tag == TagType.ForwardStop:
+                        self.state = DS.Stage1Loops_ForceForward
+                    elif ap.tag == TagType.CrossingStop:
+                        self.state = DS.Stage2Ducks_WaitForCrossing
+                elif 20 <= self.state < 30 and ap.tag == TagType.CrossingStop:
+                    self.state = DS.Stage2Ducks_WaitForCrossing
                 else:
-                    continue
+                    rospy.logwarn("NO UPDATE")
             except IndexError:
                 break
 
@@ -224,6 +255,7 @@ class LaneFollowNode(DTROS):
 
         self.seen_ap.append(SeenAP(TagType(int(msg.y)), msg.x))
 
+        return
         if self.ap_label == TagType.ParkingLotEnteringStop:
             self.state = DS.Stage3Parking_ThinkDuck
             self.state_start_time = time.time()
@@ -244,10 +276,13 @@ class LaneFollowNode(DTROS):
         self.tof_distance = min(msg.range, self.params["max_tof_distance"])
 
     def lane_callback(self, msg):
+        self.image = self.bridge.compressed_imgmsg_to_cv2(msg, "bgr8")
+
+    def evaluate_errors(self):
         if 30 <= self.state < 40:
             return
-        image = self.bridge.compressed_imgmsg_to_cv2(msg, "bgr8")
 
+        image = self.image
 
         if self.state == DS.Stage2Ducks_WaitForCrossing:
             if not self.is_good2go(image):
@@ -401,7 +436,6 @@ class LaneFollowNode(DTROS):
 
     def drive(self):
         delta_t = time.time() - self.state_start_time
-        rospy.loginfo_throttle(2, f"State: {self.state.name}")
         rospy.loginfo_throttle(
             2,
             f"Errors: {self.left_error}, {self.right_error}, {self.bottom_error}",
@@ -572,6 +606,9 @@ class LaneFollowNode(DTROS):
 if __name__ == "__main__":
     node = LaneFollowNode("lanefollow_node")
     rate = rospy.Rate(8)  # 8hz
+
     while not rospy.is_shutdown():
+        node.evaluate_errors()
+        node.state_decision()
         node.drive()
         rate.sleep()
