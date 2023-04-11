@@ -1,11 +1,13 @@
 
 <launch>
+  <!--
   <include file="$(find apriltag)/launch/apriltag.launch">
     <arg name="veh" value="$(arg veh)"/>
   </include>
   <include file="$(find deadreckoning)/launch/deadreckoning_node.launch">
     <arg name="veh" value="$(arg veh)"/>
   </include>
+  -->
   <include file="$(find lane_follower)/launch/lane_follower.launch">
     <arg name="veh" value="$(arg veh)"/>
   </include>
