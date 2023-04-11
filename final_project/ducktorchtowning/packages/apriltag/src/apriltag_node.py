@@ -193,7 +193,7 @@ class AprilTagNode(DTROS):
             transforms.append(transform_stamped)
         self.tf_broadcaster.sendTransform(transforms)
 
-        if closest_tag_id is not None:
+        if closest_tag_id is not None and min_distance < 0.5:
             try:
                 transform_odometry_at = self.tf_buffer.lookup_transform(
                     f"at_{closest_tag_id}",
@@ -207,14 +207,13 @@ class AprilTagNode(DTROS):
             except:
                 rospy.logwarn_throttle(1.0, "Another exception fired")
                 return
+            translate = [
+                transform_odometry_at.translation.x,
+                transform_odometry_at.translation.y,
+                transform_odometry_at.translation.z,
+            ]
             T_odometry_at = tr.compose_matrix(
-                translate=(
-                    [
-                        transform_odometry_at.translation.x,
-                        transform_odometry_at.translation.y,
-                        transform_odometry_at.translation.z,
-                    ]
-                ),
+                translate=(translate),
                 angles=tr.euler_from_quaternion(
                     [
                         transform_odometry_at.rotation.x,

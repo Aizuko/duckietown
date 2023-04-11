@@ -3,7 +3,7 @@
     "detection_dist_min": 0.1,
     "detection_dist_max": 0.6,
 
-    "starting_state": 11,
+    "starting_state": 32,
 
     "comment2":
     "==== Thresholds and timeouts ====",
@@ -102,20 +102,33 @@
       }
     ],
     "parking_rate": 8,
-    "parking_turn_angle_epsilon": 0.05,
-    "parking_P_x": 1,
+    "parking_P_x": 1.5,
     "parking_D_x": 0,
     "parking_P_o": 0.1,
     "parking_D_o": 0,
-    "parking_turn_angle_left": 0.5,
-    "parking_turn_angle_right": -0.5,
-    "parking_reverse_angle_left": -0.5,
-    "parking_reverse_angle_right": 0.5,
-    "parking_reverse_epsilon": 0.01,
-    "parking_rotating_x_error": 0,
-    "parking_turn_v": 0.2,
-    "parking_turn_omega": 0.75,
     "parking_max_v": 0.3,
+    "parking_turn_angle": {
+      "left": 0.5,
+      "right": -0.5
+    },
+    "parking_turn_angle_epsilon": 0.05,
+    "parking_turn_x_error": 0,
+    "parking_turn_v": 0.2,
+    "parking_turn_omega": {
+      "left": {
+        "far": -0.75,
+        "near": -1
+      },
+      "right": {
+        "far": 0.6,
+        "near": 0.75
+      }
+    },
+    "parking_reverse_epsilon": 0.05,
+    "parking_tof_distance": 1.15,
+    "parking_reverse_constant_time": 1.5,
+    "parking_reverse_v": -0.3,
+    "max_tof_distance": 1.25,
     "placeholder": false
   }
 }

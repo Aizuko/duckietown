@@ -232,11 +232,10 @@ class DeadReckoningNode(DTROS):
             self._print_time = time.time()
 
     def cb_teleport(self, transform: Transform):
-        if abs(transform.translation.z) < 0.05:
-            return
+
         self.x = transform.translation.x
         self.y = transform.translation.y
-        self.z = 0.0
+        self.z = transform.translation.z
         rospy.loginfo(
             f"Teleporting to {self.x:.2f}, {self.y:.2f}, {self.z:.2f}"
         )
