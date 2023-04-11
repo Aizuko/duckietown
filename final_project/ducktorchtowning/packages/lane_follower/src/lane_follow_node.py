@@ -102,6 +102,8 @@ class LaneFollowNode(DTROS):
         # ╚─────────────────────────────────────────────────────────────────────╝
         self.state = DS(self.params["starting_state"])
         self.state_start_time = time.time()
+        self.image = None
+        self.is_new_image = False
 
         self.is_parked = False
         self.duck_free_time = 0.0
@@ -130,8 +132,8 @@ class LaneFollowNode(DTROS):
         self.left_last_time = rospy.get_time()
         self.bottom_last_time = rospy.get_time()
 
-        self.P = 0.049
-        self.D = -0.004
+        self.P = self.params["Px_coef"]
+        self.D = self.params["Dx_coef"]
 
         # ╔─────────────────────────────────────────────────────────────────────╗
         # │ Pαrkiηg αττribμτεs                                                  |
@@ -199,8 +201,9 @@ class LaneFollowNode(DTROS):
         rospy.on_shutdown(self.hook)
 
     def debug_callback(self, _):
+        if not self.params["is_debug"]:
+            return
         self.parking_yellow_lane_error()
-        return
         rospy.loginfo(f"April tags: {len(self.seen_ap)}")
 
         if self.seen_ap[-1] is not None:
@@ -228,7 +231,6 @@ class LaneFollowNode(DTROS):
                 ap = self.seen_ap[i]
 
                 if ap is None:
-                    rospy.logwarn("Broken on None")
                     break
 
                 rospy.logwarn(f"==== Ap type: {ap.tag.name}")
@@ -286,11 +288,17 @@ class LaneFollowNode(DTROS):
 
     def lane_callback(self, msg):
         self.image = self.bridge.compressed_imgmsg_to_cv2(msg, "bgr8")
+        self.is_new_image = True
 
     def evaluate_errors(self):
-        if 30 <= self.state < 40:
+        """ What was previously in lane_callback """
+        if self.image is None or 30 <= self.state < 40:
             return
 
+        if not self.is_new_image:  # Don't re-eval same image
+            return
+
+        self.is_new_image = False
         image = self.image
 
         if self.state == DS.Stage2Ducks_WaitForCrossing:
@@ -300,7 +308,7 @@ class LaneFollowNode(DTROS):
 
         right_image = image[:, 400:, :]
         left_image = image[:, :-400, :]
-        bottom_image = image[300:, :, :]
+        bottom_image = image[300:-1, :, :]
         lines_far_image = image[340:, :, :]
         lines_close_image = image[270:, :, :]
 

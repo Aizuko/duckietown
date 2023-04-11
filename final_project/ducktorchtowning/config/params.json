@@ -3,7 +3,8 @@
     "detection_dist_min": 0.1,
     "detection_dist_max": 0.6,
 
-    "starting_state": 39,
+    "starting_state": 11,
+    "is_debug": false,
 
     "comment2":
     "==== Thresholds and timeouts ====",
@@ -19,7 +20,9 @@
     "comment1":
     "==== tuning params for forced turns and lane follows ====",
     "lane_offset": 220,
-    "lane_follow_velocity": 0.2,
+    "lane_follow_velocity": 0.3,
+    "Px_coef": 0.049,
+    "Dx_coef": -0.004,
 
     "right_turn_velocity": 0.3,
     "left_turn_velocity": 0.3,
