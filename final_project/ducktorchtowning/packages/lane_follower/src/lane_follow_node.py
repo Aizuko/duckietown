@@ -118,8 +118,6 @@ class LaneFollowNode(DTROS):
         self.twist = Twist2DStamped(v=self.velocity, omega=0)
 
         self.bottom_error = None
-        self.right_error = None
-        self.left_error = None
 
         self.right_last_error = 0
         self.left_last_error = 0
@@ -203,8 +201,8 @@ class LaneFollowNode(DTROS):
             rospy.loginfo(f"Dist from latest tag {self.seen_ap[-1].distance}")
 
         rospy.loginfo(f"==== State: {self.state.name} ====")
-        rospy.loginfo(f"Red far: {len(self.red_far_sightings)}")
-        rospy.loginfo(f"Red close: {len(self.red_close_sightings)}")
+        #rospy.loginfo(f"Red far: {len(self.red_far_sightings)}")
+        #rospy.loginfo(f"Red close: {len(self.red_close_sightings)}")
 
     def state_decision(self):
         if self.is_parked:
@@ -297,29 +295,8 @@ class LaneFollowNode(DTROS):
                 return
             self.state = DS.Stage2Ducks_LaneFollowing
 
-        right_image = image[:, 400:, :]
-        left_image = image[:, :-400, :]
         bottom_image = image[300:-1, :, :]
-        lines_far_image = image[340:, :, :]
-        lines_close_image = image[270:, :, :]
-
         crop_width = bottom_image.shape[1]
-
-        # Right
-        hsv = cv2.cvtColor(right_image, cv2.COLOR_BGR2HSV)
-        mask = cv2.inRange(hsv, ROAD_MASK[0], ROAD_MASK[1])
-        right_image = cv2.bitwise_and(right_image, right_image, mask=mask)
-        right_conts, _ = cv2.findContours(
-            mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE
-        )
-
-        # Left
-        hsv = cv2.cvtColor(left_image, cv2.COLOR_BGR2HSV)
-        mask = cv2.inRange(hsv, ROAD_MASK[0], ROAD_MASK[1])
-        left_image = cv2.bitwise_and(left_image, left_image, mask=mask)
-        left_conts, _ = cv2.findContours(
-            mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE
-        )
 
         # Bottom
         hsv = cv2.cvtColor(bottom_image, cv2.COLOR_BGR2HSV)
@@ -329,61 +306,7 @@ class LaneFollowNode(DTROS):
             mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE
         )
 
-        # Line far red
-        hsv = cv2.cvtColor(lines_far_image, cv2.COLOR_BGR2HSV)
-        mask = cv2.inRange(hsv, REDLINE_MASK[0], REDLINE_MASK[1])
-        redline_far_image = cv2.bitwise_and(
-            lines_far_image, lines_far_image, mask=mask
-        )
-        red_far_conts, _ = cv2.findContours(
-            mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE
-        )
-
-        # Line close red
-        hsv = cv2.cvtColor(lines_close_image, cv2.COLOR_BGR2HSV)
-        mask = cv2.inRange(hsv, REDLINE_MASK[0], REDLINE_MASK[1])
-        redline_close_image = cv2.bitwise_and(
-            lines_close_image, lines_close_image, mask=mask
-        )
-        red_close_conts, _ = cv2.findContours(
-            mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE
-        )
-
-        right_areas = np.array([cv2.contourArea(a) for a in right_conts])
-        left_areas = np.array([cv2.contourArea(a) for a in left_conts])
         bottom_areas = np.array([cv2.contourArea(a) for a in bottom_conts])
-        red_far_areas = np.array([cv2.contourArea(a) for a in red_far_conts])
-        red_close_areas = np.array(
-            [cv2.contourArea(a) for a in red_close_conts]
-        )
-
-        # Right error
-        if len(right_areas) == 0 or np.max(right_areas) < 20:
-            self.right_error = None
-        else:
-            max_idx = np.argmax(right_areas)
-
-            M = cv2.moments(right_conts[max_idx])
-            try:
-                cx = int(M["m10"] / M["m00"])
-                cy = int(M["m01"] / M["m00"])
-                self.right_error = cx - int(crop_width / 2) + self.lane_offset
-            except:
-                pass
-
-        # Left error
-        if len(left_areas) == 0 or np.max(left_areas) < 20:
-            self.left_error = None
-        else:
-            max_idx = np.argmax(left_areas)
-
-            M = cv2.moments(left_conts[max_idx])
-            try:
-                cx = int(M["m10"] / M["m00"])
-                cy = int(M["m01"] / M["m00"])
-                self.left_error = cx - int(crop_width / 2) + self.lane_offset
-            except:
-                pass
 
         # Bottom error
         if len(bottom_areas) == 0 or np.max(bottom_areas) < 20:
@@ -392,24 +315,10 @@ class LaneFollowNode(DTROS):
             max_idx = np.argmax(bottom_areas)
 
             M = cv2.moments(bottom_conts[max_idx])
-
             cx = int(M["m10"] / M["m00"])
             cy = int(M["m01"] / M["m00"])
+
             self.bottom_error = cx - int(crop_width / 2) + self.lane_offset
-
-        # Red far
-        if (
-            len(red_far_areas) > 0
-            and np.max(red_far_areas) > self.params["red_far_thresh"]
-        ):
-            self.red_far_sightings.append(time.time())
-
-        # Red close
-        if (
-            len(red_close_areas) > 0
-            and np.max(red_close_areas) > self.params["red_close_thresh"]
-        ):
-            self.red_close_sightings.append(time.time())
 
     def is_good2go(self, image):
         if (
@@ -444,10 +353,10 @@ class LaneFollowNode(DTROS):
 
     def drive(self):
         delta_t = time.time() - self.state_start_time
-        rospy.loginfo_throttle(
-            2,
-            f"Errors: {self.left_error}, {self.right_error}, {self.bottom_error}",
-        )
+        #rospy.loginfo_throttle(
+        #    2,
+        #    f"Errors: {self.left_error}, {self.right_error}, {self.bottom_error}",
+        #)
 
         # ==== Set target ====
         if self.state == DS.Stage1Loops_LaneFollowing:
