@@ -485,6 +485,7 @@ class LaneFollowNode(DTROS, FrozenClass):
 
     @lru_cache(maxsize=1)
     def set_leds(self, color: LEDColor, index_set: LEDIndex):
+        return
         led_msg = LEDPattern()
 
         on_color = ColorRGBA()
