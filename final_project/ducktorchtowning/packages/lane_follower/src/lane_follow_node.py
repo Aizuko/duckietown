@@ -13,7 +13,7 @@ from std_msgs.msg import Float32
 from cv_bridge import CvBridge
 import numpy as np
 from duckietown_msgs.msg import WheelsCmdStamped, Twist2DStamped
-from geometry_msgs.msg import Transform, Vector3
+from geometry_msgs.msg import Transform, Vector3, TransformStamped
 from std_msgs.msg import Float64
 from tf2_ros import Buffer, TransformListener
 from tf import transformations as tr
@@ -46,6 +46,8 @@ class DS(IntEnum):
     Stage2Ducks = 20
     Stage2Ducks_LaneFollowing = 21
     Stage2Ducks_WaitForCrossing = 22
+    Stage2Ducks_WaitToHelp = 23
+    Stage2Ducks_LondonStyle = 24
     Stage2Ducks_ThinkDuck = 29
 
     Stage3Parking = 30
@@ -134,6 +136,14 @@ class LaneFollowNode(DTROS):
         self.P = self.params["Px_coef"]
         self.D = self.params["Dx_coef"]
 
+        # For stage 2 robot detection
+        self.tof_dist_list = [0.0, 0.0, 0.0]
+        self.is_ready_to_help = False
+        self.is_helping = False
+        self.has_helped = False
+        self.started_waiting_for_help_time = None
+        self.started_english_time = None
+
         # ╔─────────────────────────────────────────────────────────────────────╗
         # │ Pαrkiηg αττribμτεs                                                  |
         # ╚─────────────────────────────────────────────────────────────────────╝
@@ -186,6 +196,12 @@ class LaneFollowNode(DTROS):
             self.tof_callback,
             queue_size=1,
         )
+        self.robot_ahead_transform_sub = rospy.Subscriber(
+            f"/{self.veh}/duckiebot_distance_node/transform",
+            TransformStamped,
+            self.robot_ahead_transform_callback,
+            queue_size=1,
+        )
 
         self.timer = rospy.Timer(rospy.Duration(1), self.debug_callback)
 
@@ -199,7 +215,9 @@ class LaneFollowNode(DTROS):
 
         if self.seen_ap[-1] is not None:
             rospy.loginfo(f"latest tag tag        {self.seen_ap[-1].tag.name}")
-            rospy.loginfo(f"Delta from latest tag {time.time() - self.seen_ap[-1].time}")
+            rospy.loginfo(
+                f"Delta from latest tag {time.time() - self.seen_ap[-1].time}"
+            )
             rospy.loginfo(f"Dist from latest tag {self.seen_ap[-1].distance}")
 
         rospy.loginfo(f"==== State: {self.state.name} ====")
@@ -217,6 +235,31 @@ class LaneFollowNode(DTROS):
         if 30 <= self.state < 40:
             return  # Let parking figure out its own state
 
+        if self.is_ready_to_help and not self.is_helping:
+            if (
+                time.time() - self.started_waiting_for_help_time
+                > self.params["wait_for_help_time"]
+            ):
+                self.state = DS.Stage2Ducks_WaitToHelp
+                self.is_helping = True
+                self.started_english_time = time.time()
+                self.offset *= -1
+            else:
+                self.state = DS.Stage2Ducks_WaitToHelp
+            return
+        elif self.is_helping and not self.has_helped:
+            if (
+                time.time() - self.started_english_time
+                > self.params["english_time"]
+            ):
+                self.state = DS.Stage2Ducks_LaneFollowing
+                self.has_helped = True
+                self.offset *= -1
+            else:
+                self.state = DS.Stage2Ducks_LondonStyle
+            return
+
+        # Make decision by ap node
         for i in range(-1, -(10**6), -1):
             try:
                 ap = self.seen_ap[i]
@@ -227,7 +270,9 @@ class LaneFollowNode(DTROS):
                 rospy.logwarn(f"==== Ap type: {ap.tag.name}")
 
                 if not ap.is_within_time():
-                    rospy.logwarn(f"Broken on time delta: {time.time() - ap.time}")
+                    rospy.logwarn(
+                        f"Broken on time delta: {time.time() - ap.time}"
+                    )
                     break
                 elif not ap.is_within_distance():
                     rospy.logwarn(f"Broken on distance delta: {ap.distance}")
@@ -257,32 +302,52 @@ class LaneFollowNode(DTROS):
 
         self.seen_ap.append(SeenAP(TagType(int(msg.y)), msg.x))
 
-        return
-        if self.ap_label == TagType.ParkingLotEnteringStop:
-            self.state = DS.Stage3Parking_ThinkDuck
-            self.state_start_time = time.time()
-        elif self.ap_label == TagType.CrossingStop:
-            self.state = DS.Stage2Ducks_WaitForCrossing
-            self.state_start_time = time.time()
-        elif self.ap_label == TagType.RightStop:
-            self.state = DS.Stage1Loops_ForceRight
-            self.state_start_time = time.time()
-        elif self.ap_label == TagType.LeftStop:
-            self.state = DS.Stage1Loops_ForceLeft
-            self.state_start_time = time.time()
-        elif self.ap_label == TagType.ForwardStop:
-            self.state = DS.Stage1Loops_ForceForward
-            self.state_start_time = time.time()
-
     def tof_callback(self, msg):
+        self.tof_dist_list.append(msg.range)
         self.tof_distance = min(msg.range, self.params["max_tof_distance"])
 
     def lane_callback(self, msg):
         self.image = self.bridge.compressed_imgmsg_to_cv2(msg, "bgr8")
         self.is_new_image = True
 
+    def robot_ahead_transform_callback(self, msg: TransformStamped):
+        if self.is_ready_to_help or self.has_helped:
+            return
+
+        transform = msg.transform
+        T = tr.compose_matrix(
+            translate=(
+                [
+                    transform.translation.x,
+                    transform.translation.y,
+                    transform.translation.z,
+                ]
+            ),
+            angles=tr.euler_from_quaternion(
+                [
+                    transform.rotation.x,
+                    transform.rotation.y,
+                    transform.rotation.z,
+                    transform.rotation.w,
+                ]
+            ),
+        )
+
+        latest_translate = T[:3, 3]
+
+        tof_dist_transformed = (
+            self.params["tof_a"] * self.tof_dist_list[-1] + self.params["tof_b"]
+        )
+
+        robot_dist = p.min(
+            np.linalg.norm(latest_translate), tof_dist_transformed
+        )
+
+        if robot_dist < self.params["min_robot_dist"]:
+            self.is_ready_to_help = True
+
     def evaluate_errors(self):
-        """ What was previously in lane_callback """
+        """What was previously in lane_callback"""
         if self.image is None or 30 <= self.state < 40:
             return
 
@@ -469,8 +534,11 @@ class LaneFollowNode(DTROS):
             self.twist.omega = self.get_lanefollowing_omega()
         elif self.state == DS.Stage2Ducks_WaitForCrossing:
             self.twist.v = self.twist.omega = 0
-        elif self.state == DS.Stage2Ducks_ThinkDuck:
+        elif self.state == DS.Stage2Ducks_WaitToHelp:
             self.twist.v = self.twist.omega = 0
+        elif self.state == DS.Stage2Ducks_LondonStyle:
+            self.twist.v = self.params["lane_follow_velocity"]
+            self.twist.omega = self.get_lanefollowing_omega()
         elif self.state == DS.Stage3Parking_ThinkDuck:
             self.twist.v = self.twist.omega = 0
             self.parking_state()
@@ -591,8 +659,16 @@ class LaneFollowNode(DTROS):
                 ]
             )
             rospy.logdebug_throttle(1, (f"error: {error}"))
-            rospy.logdebug_throttle(1, (f"tof_distance: {self.tof_distance}, target: {self.params['parking_tof_distance']}"))
-            if np.linalg.norm(error, 2) < self.params["parking_reverse_epsilon"]:
+            rospy.logdebug_throttle(
+                1,
+                (
+                    f"tof_distance: {self.tof_distance}, target: {self.params['parking_tof_distance']}"
+                ),
+            )
+            if (
+                np.linalg.norm(error, 2)
+                < self.params["parking_reverse_epsilon"]
+            ):
                 break
             self.parking_pid(error)
             self.vel_pub.publish(self.twist)

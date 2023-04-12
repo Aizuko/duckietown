@@ -2,9 +2,16 @@
   "default": {
     "detection_dist_min": 0.1,
     "detection_dist_max": 0.6,
+    "detection_publish_rate": 3,
 
     "starting_state": 11,
     "is_debug": false,
+    "tof_a": 0.592,
+    "tof_b": 0.0617,
+    "wait_for_help_time": 3,
+    "english_time": 3,
+    "min_robot_dist": 0.3,
+
 
     "comment2":
     "==== Thresholds and timeouts ====",
