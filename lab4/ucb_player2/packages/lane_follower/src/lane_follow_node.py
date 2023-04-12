@@ -181,6 +181,7 @@ class LaneFollowNode(DTROS, FrozenClass):
         self.Dx = self.params["Dx"]
 
         # New bits!!!
+        self.forced_start_time = None
         self.saw_first_ap_time = None
         self.tracking_start = None
         self.is_started_helping = False
@@ -553,6 +554,7 @@ class LaneFollowNode(DTROS, FrozenClass):
             # ==== Lane following ====
             elif self.state is DS.LaneFollowing:
                 self.set_leds(LEDColor.Green, LEDIndex.Back)
+                self.forced_start_time = None
                 self.follow_lane()
 
                 try:
@@ -561,9 +563,26 @@ class LaneFollowNode(DTROS, FrozenClass):
                         self.is_started_helping = True
                 except TypeError:
                     pass
+            elif self.state is DS.Stopped:
+                if self.last_seen_ap is None:
+                    self.state = DS.ShuttingDown
+                    print("Failed to see an ap tag before this turn")
+                elif self.last_seen_ap.tag == TagType.ForwardStop:
+                    self.state = DS.BlindForward
+                elif self.last_seen_ap.tag == TagType.LeftStop:
+                    self.state = DS.BlindTurnLeft
+                elif self.last_seen_ap.tag == TagType.RightStop:
+                    self.state = DS.BlindTurnRight
+
+                self.last_seen_ap = None
+                self.forced_start_time = time.time()
+                continue
             else:
                 print(f"===! {self.state.name} !===")
-                print(f"Saw {self.last_seen_ap.tag.name}")
+                if self.last_seen_ap is not None:
+                    print(f"Saw {self.last_seen_ap.tag.name}")
+                else:
+                    print("Didn't see a last ap tag")
 
                 rospy.signal_shutdown("Saw an AP tag")
 
