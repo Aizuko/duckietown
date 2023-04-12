@@ -217,7 +217,9 @@ class LaneFollowNode(DTROS):
 
         if self.seen_ap[-1] is not None:
             rospy.loginfo(f"latest tag tag        {self.seen_ap[-1].tag.name}")
-            rospy.loginfo(f"Delta from latest tag {time.time() - self.seen_ap[-1].time}")
+            rospy.loginfo(
+                f"Delta from latest tag {time.time() - self.seen_ap[-1].time}"
+            )
             rospy.loginfo(f"Dist from latest tag {self.seen_ap[-1].distance}")
 
         rospy.loginfo(f"==== State: {self.state.name} ====")
@@ -245,7 +247,9 @@ class LaneFollowNode(DTROS):
                 rospy.logwarn(f"==== Ap type: {ap.tag.name}")
 
                 if not ap.is_within_time():
-                    rospy.logwarn(f"Broken on time delta: {time.time() - ap.time}")
+                    rospy.logwarn(
+                        f"Broken on time delta: {time.time() - ap.time}"
+                    )
                     break
                 elif not ap.is_within_distance():
                     rospy.logwarn(f"Broken on distance delta: {ap.distance}")
@@ -303,7 +307,7 @@ class LaneFollowNode(DTROS):
         self.odom = msg
 
     def evaluate_errors(self):
-        """ What was previously in lane_callback """
+        """What was previously in lane_callback"""
         if self.image is None or 30 <= self.state < 40:
             return
 
@@ -538,11 +542,12 @@ class LaneFollowNode(DTROS):
     def parking_stop_state(self):
         self.state_start_time = time.time()
         rate = rospy.Rate(self.params["parking_rate"])
-        while time.time() - self.state_start_time < self.params["parking_stop_time"] or self.odom is None:
+        while time.time() - self.state_start_time < self.params["parking_stop_time"]:
             self.twist.v = 0
             self.twist.omega = 0
             self.vel_pub.publish(self.twist)
             rate.sleep()
+
         self.state = DS.Stage3Parking_Forward
 
     def parking_pid(self, error, P_, D_):
@@ -561,7 +566,7 @@ class LaneFollowNode(DTROS):
         omega = np.clip(
             omega,
             -self.params["parking_max_omega"],
-            self.params["parking_max_omega"]
+            self.params["parking_max_omega"],
         )
         self.twist.v = v
         self.twist.omega = omega
@@ -571,13 +576,13 @@ class LaneFollowNode(DTROS):
         x, y, w, h = cv.boundingRect(contour)
         if h == 0:
             return False
-        aspect_ratio = w /h
+        aspect_ratio = w / h
         return aspect_ratio > self.params["parking_lane_aspect_ratio"]
 
     def parking_yellow_lane_error(self):
         if self.image is None:
             return None
-        image = self.image[self.params["parking_lane_crop_top"]:, :]
+        image = self.image[self.params["parking_lane_crop_top"] :, :]
         image = cv2.GaussianBlur(image, (5, 5), 0)
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
         mask = cv2.inRange(hsv, DUCKIES_PLUS_LINE[0], DUCKIES_PLUS_LINE[1])
@@ -601,7 +606,13 @@ class LaneFollowNode(DTROS):
                     2,
                 )
 
-        contours = list(filter(lambda x: cv2.contourArea(x) > self.params["parking_lane_min_area"], contours))
+        contours = list(
+            filter(
+                lambda x: cv2.contourArea(x)
+                > self.params["parking_lane_min_area"],
+                contours,
+            )
+        )
         if len(contours) < 3:
             return None
 
@@ -639,11 +650,9 @@ class LaneFollowNode(DTROS):
                     cv2.FONT_HERSHEY_SIMPLEX,
                     1,
                     color,
-                    2
+                    2,
                 )
-                cv2.line(image_copy,
-                         center,
-                         (int(endx), int(endy)), BLACK, 3)
+                cv2.line(image_copy, center, (int(endx), int(endy)), BLACK, 3)
         lines = np.array(lines)
 
         # get point at infinity at intersection
@@ -658,27 +667,64 @@ class LaneFollowNode(DTROS):
         )
 
         if self.params["parking_lane_debug"]:
-            cv2.circle(image_copy, (intersection[0], intersection[1]), 10, (255, 0, 255), -1)
-            cv2.line(image_copy, (intersection[0], 0), (intersection[0], image.shape[0]), (0, 255, 0), 3)
-            cv2.line(image_copy, (image.shape[1] // 2, 0), (image.shape[1] // 2, image.shape[0]), (255, 255, 0), 3)
-            cv2.putText(image_copy, f"{error:.2f}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, BLACK, 2, cv2.LINE_AA)
-            message = self.bridge.cv2_to_compressed_imgmsg(image_copy, dst_format="jpeg")
+            cv2.circle(
+                image_copy,
+                (intersection[0], intersection[1]),
+                10,
+                (255, 0, 255),
+                -1,
+            )
+            cv2.line(
+                image_copy,
+                (intersection[0], 0),
+                (intersection[0], image.shape[0]),
+                (0, 255, 0),
+                3,
+            )
+            cv2.line(
+                image_copy,
+                (image.shape[1] // 2, 0),
+                (image.shape[1] // 2, image.shape[0]),
+                (255, 255, 0),
+                3,
+            )
+            cv2.putText(
+                image_copy,
+                f"{error:.2f}",
+                (10, 30),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                1,
+                BLACK,
+                2,
+                cv2.LINE_AA,
+            )
+            message = self.bridge.cv2_to_compressed_imgmsg(
+                image_copy, dst_format="jpeg"
+            )
             self.pub_parking_lane.publish(message)
 
         return error
 
     def parking_forward_state(self):
+        rate = rospy.Rate(1 / self.params["parking_forward_time"])
+        self.twist.v = self.params["parking_forward_constant_v"]
+        self.twist.omega = 0
+        self.vel_pub.publish(self.twist)
+        rate.sleep()
+
+        self.parking_find_perpendicular(self.params["parking_stop_tof_min"])
+
         rate = rospy.Rate(self.params["parking_rate"])
-        P_ = np.array(
-            [self.params["parking_P_x"], 0]
-        )
-        D_ = np.array(
-            [self.params["parking_D_x"], 0]
-        )
+        P_ = np.array([self.params["parking_P_x"], 0])
+        D_ = np.array([self.params["parking_D_x"], 0])
         depth = self.parking_stall["depth"]
         while True:
+            if self.tof_distance >= self.params["max_tof_distance"]:
+                self.parking_find_perpendicular()
+                continue
             distance_error = (
-                self.tof_distance - self.params["parking_forward_distance"][depth]
+                self.tof_distance
+                - self.params["parking_forward_distance"][depth]
             )
             error = np.array([distance_error, 0])
             if abs(distance_error) < self.params["parking_forward_epsilon"]:
@@ -689,28 +735,66 @@ class LaneFollowNode(DTROS):
 
         self.state = DS.Stage3Parking_Turn
 
+    def parking_find_perpendicular(self, ignore_tof_min = 0):
+        rate_rotate = rospy.Rate(1 / self.params["parking_find_perpendicular_rotate_time"])
+        rate_stop = rospy.Rate(1 / self.params["parking_find_perpendicular_stop_time"])
+        min_tof_distance = self.params["max_tof_distance"]
+        side = self.parking_stall["side"]
+        omega = self.params["parking_find_perpendicular_omega"][side]
+        step = 0
+        max_step = 1
+        add = 1
+        total_steps = 0
+        while True:
+            rospy.loginfo(f"step / max / total: {step} / {max_step} / {total_steps}")
+            rospy.loginfo(f"tof_distance: {self.tof_distance}")
+            rospy.loginfo(f"min_tof_distance: {min_tof_distance}")
+            rospy.loginfo(f"omega: {omega}")
+            self.twist.v = 0
+            self.twist.omega = omega
+            self.vel_pub.publish(self.twist)
+            rate_rotate.sleep()
+            self.twist.v = 0
+            self.twist.omega = 0
+            self.vel_pub.publish(self.twist)
+            rate_stop.sleep()
+            if step == max_step:
+                omega = -omega
+                max_step += add
+                max_step *= -1
+                add *= -1
+            step += add
+            if self.tof_distance < min_tof_distance and self.tof_distance > ignore_tof_min:
+                min_tof_distance = self.tof_distance
+                omega = self.params["parking_find_perpendicular_omega"][side]
+                step = 0
+                max_step = 1
+                add = 1
+            elif total_steps > 3 and step == 0:
+                break
+            elif total_steps > self.params["max_total_steps"]:
+                total_steps = 0
+                min_tof_distance = self.params["max_tof_distance"]
+                step = 0
+            total_steps += 1
+
     def parking_turn_state(self):
         rate = rospy.Rate(self.params["parking_rate"])
-        P_ = np.array(
-            [0, self.params["parking_turn_P_o"]]
-        )
-        D_ = np.array(
-            [0, self.params["parking_turn_D_o"]]
-        )
         side = self.parking_stall["side"]
-        initial_yaw = self.odom.pose.pose.orientation.z
-        target_yaw = self.params["parking_turn_angle"][side]
-        while True:
-            yaw = self.odom.pose.pose.orientation.z - initial_yaw
-            error = np.array([0, yaw - target_yaw])
-            rospy.loginfo(f"DEBUG yaw: {yaw}")
-            rospy.loginfo(f"DEBUG target_yaw: {target_yaw}")
-            rospy.loginfo(f"DEBUG error: {error}")
-            if abs(error[1]) < self.params["parking_turn_epsilon"]:
-                break
-            self.parking_pid(error, P_, D_)
+        self.twist.v = 0
+        self.twist.omega = 0
+        rate.sleep()
+        while self.tof_distance < self.params["max_tof_distance"]:
+            self.twist.omega = self.params["parking_turn_omega"][side]
             self.vel_pub.publish(self.twist)
             rate.sleep()
+
+        while self.tof_distance > self.params["parking_turn_max_tof_distance"]:
+            self.twist.omega = self.params["parking_turn_omega"][side]
+            self.vel_pub.publish(self.twist)
+            rate.sleep()
+
+        self.parking_find_perpendicular()
 
         self.state = DS.Stage3Parking_Reverse
 
@@ -723,19 +807,20 @@ class LaneFollowNode(DTROS):
             [self.params["parking_D_x"], self.params["parking_reverse_D_o"]]
         )
         while True:
-            yellow_lane_error = self.parking_yellow_lane_error()
-            if self.tof_distance > self.params["parking_reverse_max_tof_distance_alignment"]:
-                omega_error = 0
-            elif yellow_lane_error is not None:
-                omega_error = yellow_lane_error
-            else:
-                omega_error = 0
+            # yellow_lane_error = self.parking_yellow_lane_error()
+            # if self.tof_distance > self.params["parking_reverse_max_tof_distance_alignment"]:
+            #     omega_error = 0
+            # elif yellow_lane_error is not None:
+            #     omega_error = yellow_lane_error
+            # else:
+            #     omega_error = 0
             distance_error = (
-                self.tof_distance - self.params["parking_reverse_target_tof_distance"]
+                self.tof_distance
+                - self.params["parking_reverse_target_tof_distance"]
             )
-            error = np.array([distance_error, omega_error])
+            error = np.array([distance_error, 0])
             rospy.loginfo(f"DEBUG error: {error}")
-            if abs(distance_error) < self.params["parking_reverse_epsilon"]:
+            if np.linalg.norm(error) < self.params["parking_reverse_epsilon"]:
                 break
             self.parking_pid(error, P_, D_)
             rospy.loginfo(f"DEBUG v: {self.twist.v}")
