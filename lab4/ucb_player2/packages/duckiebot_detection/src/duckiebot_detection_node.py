@@ -5,10 +5,12 @@ import cv2
 import rospy
 from cv_bridge import CvBridge
 import os
+import json
 from duckietown.dtros import DTParam, DTROS, NodeType, ParamType
 from duckietown_msgs.msg import BoolStamped, VehicleCorners
 from geometry_msgs.msg import Point32
 from sensor_msgs.msg import CompressedImage
+
 
 class DuckiebotDetectionNode(DTROS):
     """
@@ -25,23 +27,25 @@ class DuckiebotDetectionNode(DTROS):
     """
 
     def __init__(self, node_name):
-
         # Initialize the DTROS parent class
-        super(DuckiebotDetectionNode, self).__init__(node_name=node_name, node_type=NodeType.PERCEPTION)
+        super(DuckiebotDetectionNode, self).__init__(
+            node_name=node_name, node_type=NodeType.PERCEPTION
+        )
         # Initialize the parameters
+        with open("/params.json") as f:
+            self.params = json.load(f)['default']
 
-        self.host = str(os.environ['VEHICLE_NAME'])
+        self.host = str(os.environ["VEHICLE_NAME"])
 
-        #Frequency at which to process the incoming images
+        # Frequency at which to process the incoming images
         self.process_frequency = 2
 
-        #Number of dots in the pattern, two elements: [number of columns, number of rows]
+        # Number of dots in the pattern, two elements: [number of columns, number of rows]
         self.circlepattern_dims = [7, 3]
 
-        #Parameters for the blob detector, passed to `SimpleBlobDetector <https://docs.opencv.org/4.3.0/d0/d7a/classcv_1_1SimpleBlobDetector.html>`_
+        # Parameters for the blob detector, passed to `SimpleBlobDetector <https://docs.opencv.org/4.3.0/d0/d7a/classcv_1_1SimpleBlobDetector.html>`_
         self.blobdetector_min_area = 10
         self.blobdetector_min_dist_between_blobs = 2
-
 
         self.cbParametersChanged()
 
@@ -50,17 +54,34 @@ class DuckiebotDetectionNode(DTROS):
         self.last_stamp = rospy.Time.now()
 
         # Subscriber
-        self.sub_image = rospy.Subscriber("/{}/camera_node/image/compressed".format(self.host), CompressedImage, self.cb_image, queue_size=1)
+        self.sub_image = rospy.Subscriber(
+            "/{}/camera_node/image/compressed".format(self.host),
+            CompressedImage,
+            self.cb_image,
+            queue_size=1,
+        )
 
         # Publishers
-        self.pub_centers = rospy.Publisher("/{}/duckiebot_detection_node/centers".format(self.host), VehicleCorners, queue_size=1)
-        self.pub_circlepattern_image = rospy.Publisher("/{}/duckiebot_detection_node/detection_image/compressed".format(self.host), CompressedImage, queue_size=1)
-        self.pub_detection = rospy.Publisher("/{}/duckiebot_detection_node/detection".format(self.host), BoolStamped, queue_size=1)
+        self.pub_centers = rospy.Publisher(
+            "/{}/duckiebot_detection_node/centers".format(self.host),
+            VehicleCorners,
+            queue_size=1,
+        )
+        self.pub_circlepattern_image = rospy.Publisher(
+            "/{}/duckiebot_detection_node/detection_image/compressed".format(
+                self.host
+            ),
+            CompressedImage,
+            queue_size=1,
+        )
+        self.pub_detection = rospy.Publisher(
+            "/{}/duckiebot_detection_node/detection".format(self.host),
+            BoolStamped,
+            queue_size=1,
+        )
         self.log("Detection Initialization completed.")
 
     def cbParametersChanged(self):
-
-        self.publish_duration = rospy.Duration.from_sec(1.0 / self.process_frequency)
         params = cv2.SimpleBlobDetector_Params()
         params.minArea = self.blobdetector_min_area
         params.minDistBetweenBlobs = self.blobdetector_min_dist_between_blobs
@@ -78,7 +99,7 @@ class DuckiebotDetectionNode(DTROS):
 
         """
         now = rospy.Time.now()
-        if now - self.last_stamp < self.publish_duration:
+        if (now - self.last_stamp).to_sec() < self.params['detection_publish_rate']:
             return
         else:
             self.last_stamp = now
