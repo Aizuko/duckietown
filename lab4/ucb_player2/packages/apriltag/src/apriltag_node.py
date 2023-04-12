@@ -178,7 +178,7 @@ class AprilTagNode(DTROS):
                 min_distance = distance
                 closest_tag_id = tag_id
 
-        if closest_tag_id is not None and min_distance < 0.5:
+        if closest_tag_id is not None:
             self.pub_ap_detection.publish(
                 Vector3(
                     min_distance,

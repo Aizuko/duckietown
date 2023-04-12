@@ -4,6 +4,7 @@
     "starting_state": 1,
 
     "ap_rate": 3,
+    "min_ap_dist": 3,
 
     "Px": 0.049,
     "Dx": -0.004,

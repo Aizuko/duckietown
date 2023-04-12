@@ -373,7 +373,7 @@ class LaneFollowNode(DTROS, FrozenClass):
 
     def stop_callback(self, msg):
         img = self.bridge.compressed_imgmsg_to_cv2(msg, "bgr8")
-        crop = img[300:-1, :, :]
+        crop = img[400:-1, :, :]
         hsv = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
         mask = cv2.inRange(hsv, STOP_MASK[0], STOP_MASK[1])
         crop = cv2.bitwise_and(crop, crop, mask=mask)
