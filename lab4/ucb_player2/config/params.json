@@ -2,6 +2,8 @@
   "default": {
     "init_wait_time": 3,
     "starting_state": 1,
+    "run_rate": 3,
+    "crossing_interval": 0.5,
 
     "ap_rate": 3,
     "min_ap_dist": 3,
@@ -10,10 +12,10 @@
     "#rot_omega_l": 0.65,
     "rot_omega_l": 0.60,
     "rot_omega_r": 1.15,
-    "blind_duration_forward": 2,
+    "blind_duration_forward": 4,
     "blind_duration_left": 3.9,
     "blind_duration_right": 1.7,
-    "crossing_sum_thresh": 5000,
+    "crossing_sum_thresh": 7000,
 
     "Px": 0.049,
     "Dx": -0.004,
@@ -34,7 +36,6 @@
     "tracking_timeout": 2,
     "stopline_area_min": 1500,
     "stopline_area_max": 4000,
-    "run_rate": 3,
     "deque_maxlen": 8,
     "left_rot": 0.25,
     "right_rot": -0.25,
