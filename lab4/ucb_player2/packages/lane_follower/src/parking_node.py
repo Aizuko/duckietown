@@ -43,6 +43,7 @@ class ParkingNode(DTROS):
         self.state_start_time = time.time()
 
         self.tof_distance = np.inf
+        self.twist = Twist2DStamped(v=0, omega=0)
 
         # ╔─────────────────────────────────────────────────────────────────────╗
         # │ Pαrkiηg αττribμτεs                                                  |
@@ -79,7 +80,6 @@ class ParkingNode(DTROS):
             return
 
     def tof_callback(self, msg):
-        self.tof_dist_list.append(msg.range)
         self.tof_distance = min(msg.range, self.params["max_tof_distance"])
 
     def start_callback(self):
