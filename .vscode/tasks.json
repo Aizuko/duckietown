@@ -80,6 +80,7 @@
     "description": "Bot hostname",
     "options": [
       "csc22902",
+      "csc22903",
       "csc22927",
       "csc22920",
     ],

@@ -12,6 +12,7 @@ from sensor_msgs.msg import CameraInfo, CompressedImage, Range
 from std_msgs.msg import Float32
 from cv_bridge import CvBridge
 import numpy as np
+from nav_msgs.msg import Odometry
 from duckietown_msgs.msg import WheelsCmdStamped, Twist2DStamped
 from geometry_msgs.msg import Transform, Vector3
 from std_msgs.msg import Float64
@@ -50,6 +51,7 @@ class DS(IntEnum):
     Stage2Ducks_ThinkDuck = 29
 
     Stage3Parking = 30
+    Stage3Parking_Forward = 31
     Stage3Parking_Turn = 32
     Stage3Parking_Reverse = 33
     Stage3Parking_ThinkDuck = 39
@@ -134,6 +136,7 @@ class LaneFollowNode(DTROS):
 
         self.P = self.params["Px_coef"]
         self.D = self.params["Dx_coef"]
+        self.odom = None
 
         # ╔─────────────────────────────────────────────────────────────────────╗
         # │ Pαrkiηg αττribμτεs                                                  |
@@ -185,6 +188,12 @@ class LaneFollowNode(DTROS):
             self.lane_callback,
             queue_size=1,
             buff_size="20MB",
+        )
+        self.odom_sub = rospy.Subscriber(
+            f"/{self.veh}/deadreckoning_node/odom",
+            Odometry,
+            self.odom_callback,
+            queue_size=1,
         )
         self.tof_sub = rospy.Subscriber(
             f"/{self.veh}/front_center_tof_driver_node/range",
@@ -289,6 +298,9 @@ class LaneFollowNode(DTROS):
     def lane_callback(self, msg):
         self.image = self.bridge.compressed_imgmsg_to_cv2(msg, "bgr8")
         self.is_new_image = True
+
+    def odom_callback(self, msg):
+        self.odom = msg
 
     def evaluate_errors(self):
         """ What was previously in lane_callback """
@@ -484,6 +496,8 @@ class LaneFollowNode(DTROS):
         elif self.state == DS.Stage3Parking_ThinkDuck:
             self.twist.v = self.twist.omega = 0
             self.parking_stop_state()
+        elif self.state == DS.Stage3Parking_Forward:
+            self.parking_forward_state()
         elif self.state == DS.Stage3Parking_Turn:
             self.parking_turn_state()
         elif self.state == DS.Stage3Parking_Reverse:
@@ -524,12 +538,12 @@ class LaneFollowNode(DTROS):
     def parking_stop_state(self):
         self.state_start_time = time.time()
         rate = rospy.Rate(self.params["parking_rate"])
-        while time.time() - self.state_start_time < self.params["parking_stop_time"]:
+        while time.time() - self.state_start_time < self.params["parking_stop_time"] or self.odom is None:
             self.twist.v = 0
             self.twist.omega = 0
             self.vel_pub.publish(self.twist)
             rate.sleep()
-        self.state = DS.Stage3Parking_Turn
+        self.state = DS.Stage3Parking_Forward
 
     def parking_pid(self, error, P_, D_):
         P = error * P_
@@ -553,25 +567,44 @@ class LaneFollowNode(DTROS):
         self.twist.omega = omega
 
     def filter_parking_contours(self, contour):
-        if contour.shape[0] < 5:
+        # ratio of contour y length to x length
+        x, y, w, h = cv.boundingRect(contour)
+        if h == 0:
             return False
-        (x, y), (MA, ma), angle = cv2.fitEllipse(contour)
-        if MA == 0:
-            return False
-        return (ma / MA) > self.params["parking_lane_aspect_ratio"]
+        aspect_ratio = w /h
+        return aspect_ratio > self.params["parking_lane_aspect_ratio"]
 
     def parking_yellow_lane_error(self):
         if self.image is None:
             return None
         image = self.image[self.params["parking_lane_crop_top"]:, :]
+        image = cv2.GaussianBlur(image, (5, 5), 0)
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
         mask = cv2.inRange(hsv, DUCKIES_PLUS_LINE[0], DUCKIES_PLUS_LINE[1])
         contours, _ = cv2.findContours(
             mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE
         )
+
+        BLACK = (0, 0, 0)
+        if self.params["parking_lane_debug"]:
+            image_copy = image.copy()
+            cv2.drawContours(image_copy, contours, -1, BLACK, 3)
+            for contour in contours:
+                area = cv2.contourArea(contour)
+                cv2.putText(
+                    image_copy,
+                    f"{int(area)}",
+                    tuple(contour[0][0]),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    1,
+                    BLACK,
+                    2,
+                )
+
         contours = list(filter(lambda x: cv2.contourArea(x) > self.params["parking_lane_min_area"], contours))
         if len(contours) < 3:
             return None
+
         contours = sorted(contours, key=cv2.contourArea, reverse=True)
         contours = contours[:3]
         contours = sorted(contours, key=lambda x: x[0][0][0])
@@ -584,9 +617,6 @@ class LaneFollowNode(DTROS):
         lines = []
 
         colors = [(255, 0, 0), (0, 0, 255)]
-        black = (0, 0, 0)
-        if self.params["parking_lane_debug"]:
-            image_copy = image.copy()
 
         for contour, color in zip(contours, colors):
             # https://stackoverflow.com/questions/64396183/opencv-find-a-middle-line-of-a-contour-python
@@ -601,80 +631,115 @@ class LaneFollowNode(DTROS):
             lines.append(line)
             if self.params["parking_lane_debug"]:
                 cv2.drawContours(image_copy, [contour], -1, color, 3)
+                area = cv2.contourArea(contour)
                 cv2.putText(
                     image_copy,
-                    str(cv2.contourArea(contour)), (center),
+                    f"{int(area)}",
+                    (center),
                     cv2.FONT_HERSHEY_SIMPLEX,
                     1,
                     color,
-                    2,
-                    cv2.LINE_AA
+                    2
                 )
                 cv2.line(image_copy,
                          center,
-                         (int(endx), int(endy)), black, 3)
+                         (int(endx), int(endy)), BLACK, 3)
         lines = np.array(lines)
 
         # get point at infinity at intersection
         intersection = np.cross(lines[0], lines[1])
-        intersection = intersection / intersection[2]
+        intersection /= intersection[2]
         intersection = intersection.astype(int)
 
-        # error is distance from self.center of image
-        error = intersection[0] - self.image.shape[1] / 2
+        # error is angle of intersection with vertical line
+        error = np.arctan2(
+            intersection[0] - image.shape[1] // 2,
+            abs(image.shape[0] - intersection[1]),
+        )
 
         if self.params["parking_lane_debug"]:
             cv2.circle(image_copy, (intersection[0], intersection[1]), 10, (255, 0, 255), -1)
             cv2.line(image_copy, (intersection[0], 0), (intersection[0], image.shape[0]), (0, 255, 0), 3)
             cv2.line(image_copy, (image.shape[1] // 2, 0), (image.shape[1] // 2, image.shape[0]), (255, 255, 0), 3)
-            cv2.putText(image_copy, str(error), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, black, 2, cv2.LINE_AA)
+            cv2.putText(image_copy, f"{error:.2f}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, BLACK, 2, cv2.LINE_AA)
             message = self.bridge.cv2_to_compressed_imgmsg(image_copy, dst_format="jpeg")
             self.pub_parking_lane.publish(message)
 
         return error
 
-    def parking_turn_state(self):
-        # parameterized blind turn
+    def parking_forward_state(self):
         rate = rospy.Rate(self.params["parking_rate"])
-        start = time.time()
-        time_elapsed = 0
-        while time_elapsed < self.parking_stall["turn"]["time"]:
-            self.twist.v = self.params["parking_turn_v"]
-            self.twist.omega = self.parking_stall["turn"]["omega"] * np.pi
+        P_ = np.array(
+            [self.params["parking_P_x"], 0]
+        )
+        D_ = np.array(
+            [self.params["parking_D_x"], 0]
+        )
+        depth = self.parking_stall["depth"]
+        while True:
+            distance_error = (
+                self.tof_distance - self.params["parking_forward_distance"][depth]
+            )
+            error = np.array([distance_error, 0])
+            if abs(distance_error) < self.params["parking_forward_epsilon"]:
+                break
+            self.parking_pid(error, P_, D_)
             self.vel_pub.publish(self.twist)
-            time_elapsed = time.time() - start
+            rate.sleep()
+
+        self.state = DS.Stage3Parking_Turn
+
+    def parking_turn_state(self):
+        rate = rospy.Rate(self.params["parking_rate"])
+        P_ = np.array(
+            [0, self.params["parking_turn_P_o"]]
+        )
+        D_ = np.array(
+            [0, self.params["parking_turn_D_o"]]
+        )
+        side = self.parking_stall["side"]
+        initial_yaw = self.odom.pose.pose.orientation.z
+        target_yaw = self.params["parking_turn_angle"][side]
+        while True:
+            yaw = self.odom.pose.pose.orientation.z - initial_yaw
+            error = np.array([0, yaw - target_yaw])
+            rospy.loginfo(f"DEBUG yaw: {yaw}")
+            rospy.loginfo(f"DEBUG target_yaw: {target_yaw}")
+            rospy.loginfo(f"DEBUG error: {error}")
+            if abs(error[1]) < self.params["parking_turn_epsilon"]:
+                break
+            self.parking_pid(error, P_, D_)
+            self.vel_pub.publish(self.twist)
             rate.sleep()
 
         self.state = DS.Stage3Parking_Reverse
 
     def parking_reverse_state(self):
         rate = rospy.Rate(self.params["parking_rate"])
-        prev_yellow_lane_error = None
+        P_ = np.array(
+            [self.params["parking_P_x"], self.params["parking_reverse_P_o"]]
+        )
+        D_ = np.array(
+            [self.params["parking_D_x"], self.params["parking_reverse_D_o"]]
+        )
         while True:
             yellow_lane_error = self.parking_yellow_lane_error()
             if self.tof_distance > self.params["parking_reverse_max_tof_distance_alignment"]:
                 omega_error = 0
             elif yellow_lane_error is not None:
                 omega_error = yellow_lane_error
-                prev_yellow_lane_error = yellow_lane_error
-            elif prev_yellow_lane_error is None:
-                omega_error = 0
             else:
-                prev_yellow_lane_error *= self.params["parking_reverse_beta"]
-                omega_error = prev_yellow_lane_error
+                omega_error = 0
             distance_error = (
                 self.tof_distance - self.params["parking_reverse_target_tof_distance"]
             )
             error = np.array([distance_error, omega_error])
-            rospy.logdebug(f"error: {error}")
+            rospy.loginfo(f"DEBUG error: {error}")
             if abs(distance_error) < self.params["parking_reverse_epsilon"]:
                 break
-            self.parking_pid(error, np.array(
-                [self.params["parking_P_x"], self.params["parking_reverse_P_o"]]
-            ), np.array(
-                [self.params["parking_D_x"], self.params["parking_reverse_D_o"]]
-            ))
-            rospy.logdebug(f"omega: {self.twist.omega}")
+            self.parking_pid(error, P_, D_)
+            rospy.loginfo(f"DEBUG v: {self.twist.v}")
+            rospy.loginfo(f"DEBUG omega: {self.twist.omega}")
             self.vel_pub.publish(self.twist)
             rate.sleep()
         rate = rospy.Rate(1 / self.params["parking_reverse_constant_time"])
