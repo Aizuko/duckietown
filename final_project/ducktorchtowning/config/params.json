@@ -63,7 +63,7 @@
     "comment4":
     "==== Parking settings ====",
     "parking_stall_number": 4,
-    "parking_lot_depth_apriltag_id": 227,
+
     "parking_lot": [
       {
         "distance": 1.28,
@@ -138,29 +138,16 @@
     "parking_rate": 10,
     "parking_P_x": 1.5,
     "parking_D_x": 0,
-    "parking_P_o": -0.1,
-    "parking_D_o": 0,
 
     "parking_max_v": 0.25,
     "parking_max_omega": 3,
-    "parking_turn_angle": {
-      "left": -0.5,
-      "right": 0.5
-    },
     "parking_turn_omega": {
       "left": -3.3,
       "right": 3.3
     },
-    "parking_turn_max_tof_distance": 0.82,
 
-    "parking_reverse_epsilon": 0.05,
-    "parking_reverse_P_o": 1,
-    "parking_reverse_D_o": 0,
-    "parking_reverse_constant_time": 2,
-    "parking_reverse_v": -0.2,
-    "parking_reverse_max_tof_distance_alignment": 0.7,
-    "parking_reverse_target_tof_distance": 1.15,
     "parking_stop_tof_min": 0.5,
+
 
     "parking_find_perpendicular_stop_time": 0.25,
     "parking_find_perpendicular_rotate_time": 0.125,
@@ -168,16 +155,17 @@
       "left": -3,
       "right": 3
     },
-    "max_total_steps": 100,
+    "parking_find_perpendicular_max_total_steps": 100,
+
+    "parking_turn_max_tof_distance": 0.82,
 
     "parking_forward_constant_v": 0.2,
     "parking_forward_time": 1,
 
-    "parking_lane_aspect_ratio": 0.3,
-    "parking_lane_min_area": 300,
-    "parking_lane_crop_top": 200,
-    "parking_lane_debug": true,
-    "parking_lane_hsv_mask": [[30, 50, 120], [45, 255, 255]],
+    "parking_reverse_epsilon": 0.05,
+    "parking_reverse_constant_time": 2,
+    "parking_reverse_v": -0.2,
+    "parking_reverse_target_tof_distance": 1.15,
 
     "max_tof_distance": 1.25,
     "placeholder": false

@@ -228,7 +228,6 @@ class LaneFollowNode(DTROS):
     def debug_callback(self, _):
         if not self.params["is_debug"]:
             return
-        self.parking_yellow_lane_error()
         rospy.loginfo(f"April tags: {len(self.seen_ap)}")
 
         if self.seen_ap[-1] is not None:
@@ -643,132 +642,6 @@ class LaneFollowNode(DTROS):
         aspect_ratio = w / h
         return aspect_ratio > self.params["parking_lane_aspect_ratio"]
 
-    def parking_yellow_lane_error(self):
-        if self.image is None:
-            return None
-        image = self.image[self.params["parking_lane_crop_top"] :, :]
-        image = cv2.GaussianBlur(image, (5, 5), 0)
-        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-        mask = cv2.inRange(hsv, DUCKIES_PLUS_LINE[0], DUCKIES_PLUS_LINE[1])
-        contours, _ = cv2.findContours(
-            mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE
-        )
-
-        BLACK = (0, 0, 0)
-        if self.params["parking_lane_debug"]:
-            image_copy = image.copy()
-            cv2.drawContours(image_copy, contours, -1, BLACK, 3)
-            for contour in contours:
-                area = cv2.contourArea(contour)
-                cv2.putText(
-                    image_copy,
-                    f"{int(area)}",
-                    tuple(contour[0][0]),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    1,
-                    BLACK,
-                    2,
-                )
-
-        contours = list(
-            filter(
-                lambda x: cv2.contourArea(x)
-                > self.params["parking_lane_min_area"],
-                contours,
-            )
-        )
-        if len(contours) < 3:
-            return None
-
-        contours = sorted(contours, key=cv2.contourArea, reverse=True)
-        contours = contours[:3]
-        contours = sorted(contours, key=lambda x: x[0][0][0])
-        if self.parking_stall["depth"] == "near":
-            contours = contours[-2:]
-        elif self.parking_stall["depth"] == "far":
-            contours = contours[:2]
-
-        # get parallel lines
-        lines = []
-
-        colors = [(255, 0, 0), (0, 0, 255)]
-
-        for contour, color in zip(contours, colors):
-            # https://stackoverflow.com/questions/64396183/opencv-find-a-middle-line-of-a-contour-python
-            M = cv2.moments(contour)
-            if M["m00"] == 0:
-                return None
-            center = (int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]))
-            theta = 0.5 * np.arctan2(2 * M["mu11"], M["mu20"] - M["mu02"])
-            endx = np.cos(theta) + center[0]
-            endy = np.sin(theta) + center[1]
-            line = np.cross([center[0], center[1], 1], [endx, endy, 1])
-            lines.append(line)
-            if self.params["parking_lane_debug"]:
-                cv2.drawContours(image_copy, [contour], -1, color, 3)
-                area = cv2.contourArea(contour)
-                cv2.putText(
-                    image_copy,
-                    f"{int(area)}",
-                    (center),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    1,
-                    color,
-                    2,
-                )
-                cv2.line(image_copy, center, (int(endx), int(endy)), BLACK, 3)
-        lines = np.array(lines)
-
-        # get point at infinity at intersection
-        intersection = np.cross(lines[0], lines[1])
-        intersection /= intersection[2]
-        intersection = intersection.astype(int)
-
-        # error is angle of intersection with vertical line
-        error = np.arctan2(
-            intersection[0] - image.shape[1] // 2,
-            abs(image.shape[0] - intersection[1]),
-        )
-
-        if self.params["parking_lane_debug"]:
-            cv2.circle(
-                image_copy,
-                (intersection[0], intersection[1]),
-                10,
-                (255, 0, 255),
-                -1,
-            )
-            cv2.line(
-                image_copy,
-                (intersection[0], 0),
-                (intersection[0], image.shape[0]),
-                (0, 255, 0),
-                3,
-            )
-            cv2.line(
-                image_copy,
-                (image.shape[1] // 2, 0),
-                (image.shape[1] // 2, image.shape[0]),
-                (255, 255, 0),
-                3,
-            )
-            cv2.putText(
-                image_copy,
-                f"{error:.2f}",
-                (10, 30),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                1,
-                BLACK,
-                2,
-                cv2.LINE_AA,
-            )
-            message = self.bridge.cv2_to_compressed_imgmsg(
-                image_copy, dst_format="jpeg"
-            )
-            self.pub_parking_lane.publish(message)
-
-        return error
-
     def parking_forward_state(self):
         rate = rospy.Rate(1 / self.params["parking_forward_time"])
         self.twist.v = self.params["parking_forward_constant_v"]
@@ -836,7 +709,7 @@ class LaneFollowNode(DTROS):
                 add = 1
             elif total_steps > 3 and step == 0:
                 break
-            elif total_steps > self.params["max_total_steps"]:
+            elif total_steps > self.params["parking_find_perpendicular_max_total_steps"]:
                 total_steps = 0
                 min_tof_distance = self.params["max_tof_distance"]
                 step = 0
@@ -865,19 +738,12 @@ class LaneFollowNode(DTROS):
     def parking_reverse_state(self):
         rate = rospy.Rate(self.params["parking_rate"])
         P_ = np.array(
-            [self.params["parking_P_x"], self.params["parking_reverse_P_o"]]
+            [self.params["parking_P_x"], 0]
         )
         D_ = np.array(
-            [self.params["parking_D_x"], self.params["parking_reverse_D_o"]]
+            [self.params["parking_D_x"], 0]
         )
         while True:
-            # yellow_lane_error = self.parking_yellow_lane_error()
-            # if self.tof_distance > self.params["parking_reverse_max_tof_distance_alignment"]:
-            #     omega_error = 0
-            # elif yellow_lane_error is not None:
-            #     omega_error = yellow_lane_error
-            # else:
-            #     omega_error = 0
             distance_error = (
                 self.tof_distance
                 - self.params["parking_reverse_target_tof_distance"]
