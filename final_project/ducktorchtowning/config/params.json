@@ -66,64 +66,36 @@
 
     "parking_lot": [
       {
-        "distance": 1.28,
         "id": 207,
         "number": 1,
-        "opposite_stall_number": 3,
         "side": "left",
         "depth": "far",
         "x": 1.62,
-        "y": 1.19,
-        "turn": {
-          "v": 0.2,
-          "omega": -0.45,
-          "time": 4
-        }
+        "y": 1.19
       },
       {
-        "distance": 1.28,
         "id": 226,
-        "opposite_stall_number": 4,
         "number": 2,
         "side": "left",
         "depth": "near",
         "x": 1.40,
-        "y": 1.19,
-        "turn": {
-          "v": 0.2,
-          "omega": -0.75,
-          "time": 4
-        }
+        "y": 1.19
       },
       {
-        "distance": 1.28,
         "id": 228,
-        "opposite_stall_number": 1,
         "number": 3,
         "side": "right",
         "depth": "far",
         "x": 1.62,
-        "y": 2.47,
-        "turn": {
-          "v": 0.2,
-          "omega": 0.45,
-          "time": 5
-        }
+        "y": 2.47
       },
       {
-        "distance": 1.28,
         "id": 75,
-        "opposite_stall_number": 2,
         "number": 4,
         "side": "right",
         "depth": "near",
         "x": 1.40,
-        "y": 2.47,
-        "turn": {
-          "v": 0.2,
-          "omega": 0.75,
-          "time": 8
-        }
+        "y": 2.47
       }
     ],
 

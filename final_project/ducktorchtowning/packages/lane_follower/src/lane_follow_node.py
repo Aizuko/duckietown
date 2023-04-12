@@ -158,8 +158,6 @@ class LaneFollowNode(DTROS):
         parking_stall_number = self.params["parking_stall_number"]
 
         self.parking_stall = parking_lot[parking_stall_number - 1]
-        opposite_stall_number = self.parking_stall["opposite_stall_number"]
-        self.opposite_stall = parking_lot[opposite_stall_number - 1]
         self.tof_distance = np.inf
 
         self.tf_buffer = Buffer()
