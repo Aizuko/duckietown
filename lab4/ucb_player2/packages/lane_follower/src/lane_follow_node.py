@@ -183,6 +183,7 @@ class LaneFollowNode(DTROS, FrozenClass):
         # New bits!!!
         self.saw_first_ap_time = None
         self.tracking_start = None
+        self.is_started_helping = False
         self.finished_helping = False
         self.finish_help_time = None
 
@@ -451,7 +452,9 @@ class LaneFollowNode(DTROS, FrozenClass):
             self.twist.omega = P + D
 
     def pid_z(self):
+        return
         distance_to_robot_ahead = self.distance_to_robot_ahead()
+
         if distance_to_robot_ahead is None:
             return
         self.tracking_error = self.safe_distance - distance_to_robot_ahead
@@ -486,11 +489,8 @@ class LaneFollowNode(DTROS, FrozenClass):
         self.twist.v = self.twist.omega = 0
         self.vel_pub.publish(self.twist)
 
-    def distance_to_robot_ahead(self):
-        """Distance between our robot and theirs. Always positive
-
-        None is returned when there's no bot detected ahead
-        """
+    def is_robot_ahead(self):
+        """ Returns true if a robot is ahead within distance """
         if (
             self.robot_transform_time is not None
             and time.time() - self.robot_transform_time
@@ -505,9 +505,15 @@ class LaneFollowNode(DTROS, FrozenClass):
                 rospy.loginfo(
                     f"{np.linalg.norm(latest_translate)}, {self.tof_dist[-1]}, {tof_dist_transformed}"
                 )
-            return min(np.linalg.norm(latest_translate), tof_dist_transformed)
 
-        return None
+            dist = min(np.linalg.norm(latest_translate), tof_dist_transformed)
+
+            if dist <= self.tracking_distance:
+                return False
+            else:
+                return True
+
+        return False
 
     @lru_cache(maxsize=1)
     def set_leds(self, color: LEDColor, index_set: LEDIndex):
@@ -544,6 +550,17 @@ class LaneFollowNode(DTROS, FrozenClass):
                     > params["init_wait_time"]
                 ):
                     self.state = DS.LaneFollowing
+            # ==== Lane following ====
+            elif self.state is DS.LaneFollowing:
+                self.set_leds(LEDColor.Green, LEDIndex.Back)
+                self.follow_lane()
+
+                try:
+                    if self.is_robot_ahead() and not self.is_started_helping:
+                        self.state = DS.Tracking
+                        self.is_started_helping = True
+                except TypeError:
+                    pass
             else:
                 print(f"===! {self.state.name} !===")
                 print(f"Saw {self.last_seen_ap.tag.name}")
