@@ -22,26 +22,40 @@ from tf2_ros import Buffer, TransformListener
 from tf import transformations as tr
 
 
-# TODO: extact into config file for faster tuning
 # ROAD_MASK = [(20, 60, 0), (50, 255, 255)]
 ROAD_MASK = [(10, 60, 165), (40, 255, 255)]
-STOP_MASK = [(0, 70, 150), (20, 255, 255)]
+# STOP_MASK = [(0, 70, 150), (20, 255, 255)]
+STOP_MASK = [(0, 100, 120), (10, 255, 255)]
+DUCKIES_ONLY = [(0, 55, 145), (20, 255, 255)]
 
 OFF_COLOR = ColorRGBA()
 OFF_COLOR.r = OFF_COLOR.g = OFF_COLOR.b = OFF_COLOR.a = 0.0
 
 
+with open("/params.json") as f:
+    params = json.load(f)["default"]
+
+
 @unique
-class DuckieState(Enum):
+class DS(IntEnum):
     """States our duckiebot can visit. These modify the LaneFollowNode"""
 
-    LaneFollowing = auto()
-    Stopped = auto()
-    BlindTurnLeft = auto()
-    BlindTurnRight = auto()
-    BlindForward = auto()
-    Tracking = auto()
-    LondonStyle = auto()
+    WaitForInitialAP = 1
+    LaneFollowing = 2
+    Stopped = 3
+    BlindTurnLeft = 4
+    BlindTurnRight = 5
+    BlindForward = 6
+    Tracking = 7
+    LondonStyle = 8
+    WaitForCrossing = 9
+
+    Stage3Parking = 30
+    Stage3Parking_Turn = 32
+    Stage3Parking_Reverse = 33
+    Stage3Parking_ThinkDuck = 39
+
+    ShuttingDown = 90
 
 
 @unique
@@ -72,6 +86,7 @@ class LEDIndex(Enum):
     FrontLeft = set([0])
     FrontRight = set([2])
 
+
 class TagType(IntEnum):
     """IntEnum mirror of the classification @ apriltag tag.py"""
 
@@ -81,6 +96,28 @@ class TagType(IntEnum):
     ForwardStop = 3
     CrossingStop = 4
     ParkingLotEnteringStop = 5
+
+
+with open("/params.json") as f:
+    params = json.load(f)["default"]
+
+
+class SeenAP:
+    """Tuple for an apriltag detection"""
+
+    def __init__(self, tag: TagType, distance: float):
+        self.tag = tag
+        self.distance = distance
+        self.time = time.time()
+
+    def is_within_time(self) -> bool:
+        return time.time() - self.time < params["ap_stale_timeout"]
+
+    def is_within_distance(self) -> bool:
+        return self.distance < params["ap_considered_distance"]
+
+    def is_within_criteria(self) -> bool:
+        return self.is_within_time() and self.is_within_distance()
 
 
 class SeenAP:
@@ -127,19 +164,14 @@ class LaneFollowNode(DTROS, FrozenClass):
         self.veh = rospy.get_param("~veh")
         self.bridge = CvBridge()
 
-        with open("/params.json") as f:
-            self.params = json.load(f)
+        self.params = params
 
-        self.params = {
-            **self.params["default"],
-            **(self.params.get(self.veh) or {}),
-        }
-
-        self.is_american = self.params["is_american"]
+        self.is_american = True
         self.is_debug = self.params["is_debug"]
+        self.last_seen_ap = None
 
         # Lane following
-        self.offset = 220 * (2 * int(self.is_american) - 1)
+        self.offset = 220
 
         self.min_velocity = self.params["min_velocity"]
         self.velocity = self.params["velocity"]
@@ -149,6 +181,7 @@ class LaneFollowNode(DTROS, FrozenClass):
         self.Dx = self.params["Dx"]
 
         # New bits!!!
+        self.saw_first_ap_time = None
         self.tracking_start = None
         self.finished_helping = False
         self.finish_help_time = None
@@ -171,13 +204,13 @@ class LaneFollowNode(DTROS, FrozenClass):
         # │ Dyηαmic ναriαblεs                                                  |
         # ╚────────────────────────────────────────────────────────────────────╝
         # State
-        self.state = DuckieState.LaneFollowing
+        self.state = self.params["starting_state"]
 
         # PID Variables
         self.error = None  # Error off target
 
         self.last_error = 0
-        self.last_time = rospy.get_time()
+        self.last_time = time.time()
 
         # Stopline variables
         self.stop_time = None
@@ -187,7 +220,6 @@ class LaneFollowNode(DTROS, FrozenClass):
 
         # TOF
         self.tof_dist = [0.0, 0.0, 0.0]
-        self.seen_ap = [None, None]
 
         # Transform
         self.robot_transform_queue = deque(maxlen=self.params["deque_maxlen"])
@@ -195,7 +227,7 @@ class LaneFollowNode(DTROS, FrozenClass):
 
         self.tracking_error = None
         self.tracking_last_error = 0
-        self.tracking_last_time = rospy.get_time()
+        self.tracking_last_time = time.time()
 
         self.Pz = self.params["Pz"]
         self.Dz = self.params["Dz"]
@@ -258,13 +290,13 @@ class LaneFollowNode(DTROS, FrozenClass):
         # Don't do any ap callbacks in the parking state
         if DS.Stage3Parking <= self.state < DS.Stage3Parking + 10:
             return
-
-        self.seen_ap.append(SeenAP(TagType(int(msg.y)), msg.x))
+        print(f"Saw an ap with {msg.y}")
+        self.last_seen_ap = SeenAP(TagType(int(msg.y)), msg.x)
 
     def ajoin_callback(self, msg):
         self.lane_callback(msg)
 
-        if self.state is not DuckieState.Stopped:
+        if self.state is not DS.Stopped:
             self.stop_callback(msg)
 
     def lane_callback(self, msg):
@@ -329,11 +361,11 @@ class LaneFollowNode(DTROS, FrozenClass):
         y_rote = tr.euler_from_matrix(T)[1]
 
         if y_rote > self.params["left_rot"]:
-            self.next_blind_state = DuckieState.BlindTurnLeft
+            self.next_blind_state = DS.BlindTurnLeft
         elif y_rote < self.params["right_rot"]:
-            self.next_blind_state = DuckieState.BlindTurnRight
+            self.next_blind_state = DS.BlindTurnRight
         else:
-            self.next_blind_state = DuckieState.BlindForward
+            self.next_blind_state = DS.BlindForward
 
         rospy.loginfo_throttle(1, f"{y_rote}")
         self.robot_transform_time = msg.header.stamp.to_sec()
@@ -355,26 +387,26 @@ class LaneFollowNode(DTROS, FrozenClass):
             )
         )
 
-        time = rospy.get_time()
+        time = time.time()
         ltime = self.stop_time
 
-        if is_stopline and self.state is DuckieState.Tracking:
+        if is_stopline and self.state is DS.Tracking:
             if (
                 ltime is None
                 or time - ltime > self.params["stop_immunity_tracking"]
             ):
-                self.state = DuckieState.Stopped
+                self.state = DS.Stopped
                 self.stop_time = time
             else:
                 self.is_stop_line = True
         elif (
             is_stopline
-            and self.state is DuckieState.LaneFollowing
+            and self.state is DS.LaneFollowing
             and (ltime is None or time - ltime > self.params["stop_immunity"])
         ):
             self.is_stop_line = True
         elif not is_stopline and self.is_stop_line:
-            self.state = DuckieState.Stopped
+            self.state = DS.Stopped
             self.stop_time = time
             self.is_stop_line = False
 
@@ -386,13 +418,13 @@ class LaneFollowNode(DTROS, FrozenClass):
         self.last_error = self.error = 0
         self.twist.v = self.velocity
 
-        if self.state is DuckieState.BlindForward:
+        if self.state is DS.BlindForward:
             self.set_leds(LEDColor.Yellow, LEDIndex.Back)
             self.twist.omega = 0
-        elif self.state is DuckieState.BlindTurnLeft:
+        elif self.state is DS.BlindTurnLeft:
             self.set_leds(LEDColor.Teal, LEDIndex.Back)
             self.twist.omega = self.params["rot_omega_l"] * np.pi
-        elif self.state is DuckieState.BlindTurnRight:
+        elif self.state is DS.BlindTurnRight:
             self.set_leds(LEDColor.Magenta, LEDIndex.Back)
             self.twist.omega = -self.params["rot_omega_r"] * np.pi
         else:
@@ -406,21 +438,15 @@ class LaneFollowNode(DTROS, FrozenClass):
             self.twist.omega = 0
         else:
             # P Term
-            if self.state is DuckieState.Tracking:
-                P = -self.error * self.params["Pxt"]
-            else:
-                P = -self.error * self.Px
+            P = -self.error * self.Px
 
             # D Term
             d_error = (self.error - self.last_error) / (
-                rospy.get_time() - self.last_time
+                time.time() - self.last_time
             )
             self.last_error = self.error
-            self.last_time = rospy.get_time()
-            if self.state is DuckieState.Tracking:
-                D = d_error * self.params["Dxt"]
-            else:
-                D = d_error * self.Dx
+            self.last_time = time.time()
+            D = d_error * self.Dx
 
             self.twist.omega = P + D
 
@@ -435,9 +461,9 @@ class LaneFollowNode(DTROS, FrozenClass):
 
         Pz = -self.tracking_error * self.Pz
         d_error = self.tracking_error - self.tracking_last_error
-        d_time = rospy.get_time() - self.tracking_last_time
+        d_time = time.time() - self.tracking_last_time
         self.tracking_last_error = self.tracking_error
-        self.tracking_last_time = rospy.get_time()
+        self.tracking_last_time = time.time()
         Dz = d_error / d_time * self.Dz
         v = Pz + Dz
         v = np.sign(v) * np.clip(
@@ -467,7 +493,7 @@ class LaneFollowNode(DTROS, FrozenClass):
         """
         if (
             self.robot_transform_time is not None
-            and rospy.get_time() - self.robot_transform_time
+            and time.time() - self.robot_transform_time
             < self.params["tofdist_fusion"]
         ):
             latest_transform = self.robot_transform_queue[-1]
@@ -504,22 +530,43 @@ class LaneFollowNode(DTROS, FrozenClass):
         rate = rospy.Rate(self.params["run_rate"])
 
         while not rospy.is_shutdown():
-            rospy.loginfo_throttle(1, f"STATE: {self.state}")
+            rospy.loginfo_throttle(1, f"==== STATE: {self.state} ====")
 
-            if self.state is DuckieState.LondonStyle:
+            # ==== Initial Wait ====
+            if self.state == DS.WaitForInitialAP:
+                if self.last_seen_ap is None:
+                    pass
+                elif self.saw_first_ap_time is None:
+                    print("Saw ap tag now")
+                    self.saw_first_ap_time = time.time()
+                elif (
+                    time.time() - self.saw_first_ap_time
+                    > params["init_wait_time"]
+                ):
+                    self.state = DS.LaneFollowing
+            else:
+                print(f"===! {self.state.name} !===")
+                print(f"Saw {self.last_seen_ap.tag.name}")
+
+                rospy.signal_shutdown("Saw an AP tag")
+
+            rate.sleep()
+            continue
+
+            if self.state is DS.LondonStyle:
                 print("In london")
                 if (
                     time.time() - self.finish_help_time
                     > self.params["london_time"]
                 ):
                     print("FINISHED LONDON")
-                    self.state = DuckieState.LaneFollowing
+                    self.state = DS.LaneFollowing
                     self.offset = 220
                     continue
                 else:
                     self.follow_lane()
 
-            elif self.state is DuckieState.LaneFollowing:
+            elif self.state is DS.LaneFollowing:
                 self.set_leds(LEDColor.Green, LEDIndex.Back)
                 self.follow_lane()
                 try:
@@ -529,46 +576,46 @@ class LaneFollowNode(DTROS, FrozenClass):
                         <= self.tracking_distance
                         and not self.finished_helping
                     ):
-                        self.state = DuckieState.Tracking
+                        self.state = DS.Tracking
                 except TypeError:
                     pass
 
-            elif self.state is DuckieState.Stopped:
+            elif self.state is DS.Stopped:
                 self.set_leds(LEDColor.Red, LEDIndex.Back)
-                if rospy.get_time() - self.stop_time >= self.stop_duration:
+                if time.time() - self.stop_time >= self.stop_duration:
                     if self.robot_transform_time is None:
-                        self.state = DuckieState.LaneFollowing
+                        self.state = DS.LaneFollowing
                     elif (
-                        rospy.get_time() - self.robot_transform_time
+                        time.time() - self.robot_transform_time
                         < self.params["inter_plan_time"]
                     ):
                         self.state = self.next_blind_state
                     else:
-                        self.state = DuckieState.LaneFollowing
+                        self.state = DS.LaneFollowing
                 else:
                     self.stop_wheels()
 
             elif self.state in (
-                DuckieState.BlindTurnLeft,
-                DuckieState.BlindTurnRight,
-                DuckieState.BlindForward,
+                DS.BlindTurnLeft,
+                DS.BlindTurnRight,
+                DS.BlindForward,
             ):
-                if self.state is DuckieState.BlindTurnLeft:
+                if self.state is DS.BlindTurnLeft:
                     blind_duration = self.params["blind_duration_left"]
-                elif self.state is DuckieState.BlindTurnRight:
+                elif self.state is DS.BlindTurnRight:
                     blind_duration = self.params["blind_duration_right"]
                 else:
                     blind_duration = self.params["blind_duration_forward"]
 
                 if self.blind_start_time is None:
-                    self.blind_start_time = rospy.get_time()
-                elif rospy.get_time() - self.blind_start_time > blind_duration:
+                    self.blind_start_time = time.time()
+                elif time.time() - self.blind_start_time > blind_duration:
                     self.blind_start_time = None
-                    self.state = DuckieState.LaneFollowing
+                    self.state = DS.LaneFollowing
                 else:
                     self.drive_bindly()
 
-            elif self.state is DuckieState.Tracking:
+            elif self.state is DS.Tracking:
                 print("Tracking")
 
                 if self.tracking_start is None:
@@ -581,7 +628,7 @@ class LaneFollowNode(DTROS, FrozenClass):
                     self.finished_helping = True
                     self.finish_help_time = time.time()
                     self.set_leds(LEDColor.Magenta, LEDIndex.Back)
-                    self.state = DuckieState.LondonStyle
+                    self.state = DS.LondonStyle
                     self.offset = -220
                     continue
 
