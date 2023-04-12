@@ -127,10 +127,10 @@
       "near": 0.40,
       "far": 0.15
     },
-    "parking_forward_epsilon": 0.02,
+    "parking_forward_epsilon": 0.025,
 
     "parking_rate": 8,
-    "parking_P_x": 1.5,
+    "parking_P_x": 1.8,
     "parking_D_x": 0,
     "parking_P_o": -0.1,
     "parking_D_o": 0,
@@ -138,11 +138,11 @@
     "parking_max_v": 0.2,
     "parking_max_omega": 3,
     "parking_turn_angle": {
-      "left": -0.5,
+      "left": -0.6,
       "right": 0.5
     },
-    "parking_turn_epsilon": 0.05,
-    "parking_turn_P_o": -3,
+    "parking_turn_epsilon": 0.1,
+    "parking_turn_P_o": -9,
     "parking_turn_D_o": 0,
 
     "parking_reverse_epsilon": 0.08,
