@@ -49,6 +49,87 @@
     "stop_immunity_tracking": 5,
     "detection_publish_rate": 1,
 
+    "max_tof_distance": 1.25,
+
+    "parking_stall_number": 4,
+
+    "parking_lot": [
+      {
+        "id": 207,
+        "number": 1,
+        "side": "left",
+        "depth": "far",
+        "x": 1.62,
+        "y": 1.19
+      },
+      {
+        "id": 226,
+        "number": 2,
+        "side": "left",
+        "depth": "near",
+        "x": 1.40,
+        "y": 1.19
+      },
+      {
+        "id": 228,
+        "number": 3,
+        "side": "right",
+        "depth": "far",
+        "x": 1.62,
+        "y": 2.47
+      },
+      {
+        "id": 75,
+        "number": 4,
+        "side": "right",
+        "depth": "near",
+        "x": 1.40,
+        "y": 2.47
+      }
+    ],
+
+    "parking_stop_time": 1,
+
+    "parking_forward_distance": {
+      "near": 0.35,
+      "far": 0.12
+    },
+    "parking_forward_epsilon": 0.03,
+
+    "parking_rate": 10,
+    "parking_waiting_rate": 1,
+
+    "parking_P_x": 1.5,
+    "parking_D_x": 0,
+    "parking_max_v": 0.25,
+    "parking_max_omega": 3,
+
+    "parking_stop_tof_min": 0.5,
+
+    "parking_find_perpendicular_stop_time": 0.25,
+    "parking_find_perpendicular_rotate_time": 0.125,
+    "parking_find_perpendicular_omega": {
+      "left": -3,
+      "right": 3
+    },
+    "parking_find_perpendicular_max_total_steps": 100,
+
+    "parking_forward_constant_v": 0.2,
+    "parking_forward_time": 1,
+
+    "parking_turn_max_tof_distance": 0.82,
+    "parking_turn_omega": {
+      "left": -3.3,
+      "right": 3.3
+    },
+
+    "parking_reverse_epsilon": 0.05,
+    "parking_reverse_constant_time": 2,
+    "parking_reverse_v": -0.2,
+    "parking_reverse_target_tof_distance": 1.15,
+
+    "parking_starting_state": 0,
+
     "placeholder": false
   }
 }
