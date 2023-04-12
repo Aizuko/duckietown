@@ -8,7 +8,6 @@ from enum import IntEnum, unique
 from sensor_msgs.msg import Range
 from std_srvs.srv import Trigger, TriggerResponse
 from duckietown_msgs.msg import Twist2DStamped
-from cv_bridge import CvBridge
 import numpy as np
 
 
@@ -32,7 +31,6 @@ class ParkingNode(DTROS):
             node_name=node_name, node_type=NodeType.GENERIC
         )
         self.node_name = node_name
-        self.bridge = CvBridge()
         self.veh = rospy.get_param("~veh")
 
         with open("/params.json") as f:
@@ -45,6 +43,7 @@ class ParkingNode(DTROS):
         self.state_start_time = time.time()
 
         self.tof_distance = np.inf
+        self.twist = Twist2DStamped(v=0, omega=0)
 
         # ╔─────────────────────────────────────────────────────────────────────╗
         # │ Pαrkiηg αττribμτεs                                                  |
@@ -81,7 +80,6 @@ class ParkingNode(DTROS):
             return
 
     def tof_callback(self, msg):
-        self.tof_dist_list.append(msg.range)
         self.tof_distance = min(msg.range, self.params["max_tof_distance"])
 
     def start_callback(self):
