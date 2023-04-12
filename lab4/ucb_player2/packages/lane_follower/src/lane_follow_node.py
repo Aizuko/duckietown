@@ -49,6 +49,7 @@ class DS(IntEnum):
     Tracking = 7
     LondonStyle = 8
     WaitForCrossing = 9
+    ExitForParking = 100
 
     Stage3Parking = 30
     Stage3Parking_Turn = 32
@@ -218,6 +219,7 @@ class LaneFollowNode(DTROS, FrozenClass):
         self.next_blind_state = None
         self.blind_start_time = None
         self.is_stop_line = False
+        self.image = None
 
         # TOF
         self.tof_dist = [0.0, 0.0, 0.0]
@@ -311,9 +313,9 @@ class LaneFollowNode(DTROS, FrozenClass):
             mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE
         )
 
-        # ╔─────────────────────────────────────────────────────────────────────╗
-        # │ Sεαrch fδr lαηε iη frδητ                                            |
-        # ╚─────────────────────────────────────────────────────────────────────╝
+        # ╔────────────────────────────────────────────────────────────────────╗
+        # │ Sεαrch fδr lαηε iη frδητ                                           |
+        # ╚────────────────────────────────────────────────────────────────────╝
         areas = np.array([cv2.contourArea(a) for a in contours])
 
         if len(areas) == 0 or np.max(areas) < 20:
@@ -336,19 +338,11 @@ class LaneFollowNode(DTROS, FrozenClass):
             rect_img_msg = self.bridge.cv2_to_compressed_imgmsg(crop)
             self.pub.publish(rect_img_msg)
 
-        # ╔─────────────────────────────────────────────────────────────────────╗
-        # │ Sεαrch Dμckiεs crδssiηg                                             |
-        # ╚─────────────────────────────────────────────────────────────────────╝
-        image = img[200:-100, :, :]
-        image_width = image.shape[1]
-        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-        mask = cv2.inRange(hsv, DUCKIES_ONLY[0], DUCKIES_ONLY[1])
-        image = cv2.bitwise_and(image, image, mask=mask)
-
-        image = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
-        image[image != 0] = 1
-
-        is_seen_crossing_duck = np.sum(image) > params["crossing_sum_thresh"]
+        # ╔────────────────────────────────────────────────────────────────────╗
+        # │ Sεαrch Dμckiεs crδssiηg                                            |
+        # ╚────────────────────────────────────────────────────────────────────╝
+        self.image = img
+        is_seen_crossing_duck = self.is_seen_crossing()
 
         is_seen_crossing_ap = (
             self.last_seen_ap is not None
@@ -361,6 +355,18 @@ class LaneFollowNode(DTROS, FrozenClass):
             print("Saw duckies crossing, but not ap tag")
         elif is_seen_crossing_ap:
             print("Saw crosssing ap tag, but no ducks")
+
+    def is_seen_crossing(self):
+        image = self.image[200:-100, :, :]
+        image_width = image.shape[1]
+        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+        mask = cv2.inRange(hsv, DUCKIES_ONLY[0], DUCKIES_ONLY[1])
+        image = cv2.bitwise_and(image, image, mask=mask)
+
+        image = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
+        image[image != 0] = 1
+
+        return np.sum(image) > params["crossing_sum_thresh"]
 
     def tof_callback(self, msg):
         self.tof_dist.append(msg.range)  # Keep full backlog
@@ -435,11 +441,26 @@ class LaneFollowNode(DTROS, FrozenClass):
             rect_img_msg = self.bridge.cv2_to_compressed_imgmsg(crop)
             self.pub_red.publish(rect_img_msg)
 
+    def wait_for_crossing(self):
+        cross_rate = rospy.Rate(self.params["crossing_interval"])
+
+        is_clear = False
+
+        while True:
+            is_curr_clear = self.is_seen_crossing()
+
+            if is_clear and is_curr_clear:
+                self.state = DS.LaneFollowing
+                break
+            is_clear = is_curr_clear
+
+            cross_rate.sleep()
+
     def is_stop_immune(self):
         if self.last_stop_time is None:
             return False
         else:
-            return time.time() - self.last_stop_time < parmas["stop_immunity"]
+            return time.time() - self.last_stop_time < params["stop_immunity"]
 
     def drive_bindly(self):
         self.last_error = self.error = 0
@@ -575,8 +596,10 @@ class LaneFollowNode(DTROS, FrozenClass):
                     pass
             elif self.state is DS.Stopped:
                 if self.last_seen_ap is None:
-                    self.state = DS.ShuttingDown
-                    print("Failed to see an ap tag before this turn")
+                    self.state = DS.LaneFollowing
+                    print(
+                        "Failed to see an ap tag before this turn... Going to keep following"
+                    )
                 elif self.last_seen_ap.tag == TagType.ForwardStop:
                     self.state = DS.BlindForward
                 elif self.last_seen_ap.tag == TagType.LeftStop:
@@ -605,6 +628,11 @@ class LaneFollowNode(DTROS, FrozenClass):
                     self.state = DS.LaneFollowing
                 else:
                     self.drive_bindly()
+            elif self.state == DS.WaitForCrossing:
+                self.wait_for_crossing()
+            elif self.state == DS.ExitForParking:
+                print("It's all on you steven. Good luck!")
+                break
             else:
                 print(f"===! {self.state.name} !===")
                 if self.last_seen_ap is not None:
@@ -616,97 +644,93 @@ class LaneFollowNode(DTROS, FrozenClass):
 
             rate.sleep()
             continue
+        return
 
-            # ======================================================================
-            # ======================================================================
-            # ======================================================================
+        # ==================================================================
+        # ==================================================================
+        # ==================================================================
 
-            if self.state is DS.LondonStyle:
-                print("In london")
-                if (
-                    time.time() - self.finish_help_time
-                    > self.params["london_time"]
-                ):
-                    print("FINISHED LONDON")
-                    self.state = DS.LaneFollowing
-                    self.offset = 220
-                    continue
-                else:
-                    self.follow_lane()
-
-            elif self.state is DS.LaneFollowing:
-                self.set_leds(LEDColor.Green, LEDIndex.Back)
-                self.follow_lane()
-                try:
-                    if (
-                        self.distance_to_robot_ahead() is not None
-                        and self.distance_to_robot_ahead()
-                        <= self.tracking_distance
-                        and not self.finished_helping
-                    ):
-                        self.state = DS.Tracking
-                except TypeError:
-                    pass
-
-            elif self.state is DS.Stopped:
-                self.set_leds(LEDColor.Red, LEDIndex.Back)
-                if not self.is_stop_immune():
-                    if self.robot_transform_time is None:
-                        self.state = DS.LaneFollowing
-                    elif (
-                        time.time() - self.robot_transform_time
-                        < self.params["inter_plan_time"]
-                    ):
-                        self.state = self.next_blind_state
-                    else:
-                        self.state = DS.LaneFollowing
-                else:
-                    self.stop_wheels()
-
-            elif self.state in (
-                DS.BlindTurnLeft,
-                DS.BlindTurnRight,
-                DS.BlindForward,
-            ):
-                if self.state is DS.BlindTurnLeft:
-                    blind_duration = self.params["blind_duration_left"]
-                elif self.state is DS.BlindTurnRight:
-                    blind_duration = self.params["blind_duration_right"]
-                else:
-                    blind_duration = self.params["blind_duration_forward"]
-
-                if self.blind_start_time is None:
-                    self.blind_start_time = time.time()
-                elif time.time() - self.blind_start_time > blind_duration:
-                    self.blind_start_time = None
-                    self.state = DS.LaneFollowing
-                else:
-                    self.drive_bindly()
-
-            elif self.state is DS.Tracking:
-                print("Tracking")
-
-                if self.tracking_start is None:
-                    self.tracking_start = time.time()
-                elif (
-                    time.time() - self.tracking_start
-                    > self.params["wait_to_help"]
-                ):
-                    print("Ended waiting to help")
-                    self.finished_helping = True
-                    self.finish_help_time = time.time()
-                    self.set_leds(LEDColor.Magenta, LEDIndex.Back)
-                    self.state = DS.LondonStyle
-                    self.offset = -220
-                    continue
-
-                self.set_leds(LEDColor.Blue, LEDIndex.Back)
-                self.track_bot()
-
+        """
+        if self.state is DS.LondonStyle:
+            print("In london")
+            if time.time() - self.finish_help_time > self.params["london_time"]:
+                print("FINISHED LONDON")
+                self.state = DS.LaneFollowing
+                self.offset = 220
+                continue
             else:
-                raise Exception(f"Invalid state {self.state}")
+                self.follow_lane()
 
-            rate.sleep()
+        elif self.state is DS.LaneFollowing:
+            self.set_leds(LEDColor.Green, LEDIndex.Back)
+            self.follow_lane()
+            try:
+                if (
+                    self.distance_to_robot_ahead() is not None
+                    and self.distance_to_robot_ahead() <= self.tracking_distance
+                    and not self.finished_helping
+                ):
+                    self.state = DS.Tracking
+            except TypeError:
+                pass
+
+        elif self.state is DS.Stopped:
+            self.set_leds(LEDColor.Red, LEDIndex.Back)
+            if not self.is_stop_immune():
+                if self.robot_transform_time is None:
+                    self.state = DS.LaneFollowing
+                elif (
+                    time.time() - self.robot_transform_time
+                    < self.params["inter_plan_time"]
+                ):
+                    self.state = self.next_blind_state
+                else:
+                    self.state = DS.LaneFollowing
+            else:
+                self.stop_wheels()
+
+        elif self.state in (
+            DS.BlindTurnLeft,
+            DS.BlindTurnRight,
+            DS.BlindForward,
+        ):
+            if self.state is DS.BlindTurnLeft:
+                blind_duration = self.params["blind_duration_left"]
+            elif self.state is DS.BlindTurnRight:
+                blind_duration = self.params["blind_duration_right"]
+            else:
+                blind_duration = self.params["blind_duration_forward"]
+
+            if self.blind_start_time is None:
+                self.blind_start_time = time.time()
+            elif time.time() - self.blind_start_time > blind_duration:
+                self.blind_start_time = None
+                self.state = DS.LaneFollowing
+            else:
+                self.drive_bindly()
+
+        elif self.state is DS.Tracking:
+            print("Tracking")
+
+            if self.tracking_start is None:
+                self.tracking_start = time.time()
+            elif (
+                time.time() - self.tracking_start > self.params["wait_to_help"]
+            ):
+                print("Ended waiting to help")
+                self.finished_helping = True
+                self.finish_help_time = time.time()
+                self.set_leds(LEDColor.Magenta, LEDIndex.Back)
+                self.state = DS.LondonStyle
+                self.offset = -220
+                continue
+
+            self.set_leds(LEDColor.Blue, LEDIndex.Back)
+            self.track_bot()
+
+        else:
+            raise Exception(f"Invalid state {self.state}")
+        """
 
     def on_shutdown(self):
         print("SHUTTING DOWN")
@@ -724,4 +748,4 @@ if __name__ == "__main__":
     node = LaneFollowNode("lanefollow_node")
     rospy.on_shutdown(node.on_shutdown)
     node.run()
-    rospy.spin()  # Just in case?
+    # rospy.spin()  # Just in case?
