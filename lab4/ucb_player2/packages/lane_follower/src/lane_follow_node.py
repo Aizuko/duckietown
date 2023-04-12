@@ -16,6 +16,7 @@ from geometry_msgs.msg import TransformStamped
 from sensor_msgs.msg import CameraInfo, CompressedImage, Range
 from std_msgs.msg import ColorRGBA
 from std_msgs.msg import Float32, Float64
+from std_srvs.srv import TriggerRequest
 from cv_bridge import CvBridge
 from geometry_msgs.msg import Transform, Vector3, TransformStamped
 from tf2_ros import Buffer, TransformListener
@@ -285,6 +286,9 @@ class LaneFollowNode(DTROS, FrozenClass):
             Vector3,
             self.ap_callback,
             queue_size=1,
+        )
+        self.start_parking_serv = rospy.ServiceProxy(
+            f"/{self.veh}/parking_node/start", TriggerRequest
         )
 
         self._freeze()  # Now disallow any new attributes
@@ -632,6 +636,7 @@ class LaneFollowNode(DTROS, FrozenClass):
                 self.wait_for_crossing()
             elif self.state == DS.ExitForParking:
                 print("It's all on you steven. Good luck!")
+                self.start_parking_serv()
                 break
             else:
                 print(f"===! {self.state.name} !===")
