@@ -461,7 +461,9 @@ class LaneFollowNode(DTROS, FrozenClass):
             cross_rate.sleep()
 
     def is_stop_immune(self):
-        if self.last_stop_time is None:
+        if self.state == DS.ExitForParking:
+            return True
+        elif self.last_stop_time is None:
             return False
         else:
             return time.time() - self.last_stop_time < params["stop_immunity"]
@@ -604,6 +606,10 @@ class LaneFollowNode(DTROS, FrozenClass):
                     print(
                         "Failed to see an ap tag before this turn... Going to keep following"
                     )
+                elif self.last_seen_ap == DS.ParkingLotEnteringStop:
+                    self.state = DS.ExitForParking
+                    for _ in range(9):
+                        self.stop_wheels()
                 elif self.last_seen_ap.tag == TagType.ForwardStop:
                     self.state = DS.BlindForward
                 elif self.last_seen_ap.tag == TagType.LeftStop:
@@ -632,6 +638,8 @@ class LaneFollowNode(DTROS, FrozenClass):
                     self.state = DS.LaneFollowing
                 else:
                     self.drive_bindly()
+            elif self.state == DS.Tracking:
+                self.stop_wheels()
             elif self.state == DS.WaitForCrossing:
                 self.wait_for_crossing()
             elif self.state == DS.ExitForParking:
