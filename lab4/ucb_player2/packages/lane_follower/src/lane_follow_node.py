@@ -297,7 +297,7 @@ class LaneFollowNode(DTROS, FrozenClass):
     def ajoin_callback(self, msg):
         self.lane_callback(msg)
 
-        if self.state is not DS.Stopped:
+        if self.state is not DS.Stopped and self.state != DS.WaitForCrossing:
             self.stop_callback(msg)
 
     def lane_callback(self, msg):
@@ -311,7 +311,9 @@ class LaneFollowNode(DTROS, FrozenClass):
             mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE
         )
 
-        # Search for lane in front
+        # ╔─────────────────────────────────────────────────────────────────────╗
+        # │ Sεαrch fδr lαηε iη frδητ                                            |
+        # ╚─────────────────────────────────────────────────────────────────────╝
         areas = np.array([cv2.contourArea(a) for a in contours])
 
         if len(areas) == 0 or np.max(areas) < 20:
@@ -333,6 +335,32 @@ class LaneFollowNode(DTROS, FrozenClass):
         if self.is_debug:
             rect_img_msg = self.bridge.cv2_to_compressed_imgmsg(crop)
             self.pub.publish(rect_img_msg)
+
+        # ╔─────────────────────────────────────────────────────────────────────╗
+        # │ Sεαrch Dμckiεs crδssiηg                                             |
+        # ╚─────────────────────────────────────────────────────────────────────╝
+        image = img[200:-100, :, :]
+        image_width = image.shape[1]
+        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+        mask = cv2.inRange(hsv, DUCKIES_ONLY[0], DUCKIES_ONLY[1])
+        image = cv2.bitwise_and(image, image, mask=mask)
+
+        image = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
+        image[image != 0] = 1
+
+        is_seen_crossing_duck = np.sum(image) > params["crossing_sum_thresh"]
+
+        is_seen_crossing_ap = (
+            self.last_seen_ap is not None
+            and self.last_seen_ap.tag == TagType.CrossingStop
+        )
+
+        if is_seen_crossing_duck and is_seen_crossing_ap:
+            self.state = DS.WaitForCrossing
+        elif is_seen_crossing_duck:
+            print("Saw duckies crossing, but not ap tag")
+        elif is_seen_crossing_ap:
+            print("Saw crosssing ap tag, but no ducks")
 
     def tof_callback(self, msg):
         self.tof_dist.append(msg.range)  # Keep full backlog
@@ -374,6 +402,11 @@ class LaneFollowNode(DTROS, FrozenClass):
     def stop_callback(self, msg):
         if self.is_stop_immune():
             return
+        elif (
+            self.last_seen_ap is not None
+            and self.last_seen_ap.tag == TagType.CrossingStop
+        ):
+            pass
 
         img = self.bridge.compressed_imgmsg_to_cv2(msg, "bgr8")
         crop = img[400:-1, :, :]
@@ -424,7 +457,6 @@ class LaneFollowNode(DTROS, FrozenClass):
         else:
             raise Exception(f"Invalid state `{self.state}` for blind driving")
 
-        # rospy.loginfo(f"Publishing blind movements for state {self.state.name}")
         self.vel_pub.publish(self.twist)
 
     def pid_x(self, p_coef=1):
@@ -585,9 +617,9 @@ class LaneFollowNode(DTROS, FrozenClass):
             rate.sleep()
             continue
 
-        # ======================================================================
-        # ======================================================================
-        # ======================================================================
+            # ======================================================================
+            # ======================================================================
+            # ======================================================================
 
             if self.state is DS.LondonStyle:
                 print("In london")

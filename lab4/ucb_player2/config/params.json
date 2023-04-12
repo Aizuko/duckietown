@@ -13,6 +13,7 @@
     "blind_duration_forward": 2,
     "blind_duration_left": 3.9,
     "blind_duration_right": 1.7,
+    "crossing_sum_thresh": 5000,
 
     "Px": 0.049,
     "Dx": -0.004,
