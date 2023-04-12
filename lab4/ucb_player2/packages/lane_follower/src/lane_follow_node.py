@@ -387,27 +387,27 @@ class LaneFollowNode(DTROS, FrozenClass):
             )
         )
 
-        time = time.time()
+        now = time.time()
         ltime = self.stop_time
 
         if is_stopline and self.state is DS.Tracking:
             if (
                 ltime is None
-                or time - ltime > self.params["stop_immunity_tracking"]
+                or now - ltime > self.params["stop_immunity_tracking"]
             ):
                 self.state = DS.Stopped
-                self.stop_time = time
+                self.stop_time = now
             else:
                 self.is_stop_line = True
         elif (
             is_stopline
             and self.state is DS.LaneFollowing
-            and (ltime is None or time - ltime > self.params["stop_immunity"])
+            and (ltime is None or now - ltime > self.params["stop_immunity"])
         ):
             self.is_stop_line = True
         elif not is_stopline and self.is_stop_line:
             self.state = DS.Stopped
-            self.stop_time = time
+            self.stop_time = now
             self.is_stop_line = False
 
         if self.is_debug:
