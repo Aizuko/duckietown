@@ -1,5 +1,10 @@
 {
   "default": {
+    "init_wait_time": 3,
+    "starting_state": 1,
+
+    "ap_rate": 3,
+
     "Px": 0.049,
     "Dx": -0.004,
     "Pxt": 0.008,
