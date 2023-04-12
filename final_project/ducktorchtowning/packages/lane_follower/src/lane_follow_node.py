@@ -602,17 +602,6 @@ class LaneFollowNode(DTROS):
         for i in range(8):
             self.vel_pub.publish(self.twist)
 
-    def parking_stop_state(self):
-        self.state_start_time = time.time()
-        rate = rospy.Rate(self.params["parking_rate"])
-        while time.time() - self.state_start_time < self.params["parking_stop_time"]:
-            self.twist.v = 0
-            self.twist.omega = 0
-            self.vel_pub.publish(self.twist)
-            rate.sleep()
-
-        self.state = DS.Stage3Parking_Forward
-
     def parking_pid(self, error, P_, D_):
         P = error * P_
         d_error = error - self.parking_last_error / (
@@ -634,13 +623,16 @@ class LaneFollowNode(DTROS):
         self.twist.v = v
         self.twist.omega = omega
 
-    def filter_parking_contours(self, contour):
-        # ratio of contour y length to x length
-        x, y, w, h = cv.boundingRect(contour)
-        if h == 0:
-            return False
-        aspect_ratio = w / h
-        return aspect_ratio > self.params["parking_lane_aspect_ratio"]
+    def parking_stop_state(self):
+        self.state_start_time = time.time()
+        rate = rospy.Rate(self.params["parking_rate"])
+        while time.time() - self.state_start_time < self.params["parking_stop_time"]:
+            self.twist.v = 0
+            self.twist.omega = 0
+            self.vel_pub.publish(self.twist)
+            rate.sleep()
+
+        self.state = DS.Stage3Parking_Forward
 
     def parking_forward_state(self):
         rate = rospy.Rate(1 / self.params["parking_forward_time"])
