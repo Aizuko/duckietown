@@ -367,16 +367,6 @@ class LaneFollowNode(DTROS, FrozenClass):
         )
         self.robot_transform_queue.append(T)
 
-        y_rote = tr.euler_from_matrix(T)[1]
-
-        if y_rote > self.params["left_rot"]:
-            self.next_blind_state = DS.BlindTurnLeft
-        elif y_rote < self.params["right_rot"]:
-            self.next_blind_state = DS.BlindTurnRight
-        else:
-            self.next_blind_state = DS.BlindForward
-
-        rospy.loginfo_throttle(1, f"{y_rote}")
         self.robot_transform_time = msg.header.stamp.to_sec()
 
     def stop_callback(self, msg):
@@ -419,7 +409,7 @@ class LaneFollowNode(DTROS, FrozenClass):
         print("Looking at crossing")
         cross_rate = rospy.Rate(self.params["crossing_interval"])
 
-        is_clear_consecutive = 0
+        consecutive_clears = 0
 
         while True:
             is_curr_clear = not self.is_seen_crossing()
@@ -434,6 +424,23 @@ class LaneFollowNode(DTROS, FrozenClass):
                 break
 
             cross_rate.sleep()
+
+        start_time = time.time()
+        rate2 = rospy.Rate(10)
+
+        self.twist.v = 0.2
+        self.twist.omega = 0.0
+        while time.time() - start_time < self.params["crossing_forward_time"]:
+            self.vel_pub.publish(self.twist)
+            rate2.sleep()
+
+        for _ in range(4):
+            self.stop_wheels()
+        rate2.sleep()
+        rate2.sleep()
+        rate2.sleep()
+        rate2.sleep()
+
 
     def is_stop_immune(self):
         if self.state == DS.ExitForParking or self.state == DS.LondonStyle:
@@ -469,8 +476,14 @@ class LaneFollowNode(DTROS, FrozenClass):
         # 7. Go a bit forward (duplicate 2)
         # 8. Stop (duplicate 5)
         london_night = rospy.Rate(self.params["london_sleep_time"])
+        rate2 = rospy.Rate(self.params["london_rate"])
 
-        if self.london_stage == 0:
+        for _ in range(4):
+            self.stop_wheels()
+        london_night.sleep()
+
+        # if self.london_stage == 0:
+        if True:
             # ==== 1. Go a bit back and turn left ====
             self.twist.omega = self.params["london_rev_o"]
             self.twist.v = self.params["london_rev_v"]
@@ -479,6 +492,7 @@ class LaneFollowNode(DTROS, FrozenClass):
 
             while time.time() - start_time < self.params["london_back_time"]:
                 self.vel_pub.publish(self.twist)
+                rate2.sleep()
 
             # ==== 2. Stop ====
             for _ in range(4):
@@ -493,17 +507,24 @@ class LaneFollowNode(DTROS, FrozenClass):
 
             while time.time() - start_time < self.params["london_forward_time"]:
                 self.vel_pub.publish(self.twist)
+                rate2.sleep()
 
             # ==== 4. English driver for Ns ====
             self.london_stage = 1
-            self.london_start_time = time.time()
-            self.offset = self.params["london_follow_offset"]
-            self.state = DS.LondonStyle
+            # self.london_start_time = time.time()
+            # self.state = DS.LondonStyle
+            self.twist.omega = self.params["london_forward3_o"]
+            self.twist.v = self.params["london_forward3_v"]
 
-            return
-        else:
-            self.offset = self.params["lane_follow_offset"]
+            start_time = time.time()
 
+            while (
+                time.time() - start_time < self.params["london_forward3_time"]
+            ):
+                self.vel_pub.publish(self.twist)
+                rate2.sleep()
+
+        if True:
             # ==== 5. Stop (duplicate 2) ====
             for _ in range(4):
                 self.stop_wheels()
@@ -519,6 +540,7 @@ class LaneFollowNode(DTROS, FrozenClass):
                 time.time() - start_time < self.params["london_forward2_time"]
             ):
                 self.vel_pub.publish(self.twist)
+                rate2.sleep()
 
             # ==== 8. Stop (duplicate 2) ====
             for _ in range(4):
@@ -585,24 +607,23 @@ class LaneFollowNode(DTROS, FrozenClass):
 
     def is_robot_ahead(self):
         """Returns true if a robot is ahead within distance"""
-        if (
-            self.robot_transform_time is not None
-            and time.time() - self.robot_transform_time
-            < self.params["tofdist_fusion"]
+        if self.robot_transform_time is None:
+            return False
+        elif (
+            time.time() - self.robot_transform_time
+            > self.params["robot_ahead_stale_time"]
         ):
-            latest_transform = self.robot_transform_queue[-1]
-            latest_translate = latest_transform[:3, 3]
-            if self.params["print_distance"]:
-                rospy.loginfo(
-                    f"{np.linalg.norm(latest_translate)}, {self.tof_dist[-1]}"
-                )
-            dist = np.linalg.norm(latest_translate)
-            if dist <= self.tracking_distance:
-                return False
-            else:
-                return True
+            return False
 
-        return False
+        latest_transform = self.robot_transform_queue[-1]
+        latest_translate = latest_transform[:3, 3]
+        if self.params["print_distance"]:
+            rospy.loginfo(
+                f"{np.linalg.norm(latest_translate)}, {self.tof_dist[-1]}"
+            )
+
+        dist = np.linalg.norm(latest_translate)
+        return dist <= self.tracking_distance
 
     def run(self):
         rate = rospy.Rate(self.params["run_rate"])
