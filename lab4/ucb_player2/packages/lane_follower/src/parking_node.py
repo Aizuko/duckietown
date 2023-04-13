@@ -82,7 +82,7 @@ class ParkingNode(DTROS):
     def tof_callback(self, msg):
         self.tof_distance = min(msg.range, self.params["max_tof_distance"])
 
-    def start_callback(self):
+    def start_callback(self, _):
         self.state = ParkingState.Stop
         return 1
 
