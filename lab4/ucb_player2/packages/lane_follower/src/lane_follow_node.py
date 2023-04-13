@@ -11,7 +11,7 @@ import numpy as np
 import rospy
 from cv_bridge import CvBridge
 from duckietown.dtros import DTROS, NodeType
-from duckietown_msgs.msg import LEDPattern, Twist2DStamped, WheelsCmdStamped
+from duckietown_msgs.msg import Twist2DStamped, WheelsCmdStamped
 from geometry_msgs.msg import TransformStamped
 from sensor_msgs.msg import CameraInfo, CompressedImage, Range
 from std_msgs.msg import ColorRGBA
@@ -53,35 +53,6 @@ class DS(IntEnum):
 
     ShuttingDown = 90
     ExitForParking = 100
-
-
-@unique
-class LEDColor(Enum):
-    Red = [1.0, 0.0, 0.0]
-    Green = [0.0, 1.0, 0.0]
-    Blue = [0.0, 0.0, 1.0]
-    Yellow = [1.0, 1.0, 0.0]
-    Teal = [0.0, 1.0, 1.0]
-    Magenta = [1.0, 0.0, 1.0]
-    Off = [0.0, 0.0, 0.0]
-
-
-@unique
-class LEDIndex(Enum):
-    # 0 == front left
-    # 1 == NONE
-    # 2 == front right
-    # 3 == back right
-    # 4 == back left
-    All = set(range(0, 5))
-    Left = set([0, 4])
-    Right = set([2, 3])
-    Back = set([3, 4])
-    Front = set([0, 2])
-    BackLeft = set([4])
-    BackRight = set([3])
-    FrontLeft = set([0])
-    FrontRight = set([2])
 
 
 class TagType(IntEnum):
@@ -251,11 +222,6 @@ class LaneFollowNode(DTROS, FrozenClass):
         self.vel_pub = rospy.Publisher(
             f"/{self.veh}/car_cmd_switch_node/cmd",
             Twist2DStamped,
-            queue_size=1,
-        )
-        self.led_pub = rospy.Publisher(
-            f"/{self.veh}/led_emitter_node/led_pattern",
-            LEDPattern,
             queue_size=1,
         )
         self.sub = rospy.Subscriber(
@@ -474,13 +440,10 @@ class LaneFollowNode(DTROS, FrozenClass):
         self.twist.v = self.velocity
 
         if self.state is DS.BlindForward:
-            self.set_leds(LEDColor.Yellow, LEDIndex.Back)
             self.twist.omega = 0
         elif self.state is DS.BlindTurnLeft:
-            self.set_leds(LEDColor.Teal, LEDIndex.Back)
             self.twist.omega = self.params["rot_omega_l"] * np.pi
         elif self.state is DS.BlindTurnRight:
-            self.set_leds(LEDColor.Magenta, LEDIndex.Back)
             self.twist.omega = -self.params["rot_omega_r"] * np.pi
         else:
             raise Exception(f"Invalid state `{self.state}` for blind driving")
@@ -568,10 +531,6 @@ class LaneFollowNode(DTROS, FrozenClass):
 
         return False
 
-    @lru_cache(maxsize=1)
-    def set_leds(self, color: LEDColor, index_set: LEDIndex):
-        return
-
     def run(self):
         rate = rospy.Rate(self.params["run_rate"])
 
@@ -592,7 +551,6 @@ class LaneFollowNode(DTROS, FrozenClass):
                     self.state = DS.LaneFollowing
             # ==== Lane following ====
             elif self.state is DS.LaneFollowing:
-                self.set_leds(LEDColor.Green, LEDIndex.Back)
                 self.follow_lane()
 
                 try:
@@ -760,10 +718,8 @@ class LaneFollowNode(DTROS, FrozenClass):
         self.twist.omega = 0
 
         self.vel_pub.publish(self.twist)
-        self.set_leds(LEDColor.Off, LEDIndex.All)
         for i in range(8):
             self.vel_pub.publish(self.twist)
-            self.set_leds(LEDColor.Off, LEDIndex.All)
 
 
 if __name__ == "__main__":
