@@ -183,6 +183,7 @@ class LaneFollowNode(DTROS, FrozenClass):
         self.Dx = self.params["Dx"]
 
         # New bits!!!
+        self.has_seen_parking = False
         self.saw_first_ap_time = None
         self.tracking_start = None
         self.is_started_helping = False
@@ -297,8 +298,11 @@ class LaneFollowNode(DTROS, FrozenClass):
         # Don't do any ap callbacks in the parking state
         if DS.Stage3Parking <= self.state < DS.Stage3Parking + 10:
             return
-        #print(f"Saw an ap with {msg.y}")
+        # print(f"Saw an ap with {msg.y}")
         self.last_seen_ap = SeenAP(TagType(int(msg.y)), msg.x)
+
+        if self.last_seen_ap.tag == TagType.ParkingLotEnteringStop:
+            self.has_seen_parking = True
 
     def ajoin_callback(self, msg):
         self.lane_callback(msg)
@@ -360,10 +364,10 @@ class LaneFollowNode(DTROS, FrozenClass):
             self.state = DS.WaitForCrossing
         elif is_seen_crossing_duck:
             pass
-            #print("Saw duckies crossing, but not ap tag")
+            # print("Saw duckies crossing, but not ap tag")
         elif is_seen_crossing_ap:
             pass
-            #print("Saw crosssing ap tag, but no ducks")
+            # print("Saw crosssing ap tag, but no ducks")
 
     def is_seen_crossing(self):
         image = self.image[200:-100, :, :]
@@ -580,14 +584,14 @@ class LaneFollowNode(DTROS, FrozenClass):
         rate = rospy.Rate(self.params["run_rate"])
 
         while not rospy.is_shutdown():
-            rospy.loginfo_throttle(1, f"==== STATE: {self.state} ====")
+            rospy.loginfo_throttle(1, f"==== STATE: {self.state.name} ====")
 
             # ==== Initial Wait ====
             if self.state == DS.WaitForInitialAP:
                 if self.last_seen_ap is None:
                     pass
                 elif self.saw_first_ap_time is None:
-                    #print("Saw ap tag now")
+                    # print("Saw ap tag now")
                     self.saw_first_ap_time = time.time()
                 elif (
                     time.time() - self.saw_first_ap_time
@@ -606,15 +610,16 @@ class LaneFollowNode(DTROS, FrozenClass):
                 except TypeError:
                     pass
             elif self.state is DS.Stopped:
-                if self.last_seen_ap is None:
+                if self.has_seen_parking:
+                    self.state = DS.ExitForParking
+                    for _ in range(9):
+                        self.stop_wheels()
+                    continue
+                elif self.last_seen_ap is None:
                     self.state = DS.LaneFollowing
                     print(
                         "Failed to see an ap tag before this turn... Going to keep following"
                     )
-                elif self.last_seen_ap == TagType.ParkingLotEnteringStop:
-                    self.state = DS.ExitForParking
-                    for _ in range(9):
-                        self.stop_wheels()
                 elif self.last_seen_ap.tag == TagType.ForwardStop:
                     self.state = DS.BlindForward
                 elif self.last_seen_ap.tag == TagType.LeftStop:
