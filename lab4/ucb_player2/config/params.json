@@ -18,7 +18,7 @@
     "blind_duration_right": 1.7,
     "crossing_sum_thresh": 7000,
 
-    "Px": 0.029,
+    "Px": 0.026,
     "Dx": -0.004,
     "velocity": 0.2,
 
@@ -93,7 +93,7 @@
     "parking_stop_time": 1,
 
     "parking_forward_distance": {
-      "near": 0.35,
+      "near": 0.38,
       "far": 0.12
     },
     "parking_forward_epsilon": 0.03,
