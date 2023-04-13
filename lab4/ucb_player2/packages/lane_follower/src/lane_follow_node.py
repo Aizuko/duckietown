@@ -592,16 +592,11 @@ class LaneFollowNode(DTROS, FrozenClass):
         ):
             latest_transform = self.robot_transform_queue[-1]
             latest_translate = latest_transform[:3, 3]
-            tof_dist_transformed = (
-                self.params["tof_a"] * self.tof_dist[-1] + self.params["tof_b"]
-            )
             if self.params["print_distance"]:
                 rospy.loginfo(
-                    f"{np.linalg.norm(latest_translate)}, {self.tof_dist[-1]}, {tof_dist_transformed}"
+                    f"{np.linalg.norm(latest_translate)}, {self.tof_dist[-1]}"
                 )
-
-            dist = min(np.linalg.norm(latest_translate), tof_dist_transformed)
-
+            dist = np.linalg.norm(latest_translate)
             if dist <= self.tracking_distance:
                 return False
             else:
