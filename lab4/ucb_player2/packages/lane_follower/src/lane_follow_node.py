@@ -208,7 +208,7 @@ class LaneFollowNode(DTROS, FrozenClass):
         # │ Dyηαmic ναriαblεs                                                  |
         # ╚────────────────────────────────────────────────────────────────────╝
         # State
-        self.state = self.params["starting_state"]
+        self.state = DS(self.params["starting_state"])
 
         # PID Variables
         self.error = None  # Error off target
