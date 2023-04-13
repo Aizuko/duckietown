@@ -52,7 +52,7 @@
     "is_american": true,
     "safe_distance": 0.12,
     "stop_duration": 1,
-    "tracking_distance": 0.25,
+    "tracking_distance": 0.5,
     "tracking_timeout": 2,
     "stopline_area_min": 1500,
     "stopline_area_max": 4000,
