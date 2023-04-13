@@ -139,7 +139,7 @@ class LaneFollowNode(DTROS, FrozenClass):
         self.last_seen_ap = None
 
         # Lane following
-        self.offset = 220
+        self.offset = self.params["lane_follow_offset"]
 
         self.min_velocity = self.params["min_velocity"]
         self.velocity = self.params["velocity"]
@@ -494,12 +494,12 @@ class LaneFollowNode(DTROS, FrozenClass):
             # ==== 4. English driver for Ns ====
             self.london_stage = 1
             self.london_start_time = time.time()
-            self.offset *= -1
+            self.offset = self.params["london_follow_offset"]
             self.state = DS.LondonStyle
 
             return
         else:
-            self.offset *= -1
+            self.offset = self.params["lane_follow_offset"]
 
             # ==== 5. Stop (duplicate 2) ====
             for _ in range(4):

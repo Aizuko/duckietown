@@ -5,6 +5,7 @@
     "starting_state": 1,
     "run_rate": 3,
     "crossing_interval": 0.3,
+    "lane_follow_offset": 220,
 
     "ap_rate": 3,
     "min_ap_dist": 3,
@@ -21,6 +22,23 @@
     "Px": 0.026,
     "Dx": -0.004,
     "velocity": 0.2,
+
+
+    "london_sleep_time": 0.5,
+    "london_rev_o": 0.4,
+    "london_rev_v": 0.3,
+    "london_back_time": 1.5,
+    "london_forward_o": 0,
+    "london_forward_v": 0.2,
+    "london_forward_time": 1,
+    "london_driving_time": 5,
+    "london_forward2_o": 0.4,
+    "london_forward2_v": 0.2,
+    "london_forward2_time": 1,
+    "london_follow_offset": -220,
+
+
+
 
     "Pxt": 0.008,
     "Dxt": -0.0004,
