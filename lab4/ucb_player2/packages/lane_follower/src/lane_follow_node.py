@@ -50,14 +50,9 @@ class DS(IntEnum):
     Tracking = 7
     LondonStyle = 8
     WaitForCrossing = 9
-    ExitForParking = 100
-
-    Stage3Parking = 30
-    Stage3Parking_Turn = 32
-    Stage3Parking_Reverse = 33
-    Stage3Parking_ThinkDuck = 39
 
     ShuttingDown = 90
+    ExitForParking = 100
 
 
 @unique
@@ -295,9 +290,6 @@ class LaneFollowNode(DTROS, FrozenClass):
         self._freeze()  # Now disallow any new attributes
 
     def ap_callback(self, msg):
-        # Don't do any ap callbacks in the parking state
-        if DS.Stage3Parking <= self.state < DS.Stage3Parking + 10:
-            return
         # print(f"Saw an ap with {msg.y}")
         self.last_seen_ap = SeenAP(TagType(int(msg.y)), msg.x)
 
