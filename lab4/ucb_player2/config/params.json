@@ -153,8 +153,8 @@
       "right": 3.3
     },
 
-    "parking_reverse_epsilon": 0.05,
-    "parking_reverse_constant_time": 2,
+    "parking_reverse_epsilon": 0.03,
+    "parking_reverse_constant_time": 1.8,
     "parking_reverse_v": -0.2,
     "parking_reverse_target_tof_distance": 1.15,
 
