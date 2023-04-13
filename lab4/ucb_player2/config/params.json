@@ -4,7 +4,7 @@
     "init_wait_time": 3,
     "starting_state": 1,
     "run_rate": 3,
-    "crossing_interval": 0.5,
+    "crossing_interval": 0.3,
 
     "ap_rate": 3,
     "min_ap_dist": 3,
@@ -16,7 +16,7 @@
     "blind_duration_forward": 4,
     "blind_duration_left": 2.9,
     "blind_duration_right": 1.7,
-    "crossing_sum_thresh": 7000,
+    "crossing_sum_thresh": 4000,
 
     "Px": 0.026,
     "Dx": -0.004,

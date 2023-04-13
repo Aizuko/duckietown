@@ -319,24 +319,23 @@ class LaneFollowNode(DTROS, FrozenClass):
         )
 
         if is_seen_crossing_duck and is_seen_crossing_ap:
+            #print("BOTH")
             self.state = DS.WaitForCrossing
-        elif is_seen_crossing_duck:
-            pass
-            # print("Saw duckies crossing, but not ap tag")
-        elif is_seen_crossing_ap:
-            pass
-            # print("Saw crosssing ap tag, but no ducks")
+        #elif is_seen_crossing_duck:
+        #    print("Saw duckies crossing, but not ap tag")
+        #elif is_seen_crossing_ap:
+        #    print("Saw crosssing ap tag, but no ducks")
 
     def is_seen_crossing(self):
-        image = self.image[200:-100, :, :]
-        image_width = image.shape[1]
+        image = self.image[200:, :, :]
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
         mask = cv2.inRange(hsv, DUCKIES_ONLY[0], DUCKIES_ONLY[1])
         image = cv2.bitwise_and(image, image, mask=mask)
-
         image = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
         image[image != 0] = 1
 
+        if self.state == DS.WaitForCrossing:
+            print(f"Sum: {np.sum(image)} / {params['crossing_sum_thresh']}")
         return np.sum(image) > params["crossing_sum_thresh"]
 
     def tof_callback(self, msg):
@@ -413,12 +412,16 @@ class LaneFollowNode(DTROS, FrozenClass):
             self.pub_red.publish(rect_img_msg)
 
     def wait_for_crossing(self):
+        print("Looking at crossing")
         cross_rate = rospy.Rate(self.params["crossing_interval"])
 
         is_clear = False
 
         while True:
-            is_curr_clear = self.is_seen_crossing()
+            is_curr_clear = not self.is_seen_crossing()
+
+            if is_curr_clear:
+                print("All clear!!!")
 
             if is_clear and is_curr_clear:
                 self.state = DS.LaneFollowing
