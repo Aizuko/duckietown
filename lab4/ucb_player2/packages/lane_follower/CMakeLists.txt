@@ -11,11 +11,26 @@ find_package(catkin REQUIRED COMPONENTS
 
 add_dependencies(${catkin_EXPORTED_TARGETS})
 
-catkin_package(
-   CATKIN_DEPENDS
-   message_runtime
-)
-
 include_directories(
   ${catkin_INCLUDE_DIRS}
 )
+
+add_service_files(
+  DIRECTORY srv
+  FILES
+  StartParking.srv
+)
+
+generate_messages(
+  DEPENDENCIES
+  std_msgs
+)
+
+find_package(catkin REQUIRED COMPONENTS
+  roscpp
+  rospy
+  std_msgs
+  message_generation
+)
+
+catkin_package()

@@ -1,5 +1,6 @@
 {
   "default": {
+    "is_debug": true,
     "init_wait_time": 3,
     "starting_state": 1,
     "run_rate": 3,
@@ -17,8 +18,10 @@
     "blind_duration_right": 1.7,
     "crossing_sum_thresh": 7000,
 
-    "Px": 0.049,
+    "Px": 0.029,
     "Dx": -0.004,
+    "velocity": 0.2,
+
     "Pxt": 0.008,
     "Dxt": -0.0004,
     "Pz": 0.2,
@@ -27,9 +30,7 @@
     "london_time": 6,
     "min_velocity": 0,
     "max_velocity": 0.2,
-    "velocity": 0.2,
     "is_american": true,
-    "is_debug": true,
     "safe_distance": 0.12,
     "stop_duration": 1,
     "tracking_distance": 0.25,

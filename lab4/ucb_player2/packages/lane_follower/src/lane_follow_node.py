@@ -16,7 +16,7 @@ from geometry_msgs.msg import TransformStamped
 from sensor_msgs.msg import CameraInfo, CompressedImage, Range
 from std_msgs.msg import ColorRGBA
 from std_msgs.msg import Float32, Float64
-from std_srvs.srv import TriggerRequest
+from lane_follower.srv import StartParking, StartParkingResponse
 from cv_bridge import CvBridge
 from geometry_msgs.msg import Transform, Vector3, TransformStamped
 from tf2_ros import Buffer, TransformListener
@@ -288,7 +288,7 @@ class LaneFollowNode(DTROS, FrozenClass):
             queue_size=1,
         )
         self.start_parking_serv = rospy.ServiceProxy(
-            f"/{self.veh}/parking_node/start", TriggerRequest
+            f"/{self.veh}/parking_node/start", StartParking
         )
 
         self._freeze()  # Now disallow any new attributes
@@ -297,7 +297,7 @@ class LaneFollowNode(DTROS, FrozenClass):
         # Don't do any ap callbacks in the parking state
         if DS.Stage3Parking <= self.state < DS.Stage3Parking + 10:
             return
-        print(f"Saw an ap with {msg.y}")
+        #print(f"Saw an ap with {msg.y}")
         self.last_seen_ap = SeenAP(TagType(int(msg.y)), msg.x)
 
     def ajoin_callback(self, msg):
@@ -345,6 +345,9 @@ class LaneFollowNode(DTROS, FrozenClass):
         # ╔────────────────────────────────────────────────────────────────────╗
         # │ Sεαrch Dμckiεs crδssiηg                                            |
         # ╚────────────────────────────────────────────────────────────────────╝
+        if self.state == DS.Stopped or self.state == DS.WaitForCrossing:
+            return
+
         self.image = img
         is_seen_crossing_duck = self.is_seen_crossing()
 
@@ -356,9 +359,11 @@ class LaneFollowNode(DTROS, FrozenClass):
         if is_seen_crossing_duck and is_seen_crossing_ap:
             self.state = DS.WaitForCrossing
         elif is_seen_crossing_duck:
-            print("Saw duckies crossing, but not ap tag")
+            pass
+            #print("Saw duckies crossing, but not ap tag")
         elif is_seen_crossing_ap:
-            print("Saw crosssing ap tag, but no ducks")
+            pass
+            #print("Saw crosssing ap tag, but no ducks")
 
     def is_seen_crossing(self):
         image = self.image[200:-100, :, :]
@@ -582,7 +587,7 @@ class LaneFollowNode(DTROS, FrozenClass):
                 if self.last_seen_ap is None:
                     pass
                 elif self.saw_first_ap_time is None:
-                    print("Saw ap tag now")
+                    #print("Saw ap tag now")
                     self.saw_first_ap_time = time.time()
                 elif (
                     time.time() - self.saw_first_ap_time
@@ -606,7 +611,7 @@ class LaneFollowNode(DTROS, FrozenClass):
                     print(
                         "Failed to see an ap tag before this turn... Going to keep following"
                     )
-                elif self.last_seen_ap == DS.ParkingLotEnteringStop:
+                elif self.last_seen_ap == TagType.ParkingLotEnteringStop:
                     self.state = DS.ExitForParking
                     for _ in range(9):
                         self.stop_wheels()
@@ -640,6 +645,7 @@ class LaneFollowNode(DTROS, FrozenClass):
                     self.drive_bindly()
             elif self.state == DS.Tracking:
                 self.stop_wheels()
+                todo("Make the wheels move after")
             elif self.state == DS.WaitForCrossing:
                 self.wait_for_crossing()
             elif self.state == DS.ExitForParking:

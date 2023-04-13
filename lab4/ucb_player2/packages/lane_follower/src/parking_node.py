@@ -6,7 +6,7 @@ import json
 from duckietown.dtros import DTROS, NodeType
 from enum import IntEnum, unique
 from sensor_msgs.msg import Range
-from std_srvs.srv import Trigger, TriggerResponse
+from lane_follower.srv import StartParking, StartParkingResponse
 from duckietown_msgs.msg import Twist2DStamped
 import numpy as np
 
@@ -68,7 +68,7 @@ class ParkingNode(DTROS):
             queue_size=1,
         )
         self.start_service = rospy.Service(
-            "~start", Trigger, self.start_callback
+            "~start", StartParking, self.start_callback
         )
 
         self.timer = rospy.Timer(rospy.Duration(1), self.debug_callback)
@@ -84,7 +84,7 @@ class ParkingNode(DTROS):
 
     def start_callback(self):
         self.state = ParkingState.Stop
-        return TriggerResponse(success=True, message="Started Parking")
+        return 1
 
     def run(self):
         rospy.loginfo_throttle(1, f"State: {self.state.name}")
