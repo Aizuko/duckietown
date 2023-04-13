@@ -157,7 +157,7 @@ class ParkingNode(DTROS):
         # move forward for a parameterized amount of time
         rate = rospy.Rate(1 / self.params["parking_forward_time"])
         self.twist.v = self.params["parking_forward_constant_v"]
-        self.twist.omega = 0
+        self.twist.omega = self.params["parking_forward_constant_omega"]
         self.vel_pub.publish(self.twist)
         rate.sleep()
 
@@ -292,3 +292,4 @@ class ParkingNode(DTROS):
 if __name__ == "__main__":
     node = ParkingNode("parking_node")
     node.wait()
+    rospy.spin()
