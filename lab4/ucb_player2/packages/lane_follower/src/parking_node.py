@@ -193,8 +193,6 @@ class ParkingNode(DTROS):
             1 / self.params["parking_find_perpendicular_stop_time"]
         )
         min_tof_distance = self.params["max_tof_distance"]
-        side = self.parking_stall["side"]
-        omega = self.params["parking_find_perpendicular_omega"][side]
         step = 0
         max_step = 1
         add = 1
@@ -205,8 +203,9 @@ class ParkingNode(DTROS):
             )
             rospy.loginfo(f"tof_distance: {self.tof_distance}")
             rospy.loginfo(f"min_tof_distance: {min_tof_distance}")
-            rospy.loginfo(f"omega: {omega}")
             self.twist.v = 0
+            omega = self.params["parking_find_perpendicular_omega"][str(add)]
+            rospy.loginfo(f"omega: {omega}")
             self.twist.omega = omega
             self.vel_pub.publish(self.twist)
             rate_rotate.sleep()
@@ -215,7 +214,6 @@ class ParkingNode(DTROS):
             self.vel_pub.publish(self.twist)
             rate_stop.sleep()
             if step == max_step:
-                omega = -omega
                 max_step += add
                 max_step *= -1
                 add *= -1
@@ -225,7 +223,6 @@ class ParkingNode(DTROS):
                 and self.tof_distance > ignore_tof_min
             ):
                 min_tof_distance = self.tof_distance
-                omega = self.params["parking_find_perpendicular_omega"][side]
                 step = 0
                 max_step = 1
                 add = 1

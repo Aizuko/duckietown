@@ -111,10 +111,10 @@
     "parking_find_perpendicular_stop_time": 0.25,
     "parking_find_perpendicular_rotate_time": 0.125,
     "parking_find_perpendicular_omega": {
-      "left": -3,
-      "right": 3
+      "-1": -3,
+      "1": 4
     },
-    "parking_find_perpendicular_max_total_steps": 100,
+    "parking_find_perpendicular_max_total_steps": 30,
 
     "parking_forward_constant_v": 0.2,
     "parking_forward_time": 1,
