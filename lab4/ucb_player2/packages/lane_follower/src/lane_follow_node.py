@@ -660,6 +660,11 @@ class LaneFollowNode(DTROS, FrozenClass):
 
             rate.sleep()
             continue
+
+        self.sub.unregister()
+        self.tof_sub.unregister()
+        self.robot_ahead_transform_sub.unregister()
+        self.ap_sub.unregister()
         return
 
         # ==================================================================
@@ -750,6 +755,7 @@ class LaneFollowNode(DTROS, FrozenClass):
 
     def on_shutdown(self):
         print("SHUTTING DOWN")
+        rospy.signal_shutdown("Taking down lane follower")
         self.twist.v = 0
         self.twist.omega = 0
 
@@ -764,4 +770,4 @@ if __name__ == "__main__":
     node = LaneFollowNode("lanefollow_node")
     rospy.on_shutdown(node.on_shutdown)
     node.run()
-    # rospy.spin()  # Just in case?
+    rospy.spin()  # Just in case?
