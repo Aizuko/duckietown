@@ -149,12 +149,14 @@ class LaneFollowNode(DTROS, FrozenClass):
         self.Dx = self.params["Dx"]
 
         # New bits!!!
+        self.london_start_time = None
         self.has_seen_parking = False
         self.saw_first_ap_time = None
         self.tracking_start = None
         self.is_started_helping = False
         self.finished_helping = False
         self.finish_help_time = None
+        self.london_stage = 0
 
         # Stopping
         self.stop_duration = self.params["stop_duration"]
@@ -319,11 +321,11 @@ class LaneFollowNode(DTROS, FrozenClass):
         )
 
         if is_seen_crossing_duck and is_seen_crossing_ap:
-            #print("BOTH")
+            # print("BOTH")
             self.state = DS.WaitForCrossing
-        #elif is_seen_crossing_duck:
+        # elif is_seen_crossing_duck:
         #    print("Saw duckies crossing, but not ap tag")
-        #elif is_seen_crossing_ap:
+        # elif is_seen_crossing_ap:
         #    print("Saw crosssing ap tag, but no ducks")
 
     def is_seen_crossing(self):
@@ -431,7 +433,7 @@ class LaneFollowNode(DTROS, FrozenClass):
             cross_rate.sleep()
 
     def is_stop_immune(self):
-        if self.state == DS.ExitForParking:
+        if self.state == DS.ExitForParking or self.state == DS.LondonStyle:
             return True
         elif self.last_stop_time is None:
             return False
@@ -452,6 +454,76 @@ class LaneFollowNode(DTROS, FrozenClass):
             raise Exception(f"Invalid state `{self.state}` for blind driving")
 
         self.vel_pub.publish(self.twist)
+
+    def london_style(self):
+        # Plan
+        # 1. Go a bit back and turn left
+        # 2. Stop
+        # 3. Go a bit forward
+        # 4. English driver for Ns
+        # 5. Stop
+        # 6. Turn a bit right
+        # 7. Go a bit forward (duplicate 2)
+        # 8. Stop (duplicate 5)
+        london_night = rospy.Rate(self.params["london_sleep_time"])
+
+        if self.london_stage == 0:
+            # ==== 1. Go a bit back and turn left ====
+            self.twist.omega = self.params["london_rev_o"]
+            self.twist.v = self.params["london_rev_v"]
+
+            start_time = time.time()
+
+            while time.time() - start_time < self.params["london_back_time"]:
+                self.vel_pub.publish(self.twist)
+
+            # ==== 2. Stop ====
+            for _ in range(4):
+                self.stop_wheels()
+            london_night.sleep()
+
+            # ==== 3. Go a bit forward ====
+            self.twist.omega = self.params["london_forward_o"]
+            self.twist.v = self.params["london_forward_v"]
+
+            start_time = time.time()
+
+            while time.time() - start_time < self.params["london_forward_time"]:
+                self.vel_pub.publish(self.twist)
+
+            # ==== 4. English driver for Ns ====
+            self.london_stage = 1
+            self.london_start_time = time.time()
+            self.offset *= -1
+            self.state = DS.LondonStyle
+
+            return
+        else:
+            self.offset *= -1
+
+            # ==== 5. Stop (duplicate 2) ====
+            for _ in range(4):
+                self.stop_wheels()
+            london_night.sleep()
+
+            # ==== 6. Go forward and turn a bit right ====
+            self.twist.omega = self.params["london_forward2_o"]
+            self.twist.v = self.params["london_forward2_v"]
+
+            start_time = time.time()
+
+            while (
+                time.time() - start_time < self.params["london_forward2_time"]
+            ):
+                self.vel_pub.publish(self.twist)
+
+            # ==== 8. Stop (duplicate 2) ====
+            for _ in range(4):
+                self.stop_wheels()
+            london_night.sleep()
+
+            self.london_stage = 0
+            return
 
     def pid_x(self, p_coef=1):
         if self.error is None:
@@ -562,6 +634,15 @@ class LaneFollowNode(DTROS, FrozenClass):
                         self.is_started_helping = True
                 except TypeError:
                     pass
+            # ==== London following ====
+            elif self.state is DS.LondonStyle:
+                if (
+                    time.time() - self.london_start_time
+                    > self.params["london_driving_time"]
+                ):
+                    self.state = DS.Tracking
+                    continue
+            # ==== Stopping ====
             elif self.state is DS.Stopped:
                 if self.has_seen_parking:
                     self.state = DS.ExitForParking
@@ -603,7 +684,7 @@ class LaneFollowNode(DTROS, FrozenClass):
                     self.drive_bindly()
             elif self.state == DS.Tracking:
                 self.stop_wheels()
-                todo("Make the wheels move after")
+                self.london_style()
             elif self.state == DS.WaitForCrossing:
                 self.wait_for_crossing()
             elif self.state == DS.ExitForParking:
