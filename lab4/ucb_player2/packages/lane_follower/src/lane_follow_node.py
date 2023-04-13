@@ -28,6 +28,7 @@ ROAD_MASK = [(10, 60, 165), (40, 255, 255)]
 # STOP_MASK = [(0, 70, 150), (20, 255, 255)]
 STOP_MASK = [(0, 100, 120), (10, 255, 255)]
 DUCKIES_ONLY = [(0, 55, 145), (20, 255, 255)]
+BLUELINE = [(85, 60, 85), (120, 255, 160)]
 
 OFF_COLOR = ColorRGBA()
 OFF_COLOR.r = OFF_COLOR.g = OFF_COLOR.b = OFF_COLOR.a = 0.0
@@ -272,6 +273,8 @@ class LaneFollowNode(DTROS, FrozenClass):
 
     def lane_callback(self, msg):
         img = self.bridge.compressed_imgmsg_to_cv2(msg, "bgr8")
+        self.image = img
+
         crop = img[300:-1, :, :]
         crop_width = crop.shape[1]
         hsv = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
@@ -312,7 +315,6 @@ class LaneFollowNode(DTROS, FrozenClass):
         if self.state == DS.Stopped or self.state == DS.WaitForCrossing:
             return
 
-        self.image = img
         is_seen_crossing_duck = self.is_seen_crossing()
 
         is_seen_crossing_ap = (
@@ -329,7 +331,7 @@ class LaneFollowNode(DTROS, FrozenClass):
         #    print("Saw crosssing ap tag, but no ducks")
 
     def is_seen_crossing(self):
-        image = self.image[200:, :, :]
+        image = self.image[300:-100, :, :]
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
         mask = cv2.inRange(hsv, DUCKIES_ONLY[0], DUCKIES_ONLY[1])
         image = cv2.bitwise_and(image, image, mask=mask)
@@ -417,18 +419,19 @@ class LaneFollowNode(DTROS, FrozenClass):
         print("Looking at crossing")
         cross_rate = rospy.Rate(self.params["crossing_interval"])
 
-        is_clear = False
+        is_clear_consecutive = 0
 
         while True:
             is_curr_clear = not self.is_seen_crossing()
 
             if is_curr_clear:
-                print("All clear!!!")
+                consecutive_clears += 1
+            else:
+                consecutive_clears = 0
 
-            if is_clear and is_curr_clear:
-                self.state = DS.LaneFollowing
+            if consecutive_clears >= self.params["crossing_consec_thresh"]:
+                print("All clear!!! Onwards")
                 break
-            is_clear = is_curr_clear
 
             cross_rate.sleep()
 
@@ -686,7 +689,10 @@ class LaneFollowNode(DTROS, FrozenClass):
                 self.stop_wheels()
                 self.london_style()
             elif self.state == DS.WaitForCrossing:
+                for _ in range(8):
+                    self.stop_wheels()
                 self.wait_for_crossing()
+                self.state = DS.LaneFollowing
             elif self.state == DS.ExitForParking:
                 print("It's all on you steven. Good luck!")
                 self.start_parking_serv()
