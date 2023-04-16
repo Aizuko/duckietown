@@ -120,7 +120,7 @@
     "parking_stop_time": 1,
 
     "parking_forward_distance": {
-      "near": 0.38,
+      "near": 0.37,
       "far": 0.12
     },
     "parking_forward_epsilon": 0.03,
@@ -153,9 +153,9 @@
       "right": 3.5
     },
 
-    "parking_reverse_epsilon": 0.035,
-    "parking_reverse_constant_time": 2,
-    "parking_reverse_v": -0.225,
+    "parking_reverse_epsilon": 0.03,
+    "parking_reverse_constant_time": 1.8,
+    "parking_reverse_v": -0.2,
     "parking_reverse_target_tof_distance": 1.15,
 
     "parking_starting_state": 0,
