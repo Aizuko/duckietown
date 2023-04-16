@@ -1,0 +1,165 @@
+{
+  "default": {
+    "is_debug": true,
+    "init_wait_time": 3,
+    "starting_state": 1,
+    "run_rate": 3,
+    "crossing_interval": 0.3,
+    "lane_follow_offset": 240,
+
+    "ap_rate": 3,
+    "min_ap_dist": 3,
+    "stop_immunity": 5,
+
+    "#rot_omega_l": 0.65,
+    "rot_omega_l": 0.80,
+    "rot_omega_r": 1.15,
+    "blind_duration_forward": 4,
+    "blind_duration_left": 2.9,
+    "blind_duration_right": 1.7,
+    "crossing_sum_thresh": 8000,
+    "crossing_consec_thresh": 3,
+    "crossing_forward_v": 0.2,
+    "crossing_forward_o": 0,
+    "crossing_forward_time": 2,
+
+    "Px": 0.032,
+    "Dx": -0.005,
+    "velocity": 0.2,
+
+
+    "london_rate": 10,
+    "london_sleep_time": 1,
+    "london_rev_o": 1.5,
+    "london_rev_v": -0.3,
+    "london_back_time": 0.5,
+    "london_forward_o": 0,
+    "london_forward_v": 0.2,
+    "london_forward_time": 1,
+    "london_driving_time": 3,
+    "london_forward2_o": -2,
+    "london_forward2_v": 0.2,
+    "london_forward2_time": 2,
+    "london_forward3_o": -0.3,
+    "london_forward3_v": 0.2,
+    "london_forward3_time": 3,
+    "london_follow_offset": -220,
+    "robot_ahead_stale_time": 2,
+
+
+
+
+    "Pxt": 0.008,
+    "Dxt": -0.0004,
+    "Pz": 0.2,
+    "Dz": -0.004,
+    "wait_to_help": 3,
+    "london_time": 6,
+    "min_velocity": 0,
+    "max_velocity": 0.2,
+    "is_american": true,
+    "safe_distance": 0.12,
+    "stop_duration": 1,
+    "tracking_distance": 0.8,
+    "tracking_timeout": 2,
+    "stopline_area_min": 1500,
+    "stopline_area_max": 4000,
+    "deque_maxlen": 8,
+    "left_rot": 0.25,
+    "right_rot": -0.25,
+    "track_omega_thresh": 100,
+    "inter_plan_time": 8,
+    "no_led": false,
+    "clip_velocity": -0.2,
+    "tofdist_fusion": 2,
+    "tof_a": 0.592,
+    "tof_b": 0.0617,
+    "print_distance": true,
+    "stop_immunity_tracking": 5,
+    "detection_publish_rate": 1,
+
+    "max_tof_distance": 1.25,
+
+    "parking_stall_number": 3,
+
+    "parking_lot": [
+      {
+        "id": 207,
+        "number": 1,
+        "side": "left",
+        "depth": "far",
+        "x": 1.62,
+        "y": 1.19
+      },
+      {
+        "id": 226,
+        "number": 2,
+        "side": "left",
+        "depth": "near",
+        "x": 1.40,
+        "y": 1.19
+      },
+      {
+        "id": 228,
+        "number": 3,
+        "side": "right",
+        "depth": "far",
+        "x": 1.62,
+        "y": 2.47
+      },
+      {
+        "id": 75,
+        "number": 4,
+        "side": "right",
+        "depth": "near",
+        "x": 1.40,
+        "y": 2.47
+      }
+    ],
+
+    "parking_stop_time": 1,
+
+    "parking_forward_distance": {
+      "near": 0.37,
+      "far": 0.12
+    },
+    "parking_forward_epsilon": 0.03,
+
+    "parking_rate": 10,
+    "parking_waiting_rate": 1,
+
+    "parking_P_x": 1.5,
+    "parking_D_x": 0,
+    "parking_max_v": 0.25,
+    "parking_max_omega": 3,
+
+    "parking_stop_tof_min": 0.35,
+
+    "parking_find_perpendicular_stop_time": 0.25,
+    "parking_find_perpendicular_rotate_time": 0.25,
+    "parking_find_perpendicular_omega": {
+      "-1": -4,
+      "1": 2
+    },
+    "parking_find_perpendicular_max_total_steps": 30,
+
+    "parking_forward_constant_v": 0.2,
+    "parking_forward_constant_omega": -0.4,
+    "parking_forward_time": 1,
+
+    "parking_turn_max_tof_distance": 0.82,
+    "parking_turn_omega": {
+      "left": -3.5,
+      "right": 3.5
+    },
+
+    "parking_reverse_epsilon": 0.03,
+    "parking_reverse_constant_time": 1.8,
+    "parking_reverse_v": -0.2,
+    "parking_reverse_target_tof_distance": 1.15,
+
+    "parking_starting_state": 0,
+
+    "placeholder": false
+  }
+}

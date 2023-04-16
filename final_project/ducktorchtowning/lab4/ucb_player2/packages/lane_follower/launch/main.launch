@@ -1,0 +1,16 @@
+
+
+
+
+
+<launch>
+    <arg name="veh" doc="Name of vehicle. ex: megaman"/>
+    <include file="$(find duckiebot_detection)/launch/duckiebot_detection_node.launch">
+    </include>
+    <include file="$(find lane_follower)/launch/lane_follower.launch">
+        <arg name="veh" value="$(arg veh)"/>
+    </include>
+    <include file="$(find apriltag)/launch/apriltag.launch">
+        <arg name="veh" value="$(arg veh)"/>
+    </include>
+</launch>

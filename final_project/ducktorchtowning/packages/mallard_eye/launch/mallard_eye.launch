@@ -1,0 +1,11 @@
+<launch>
+  <arg name="veh"/>
+  <group ns="$(arg veh)">
+    <node pkg="mallard_eye"
+        type="mallard_eye_node.py"
+        name="mallard_eye"
+        output="screen">
+      <param name="veh" value="$(arg veh)"/>
+    </node>
+  </group>
+</launch>

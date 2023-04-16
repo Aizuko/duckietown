@@ -21,8 +21,8 @@ dt-launchfile-init
 #dt-exec roslaunch lane_finder lane_finder.launch veh:="$VEHICLE_NAME"
 #dt-exec roslaunch lane_follower lane_follower.launch veh:="$VEHICLE_NAME"
 
-dt-exec roslaunch deadreckoning main.launch veh:="$VEHICLE_NAME"
-#dt-exec roslaunch mallard_creator mallard_creator.launch veh:="$VEHICLE_NAME"
+#dt-exec roslaunch deadreckoning main.launch veh:="$VEHICLE_NAME"
+dt-exec roslaunch mallard_creator mallard_creator.launch veh:="$VEHICLE_NAME"
 
 # roscore&
 # sleep 5
