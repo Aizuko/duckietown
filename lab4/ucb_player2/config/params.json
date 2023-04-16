@@ -5,7 +5,7 @@
     "starting_state": 1,
     "run_rate": 3,
     "crossing_interval": 0.3,
-    "lane_follow_offset": 220,
+    "lane_follow_offset": 240,
 
     "ap_rate": 3,
     "min_ap_dist": 3,
@@ -37,9 +37,9 @@
     "london_forward_v": 0.2,
     "london_forward_time": 1,
     "london_driving_time": 3,
-    "london_forward2_o": -0.6,
+    "london_forward2_o": -2,
     "london_forward2_v": 0.2,
-    "london_forward2_time": 1,
+    "london_forward2_time": 2,
     "london_forward3_o": -0.3,
     "london_forward3_v": 0.2,
     "london_forward3_time": 3,
@@ -80,7 +80,7 @@
 
     "max_tof_distance": 1.25,
 
-    "parking_stall_number": 4,
+    "parking_stall_number": 3,
 
     "parking_lot": [
       {
@@ -136,7 +136,7 @@
     "parking_stop_tof_min": 0.35,
 
     "parking_find_perpendicular_stop_time": 0.25,
-    "parking_find_perpendicular_rotate_time": 0.15,
+    "parking_find_perpendicular_rotate_time": 0.25,
     "parking_find_perpendicular_omega": {
       "-1": -4,
       "1": 2
@@ -149,13 +149,13 @@
 
     "parking_turn_max_tof_distance": 0.82,
     "parking_turn_omega": {
-      "left": -3.3,
-      "right": 3.3
+      "left": -3.5,
+      "right": 3.5
     },
 
-    "parking_reverse_epsilon": 0.05,
+    "parking_reverse_epsilon": 0.035,
     "parking_reverse_constant_time": 2,
-    "parking_reverse_v": -0.2,
+    "parking_reverse_v": -0.225,
     "parking_reverse_target_tof_distance": 1.15,
 
     "parking_starting_state": 0,

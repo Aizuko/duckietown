@@ -27,7 +27,8 @@ from tf import transformations as tr
 ROAD_MASK = [(10, 60, 165), (40, 255, 255)]
 # STOP_MASK = [(0, 70, 150), (20, 255, 255)]
 STOP_MASK = [(0, 100, 120), (10, 255, 255)]
-DUCKIES_ONLY = [(0, 55, 145), (20, 255, 255)]
+# DUCKIES_ONLY = [(0, 55, 145), (20, 255, 255)]
+DUCKIES_ONLY = [(10, 55, 145), (20, 255, 255)]
 BLUELINE = [(85, 60, 85), (120, 255, 160)]
 
 OFF_COLOR = ColorRGBA()
@@ -441,7 +442,6 @@ class LaneFollowNode(DTROS, FrozenClass):
         rate2.sleep()
         rate2.sleep()
 
-
     def is_stop_immune(self):
         if self.state == DS.ExitForParking or self.state == DS.LondonStyle:
             return True
@@ -673,6 +673,11 @@ class LaneFollowNode(DTROS, FrozenClass):
                     print(
                         "Failed to see an ap tag before this turn... Going to keep following"
                     )
+                elif self.last_seen_ap.tag == TagType.CrossingStop:
+                    cross_rate2 = rospy.Rate(2)
+                    for _ in range(8):
+                        cross_rate2.sleep()
+                    self.state = DS.LaneFollowing
                 elif self.last_seen_ap.tag == TagType.ForwardStop:
                     self.state = DS.BlindForward
                 elif self.last_seen_ap.tag == TagType.LeftStop:
@@ -704,6 +709,7 @@ class LaneFollowNode(DTROS, FrozenClass):
             elif self.state == DS.Tracking:
                 self.stop_wheels()
                 self.london_style()
+                self.state = DS.LaneFollowing
             elif self.state == DS.WaitForCrossing:
                 for _ in range(8):
                     self.stop_wheels()
