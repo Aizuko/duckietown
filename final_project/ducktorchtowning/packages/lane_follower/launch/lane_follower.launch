@@ -10,5 +10,8 @@
         <node name="$(arg node_name)" pkg="$(arg pkg_name)" type="$(arg node_name).py" output="screen" required="true">
             <param name="veh" value="$(arg veh)" />
         </node>
+        <node name="parking_node" pkg="$(arg pkg_name)" type="parking_node.py" output="screen" required="true">
+            <param name="veh" value="$(arg veh)" />
+        </node>
     </group>
 </launch>

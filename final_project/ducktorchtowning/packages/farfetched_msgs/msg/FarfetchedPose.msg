@@ -1,3 +1,0 @@
-Header header
-int32 horizontal_target_err
-bool is_yellow_detected

@@ -65,25 +65,11 @@ class AprilTagNode(DTROS):
         self.img_pub = rospy.Publisher(
             "~compressed", CompressedImage, queue_size=1
         )
-
-        self.pub_teleport = rospy.Publisher(
-            f"/{self.hostname}/deadreckoning_node/teleport",
-            Transform,
-            queue_size=1,
-        )
-
         self.pub_ap_detection = rospy.Publisher(
             f"/{self.hostname}/ap_node/ap_detection",
             Vector3,
             queue_size=1,
         )
-
-        self.pub_ap_position = rospy.Publisher(
-            f"/{self.hostname}/ap_node/ap_position",
-            Vector3,
-            queue_size=1,
-        )
-
         self.compressed_sub = rospy.Subscriber(
             f"/{self.hostname}/camera_node/image/compressed",
             CompressedImage,
@@ -129,6 +115,7 @@ class AprilTagNode(DTROS):
         )
 
     def render_tag(self, image: np.ndarray, detection: Detection):
+        return
         for i in range(4):
             tag = TAG_ID_TO_TAG.get(
                 detection.tag_id, Tag(detection.tag_id, None, 0)
@@ -136,13 +123,13 @@ class AprilTagNode(DTROS):
             corner_a = detection.corners[i]
             corner_b = detection.corners[(i + 1) % 4]
             bgr = tag.color[::-1]
-            cv2.line(
-                image,
-                corner_a.astype(np.int64),
-                corner_b.astype(np.int64),
-                bgr,
-                2,
-            )
+            # cv2.line(
+            #    image,
+            #    corner_a.astype(np.int64),
+            #    corner_b.astype(np.int64),
+            #    bgr,
+            #    2,
+            # )
             text = str(detection.tag_id)
             font = cv2.FONT_HERSHEY_SIMPLEX
             center = detection.center.astype(np.int64)
@@ -190,73 +177,8 @@ class AprilTagNode(DTROS):
             if distance < min_distance:
                 min_distance = distance
                 closest_tag_id = tag_id
-            transforms.append(transform_stamped)
-        self.tf_broadcaster.sendTransform(transforms)
 
-        if closest_tag_id is not None and min_distance < 0.5:
-            try:
-                transform_odometry_at = self.tf_buffer.lookup_transform(
-                    f"at_{closest_tag_id}",
-                    "odometry",
-                    rospy.Time(0),
-                    rospy.Duration(1.0),
-                ).transform
-            except ConnectivityException as e:
-                rospy.logwarn_throttle(1.0, str(e))
-                return
-            except:
-                rospy.logwarn_throttle(1.0, "Another exception fired")
-                return
-            translate = [
-                transform_odometry_at.translation.x,
-                transform_odometry_at.translation.y,
-                transform_odometry_at.translation.z,
-            ]
-            T_odometry_at = tr.compose_matrix(
-                translate=(translate),
-                angles=tr.euler_from_quaternion(
-                    [
-                        transform_odometry_at.rotation.x,
-                        transform_odometry_at.rotation.y,
-                        transform_odometry_at.rotation.z,
-                        transform_odometry_at.rotation.w,
-                    ]
-                ),
-            )
-            try:
-                transform_at_static_world = self.tf_buffer.lookup_transform(
-                    "world",
-                    f"at_{closest_tag_id}_static",
-                    rospy.Time(0),
-                    rospy.Duration(1.0),
-                ).transform
-            except Exception as e:
-                rospy.logwarn_throttle(1.0, str(e))
-                return
-            T_at_static_world = tr.compose_matrix(
-                translate=(
-                    [
-                        transform_at_static_world.translation.x,
-                        transform_at_static_world.translation.y,
-                        transform_at_static_world.translation.z,
-                    ]
-                ),
-                angles=tr.euler_from_quaternion(
-                    [
-                        transform_at_static_world.rotation.x,
-                        transform_at_static_world.rotation.y,
-                        transform_at_static_world.rotation.z,
-                        transform_at_static_world.rotation.w,
-                    ]
-                ),
-            )
-            T_odometry_world = T_at_static_world @ T_odometry_at
-            translation = tr.translation_from_matrix(T_odometry_world)
-            q = tr.quaternion_from_matrix(T_odometry_world)
-            transform_odometry_world = Transform(
-                translation=Vector3(*translation), rotation=Quaternion(*q)
-            )
-
+        if closest_tag_id is not None:
             self.pub_ap_detection.publish(
                 Vector3(
                     min_distance,
@@ -264,8 +186,6 @@ class AprilTagNode(DTROS):
                     0.0,
                 )
             )
-            self.pub_teleport.publish(transform_odometry_world)
-            self.pub_ap_position.publish(Vector3(*translation))
 
         return closest_tag_id
 
@@ -280,8 +200,10 @@ class AprilTagNode(DTROS):
             image = self.rectify(image)
             grayscale = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
             detections = self.detect(grayscale)
+
             for detection in detections:
                 self.render_tag(image, detection)
+
             self.broadcast_transforms(detections)
             message = self.bridge.cv2_to_compressed_imgmsg(
                 image, dst_format="jpeg"

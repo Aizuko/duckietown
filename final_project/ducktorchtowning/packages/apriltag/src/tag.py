@@ -52,10 +52,11 @@ TAG_ID_TO_TAG = {
     50: Tag(56, TagType.LeftStop, 2),
     56: Tag(56, TagType.ForwardStop, 3),
     163: Tag(163, TagType.CrossingStop, 4),
+    21: Tag(21, TagType.CrossingStop, 4),
     38: Tag(38, TagType.ParkingLotEnteringStop, 5),
+    227: Tag(227, TagType.ParkingLot, 5),
     75: Tag(75, TagType.ParkingLot, 0),
     207: Tag(207, TagType.ParkingLot, 0),
     226: Tag(226, TagType.ParkingLot, 0),
-    227: Tag(227, TagType.ParkingLot, 0),
     228: Tag(228, TagType.ParkingLot, 0),
 }

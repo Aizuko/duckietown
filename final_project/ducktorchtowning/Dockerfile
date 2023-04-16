@@ -1,8 +1,7 @@
 # parameters
-ARG REPO_NAME="duckietown"
-ARG DESCRIPTION="Lab Exercise 3 - Computer Vision for Robotics"
-ARG MAINTAINER="Akemi Izuko <izuko@ualberta.ca>"
-ARG MAINTAINER="Steven Tang (stang5@ualberta.ca)"
+ARG REPO_NAME="LAB_4"
+ARG DESCRIPTION="StartCode"
+ARG MAINTAINER="Unmaintained"
 # pick an icon from: https://fontawesome.com/v4.7.0/icons/
 ARG ICON="cube"
 
@@ -76,7 +75,7 @@ RUN dt-install-launchers "${LAUNCH_PATH}"
 # define default command
 CMD ["bash", "-c", "dt-launcher-${DT_LAUNCHER}"]
 
-## copy the params
+# copy the params
 COPY ./config/params.json /
 
 # store module metadata
